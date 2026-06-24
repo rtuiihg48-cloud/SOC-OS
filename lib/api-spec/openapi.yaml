@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SOC OS - Self-Healing Security Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Security event operations
+  - name: simulation
+    description: Self-healing simulation
+  - name: dashboard
+    description: Dashboard and analytics
 paths:
   /healthz:
     get:
@@ -24,6 +30,134 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List all security events
+      description: Returns full memory chain of security events
+      responses:
+        "200":
+          description: List of security events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SecurityEvent"
+    post:
+      operationId: processEvent
+      tags: [events]
+      summary: Process a security event
+      description: Runs event through detection engine and returns risk score and action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "200":
+          description: Processed event result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityEvent"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get a single security event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Security event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityEvent"
+        "404":
+          description: Not found
+
+  /self-test:
+    post:
+      operationId: runSelfTest
+      tags: [simulation]
+      summary: Run self red-team test
+      description: Simulates attacks against own system and returns found vulnerabilities
+      responses:
+        "200":
+          description: Self-test results with vulnerabilities and patches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelfTestResult"
+
+  /simulate:
+    post:
+      operationId: runSimulation
+      tags: [simulation]
+      summary: Run full self-healing simulation
+      description: Runs complete SOC cycle with detection, response, self-red-team and auto-fix
+      responses:
+        "200":
+          description: Full simulation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulationResult"
+
+  /patches:
+    get:
+      operationId: listPatches
+      tags: [events]
+      summary: List all auto-applied patches
+      description: Returns all SOAR patches applied by the auto-heal engine
+      responses:
+        "200":
+          description: List of applied patches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patch"
+
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get dashboard summary
+      description: Returns aggregated security metrics and recent activity
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /threat-graph:
+    get:
+      operationId: getThreatGraph
+      tags: [dashboard]
+      summary: Get threat graph
+      description: Returns attack graph with nodes and edges for visualization
+      responses:
+        "200":
+          description: Threat graph data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreatGraph"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +168,204 @@ components:
       required:
         - status
 
+    SecurityEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        event:
+          type: string
+        score:
+          type: integer
+        action:
+          type: string
+          enum: [ALLOW, WARN, ISOLATE, PATCHED]
+        nodeId:
+          type: string
+        hash:
+          type: string
+        prevHash:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        cpuUsage:
+          type: ["integer", "null"]
+        memUsage:
+          type: ["integer", "null"]
+      required:
+        - id
+        - event
+        - score
+        - action
+        - nodeId
+        - hash
+        - prevHash
+        - timestamp
+
+    EventInput:
+      type: object
+      properties:
+        event:
+          type: string
+          minLength: 1
+        cpuUsage:
+          type: ["integer", "null"]
+        memUsage:
+          type: ["integer", "null"]
+      required:
+        - event
+
+    Patch:
+      type: object
+      properties:
+        id:
+          type: integer
+        attack:
+          type: string
+        fix:
+          type: string
+        appliedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - attack
+        - fix
+        - appliedAt
+
+    SelfTestResult:
+      type: object
+      properties:
+        vulnerabilities:
+          type: array
+          items:
+            type: object
+            properties:
+              attack:
+                type: string
+              score:
+                type: integer
+              action:
+                type: string
+              fix:
+                type: ["string", "null"]
+            required:
+              - attack
+              - score
+              - action
+        patchesApplied:
+          type: integer
+        systemStatus:
+          type: string
+      required:
+        - vulnerabilities
+        - patchesApplied
+        - systemStatus
+
+    SimulationResult:
+      type: object
+      properties:
+        baseEvent:
+          $ref: "#/components/schemas/SecurityEvent"
+        selfHealingEvents:
+          type: array
+          items:
+            type: object
+            properties:
+              attack:
+                type: string
+              fix:
+                type: string
+            required:
+              - attack
+              - fix
+        totalProcessed:
+          type: integer
+        patchesApplied:
+          type: integer
+      required:
+        - baseEvent
+        - selfHealingEvents
+        - totalProcessed
+        - patchesApplied
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalEvents:
+          type: integer
+        totalPatches:
+          type: integer
+        actionCounts:
+          type: object
+          properties:
+            ALLOW:
+              type: integer
+            WARN:
+              type: integer
+            ISOLATE:
+              type: integer
+            PATCHED:
+              type: integer
+          required: [ALLOW, WARN, ISOLATE, PATCHED]
+        systemStatus:
+          type: string
+          enum: [SECURE, MONITORING, ALERT, CRITICAL]
+        avgRiskScore:
+          type: number
+        recentEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/SecurityEvent"
+        threatLevel:
+          type: integer
+          description: 0-100 threat level indicator
+      required:
+        - totalEvents
+        - totalPatches
+        - actionCounts
+        - systemStatus
+        - avgRiskScore
+        - recentEvents
+        - threatLevel
+
+    ThreatNode:
+      type: object
+      properties:
+        id:
+          type: string
+        event:
+          type: string
+        score:
+          type: integer
+        action:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+      required:
+        - id
+        - event
+        - score
+        - action
+        - timestamp
+
+    ThreatGraph:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ThreatNode"
+        edges:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+            minItems: 2
+            maxItems: 2
+      required:
+        - nodes
+        - edges

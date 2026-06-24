@@ -1,20 +1,31 @@
-// Export your models here. Add one export per file
-// export * from "./posts";
-//
-// Each model/table should ideally be split into different files.
-// Each model/table should define a Drizzle table, insert schema, and types:
-//
-//   import { pgTable, text, serial } from "drizzle-orm/pg-core";
-//   import { createInsertSchema } from "drizzle-zod";
-//   import { z } from "zod/v4";
-//
-//   export const postsTable = pgTable("posts", {
-//     id: serial("id").primaryKey(),
-//     title: text("title").notNull(),
-//   });
-//
-//   export const insertPostSchema = createInsertSchema(postsTable).omit({ id: true });
-//   export type InsertPost = z.infer<typeof insertPostSchema>;
-//   export type Post = typeof postsTable.$inferSelect;
+import { pgTable, serial, text, integer, timestamp, real } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
 
-export {}
+export const securityEventsTable = pgTable("security_events", {
+  id: serial("id").primaryKey(),
+  event: text("event").notNull(),
+  score: integer("score").notNull(),
+  action: text("action").notNull(),
+  nodeId: text("node_id").notNull(),
+  hash: text("hash").notNull(),
+  prevHash: text("prev_hash").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+  cpuUsage: integer("cpu_usage"),
+  memUsage: integer("mem_usage"),
+});
+
+export const patchesTable = pgTable("patches", {
+  id: serial("id").primaryKey(),
+  attack: text("attack").notNull(),
+  fix: text("fix").notNull(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertSecurityEventSchema = createInsertSchema(securityEventsTable).omit({ id: true, timestamp: true });
+export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
+export type SecurityEvent = typeof securityEventsTable.$inferSelect;
+
+export const insertPatchSchema = createInsertSchema(patchesTable).omit({ id: true, appliedAt: true });
+export type InsertPatch = z.infer<typeof insertPatchSchema>;
+export type Patch = typeof patchesTable.$inferSelect;
