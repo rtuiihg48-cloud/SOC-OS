@@ -3,13 +3,17 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export type SelfTestResultVulnerabilitiesItem = {
   attack: string;
   score: number;
   action: string;
+  /** @nullable */
+  tactic?: string | null;
+  /** @nullable */
+  technique?: string | null;
   /** @nullable */
   fix?: string | null;
 };

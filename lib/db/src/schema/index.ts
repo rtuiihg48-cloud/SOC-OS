@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -7,6 +7,11 @@ export const securityEventsTable = pgTable("security_events", {
   event: text("event").notNull(),
   score: integer("score").notNull(),
   action: text("action").notNull(),
+  status: text("status").notNull().default("NEW"),
+  tactic: text("tactic"),
+  technique: text("technique"),
+  techniqueId: text("technique_id"),
+  velocityFlag: boolean("velocity_flag").notNull().default(false),
   nodeId: text("node_id").notNull(),
   hash: text("hash").notNull(),
   prevHash: text("prev_hash").notNull(),
@@ -19,6 +24,7 @@ export const patchesTable = pgTable("patches", {
   id: serial("id").primaryKey(),
   attack: text("attack").notNull(),
   fix: text("fix").notNull(),
+  tactic: text("tactic"),
   appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

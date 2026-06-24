@@ -6,9 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type DashboardSummaryActionCounts = {
-  ALLOW: number;
-  WARN: number;
-  ISOLATE: number;
-  PATCHED: number;
+export type DashboardSummaryTopTacticsItem = {
+  tactic: string;
+  count: number;
 };

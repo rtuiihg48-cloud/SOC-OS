@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: SOC OS - Self-Healing Security Platform API
 servers:
   - url: /api
@@ -22,7 +22,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -36,7 +35,23 @@ paths:
       operationId: listEvents
       tags: [events]
       summary: List all security events
-      description: Returns full memory chain of security events
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: tactic
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of security events
@@ -50,7 +65,6 @@ paths:
       operationId: processEvent
       tags: [events]
       summary: Process a security event
-      description: Runs event through detection engine and returns risk score and action
       requestBody:
         required: true
         content:
@@ -86,12 +100,39 @@ paths:
         "404":
           description: Not found
 
+  /events/{id}/status:
+    patch:
+      operationId: updateEventStatus
+      tags: [events]
+      summary: Update alert lifecycle status
+      description: Transition an event through NEW → ACKNOWLEDGED → INVESTIGATING → RESOLVED
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventStatusBody"
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityEvent"
+        "404":
+          description: Not found
+
   /self-test:
     post:
       operationId: runSelfTest
       tags: [simulation]
       summary: Run self red-team test
-      description: Simulates attacks against own system and returns found vulnerabilities
       responses:
         "200":
           description: Self-test results with vulnerabilities and patches
@@ -105,7 +146,6 @@ paths:
       operationId: runSimulation
       tags: [simulation]
       summary: Run full self-healing simulation
-      description: Runs complete SOC cycle with detection, response, self-red-team and auto-fix
       responses:
         "200":
           description: Full simulation result
@@ -119,7 +159,6 @@ paths:
       operationId: listPatches
       tags: [events]
       summary: List all auto-applied patches
-      description: Returns all SOAR patches applied by the auto-heal engine
       responses:
         "200":
           description: List of applied patches
@@ -135,7 +174,6 @@ paths:
       operationId: getDashboard
       tags: [dashboard]
       summary: Get dashboard summary
-      description: Returns aggregated security metrics and recent activity
       responses:
         "200":
           description: Dashboard summary
@@ -149,7 +187,6 @@ paths:
       operationId: getThreatGraph
       tags: [dashboard]
       summary: Get threat graph
-      description: Returns attack graph with nodes and edges for visualization
       responses:
         "200":
           description: Threat graph data
@@ -158,6 +195,52 @@ paths:
               schema:
                 $ref: "#/components/schemas/ThreatGraph"
 
+  /system-metrics:
+    get:
+      operationId: getSystemMetrics
+      tags: [dashboard]
+      summary: Get real-time server system metrics
+      description: Returns actual CPU, memory, and load average from the host system
+      responses:
+        "200":
+          description: System metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemMetrics"
+
+  /mitre-stats:
+    get:
+      operationId: getMitreStats
+      tags: [dashboard]
+      summary: Get MITRE ATT&CK tactic breakdown
+      description: Returns event counts grouped by MITRE ATT&CK tactic
+      responses:
+        "200":
+          description: MITRE stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MitreStat"
+
+  /risk-timeline:
+    get:
+      operationId: getRiskTimeline
+      tags: [dashboard]
+      summary: Get risk score over time
+      description: Returns avg risk score per hour for the last 24h
+      responses:
+        "200":
+          description: Risk timeline data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RiskTimelinePoint"
+
 components:
   schemas:
     HealthStatus:
@@ -165,8 +248,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     SecurityEvent:
       type: object
@@ -180,6 +262,17 @@ components:
         action:
           type: string
           enum: [ALLOW, WARN, ISOLATE, PATCHED]
+        status:
+          type: string
+          enum: [NEW, ACKNOWLEDGED, INVESTIGATING, RESOLVED]
+        tactic:
+          type: ["string", "null"]
+        technique:
+          type: ["string", "null"]
+        techniqueId:
+          type: ["string", "null"]
+        velocityFlag:
+          type: boolean
         nodeId:
           type: string
         hash:
@@ -198,6 +291,8 @@ components:
         - event
         - score
         - action
+        - status
+        - velocityFlag
         - nodeId
         - hash
         - prevHash
@@ -213,8 +308,15 @@ components:
           type: ["integer", "null"]
         memUsage:
           type: ["integer", "null"]
-      required:
-        - event
+      required: [event]
+
+    UpdateEventStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ACKNOWLEDGED, INVESTIGATING, RESOLVED]
+      required: [status]
 
     Patch:
       type: object
@@ -225,14 +327,12 @@ components:
           type: string
         fix:
           type: string
+        tactic:
+          type: ["string", "null"]
         appliedAt:
           type: string
           format: date-time
-      required:
-        - id
-        - attack
-        - fix
-        - appliedAt
+      required: [id, attack, fix, appliedAt]
 
     SelfTestResult:
       type: object
@@ -248,20 +348,18 @@ components:
                 type: integer
               action:
                 type: string
+              tactic:
+                type: ["string", "null"]
+              technique:
+                type: ["string", "null"]
               fix:
                 type: ["string", "null"]
-            required:
-              - attack
-              - score
-              - action
+            required: [attack, score, action]
         patchesApplied:
           type: integer
         systemStatus:
           type: string
-      required:
-        - vulnerabilities
-        - patchesApplied
-        - systemStatus
+      required: [vulnerabilities, patchesApplied, systemStatus]
 
     SimulationResult:
       type: object
@@ -275,20 +373,16 @@ components:
             properties:
               attack:
                 type: string
+              tactic:
+                type: ["string", "null"]
               fix:
                 type: string
-            required:
-              - attack
-              - fix
+            required: [attack, fix]
         totalProcessed:
           type: integer
         patchesApplied:
           type: integer
-      required:
-        - baseEvent
-        - selfHealingEvents
-        - totalProcessed
-        - patchesApplied
+      required: [baseEvent, selfHealingEvents, totalProcessed, patchesApplied]
 
     DashboardSummary:
       type: object
@@ -296,6 +390,10 @@ components:
         totalEvents:
           type: integer
         totalPatches:
+          type: integer
+        openAlerts:
+          type: integer
+        resolvedAlerts:
           type: integer
         actionCounts:
           type: object
@@ -309,6 +407,18 @@ components:
             PATCHED:
               type: integer
           required: [ALLOW, WARN, ISOLATE, PATCHED]
+        statusCounts:
+          type: object
+          properties:
+            NEW:
+              type: integer
+            ACKNOWLEDGED:
+              type: integer
+            INVESTIGATING:
+              type: integer
+            RESOLVED:
+              type: integer
+          required: [NEW, ACKNOWLEDGED, INVESTIGATING, RESOLVED]
         systemStatus:
           type: string
           enum: [SECURE, MONITORING, ALERT, CRITICAL]
@@ -320,15 +430,28 @@ components:
             $ref: "#/components/schemas/SecurityEvent"
         threatLevel:
           type: integer
-          description: 0-100 threat level indicator
+        topTactics:
+          type: array
+          items:
+            type: object
+            properties:
+              tactic:
+                type: string
+              count:
+                type: integer
+            required: [tactic, count]
       required:
         - totalEvents
         - totalPatches
+        - openAlerts
+        - resolvedAlerts
         - actionCounts
+        - statusCounts
         - systemStatus
         - avgRiskScore
         - recentEvents
         - threatLevel
+        - topTactics
 
     ThreatNode:
       type: object
@@ -341,15 +464,14 @@ components:
           type: integer
         action:
           type: string
+        tactic:
+          type: ["string", "null"]
+        status:
+          type: string
         timestamp:
           type: string
           format: date-time
-      required:
-        - id
-        - event
-        - score
-        - action
-        - timestamp
+      required: [id, event, score, action, status, timestamp]
 
     ThreatGraph:
       type: object
@@ -366,6 +488,56 @@ components:
               type: string
             minItems: 2
             maxItems: 2
+      required: [nodes, edges]
+
+    SystemMetrics:
+      type: object
+      properties:
+        cpuPercent:
+          type: number
+        memPercent:
+          type: number
+        memUsedMb:
+          type: number
+        memTotalMb:
+          type: number
+        loadAvg1m:
+          type: number
+        loadAvg5m:
+          type: number
+        loadAvg15m:
+          type: number
+        uptimeSeconds:
+          type: number
       required:
-        - nodes
-        - edges
+        - cpuPercent
+        - memPercent
+        - memUsedMb
+        - memTotalMb
+        - loadAvg1m
+        - loadAvg5m
+        - loadAvg15m
+        - uptimeSeconds
+
+    MitreStat:
+      type: object
+      properties:
+        tactic:
+          type: string
+        count:
+          type: integer
+        avgScore:
+          type: number
+      required: [tactic, count, avgScore]
+
+    RiskTimelinePoint:
+      type: object
+      properties:
+        hour:
+          type: string
+          format: date-time
+        avgScore:
+          type: number
+        count:
+          type: integer
+      required: [hour, avgScore, count]

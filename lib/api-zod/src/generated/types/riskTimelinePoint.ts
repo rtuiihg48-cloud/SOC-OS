@@ -6,9 +6,8 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type DashboardSummaryActionCounts = {
-  ALLOW: number;
-  WARN: number;
-  ISOLATE: number;
-  PATCHED: number;
-};
+export interface RiskTimelinePoint {
+  hour: Date;
+  avgScore: number;
+  count: number;
+}

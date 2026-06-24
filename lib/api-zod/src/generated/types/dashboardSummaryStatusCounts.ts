@@ -6,9 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type DashboardSummaryActionCounts = {
-  ALLOW: number;
-  WARN: number;
-  ISOLATE: number;
-  PATCHED: number;
+export type DashboardSummaryStatusCounts = {
+  NEW: number;
+  ACKNOWLEDGED: number;
+  INVESTIGATING: number;
+  RESOLVED: number;
 };

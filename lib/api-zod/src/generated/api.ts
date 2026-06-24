@@ -3,13 +3,12 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -18,14 +17,25 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Returns full memory chain of security events
  * @summary List all security events
  */
+export const ListEventsQueryParams = zod.object({
+  "action": zod.coerce.string().optional(),
+  "status": zod.coerce.string().optional(),
+  "tactic": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional()
+})
+
 export const ListEventsResponseItem = zod.object({
   "id": zod.number(),
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
   "nodeId": zod.string(),
   "hash": zod.string(),
   "prevHash": zod.string(),
@@ -37,7 +47,6 @@ export const ListEventsResponse = zod.array(ListEventsResponseItem)
 
 
 /**
- * Runs event through detection engine and returns risk score and action
  * @summary Process a security event
  */
 
@@ -54,6 +63,11 @@ export const ProcessEventResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
   "nodeId": zod.string(),
   "hash": zod.string(),
   "prevHash": zod.string(),
@@ -75,6 +89,11 @@ export const GetEventResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
   "nodeId": zod.string(),
   "hash": zod.string(),
   "prevHash": zod.string(),
@@ -85,7 +104,37 @@ export const GetEventResponse = zod.object({
 
 
 /**
- * Simulates attacks against own system and returns found vulnerabilities
+ * Transition an event through NEW → ACKNOWLEDGED → INVESTIGATING → RESOLVED
+ * @summary Update alert lifecycle status
+ */
+export const UpdateEventStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateEventStatusBody = zod.object({
+  "status": zod.enum(['ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED'])
+})
+
+export const UpdateEventStatusResponse = zod.object({
+  "id": zod.number(),
+  "event": zod.string(),
+  "score": zod.number(),
+  "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
+  "nodeId": zod.string(),
+  "hash": zod.string(),
+  "prevHash": zod.string(),
+  "timestamp": zod.coerce.date(),
+  "cpuUsage": zod.number().nullish(),
+  "memUsage": zod.number().nullish()
+})
+
+
+/**
  * @summary Run self red-team test
  */
 export const RunSelfTestResponse = zod.object({
@@ -93,6 +142,8 @@ export const RunSelfTestResponse = zod.object({
   "attack": zod.string(),
   "score": zod.number(),
   "action": zod.string(),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
   "fix": zod.string().nullish()
 })),
   "patchesApplied": zod.number(),
@@ -101,7 +152,6 @@ export const RunSelfTestResponse = zod.object({
 
 
 /**
- * Runs complete SOC cycle with detection, response, self-red-team and auto-fix
  * @summary Run full self-healing simulation
  */
 export const RunSimulationResponse = zod.object({
@@ -110,6 +160,11 @@ export const RunSimulationResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
   "nodeId": zod.string(),
   "hash": zod.string(),
   "prevHash": zod.string(),
@@ -119,6 +174,7 @@ export const RunSimulationResponse = zod.object({
 }),
   "selfHealingEvents": zod.array(zod.object({
   "attack": zod.string(),
+  "tactic": zod.string().nullish(),
   "fix": zod.string()
 })),
   "totalProcessed": zod.number(),
@@ -127,30 +183,37 @@ export const RunSimulationResponse = zod.object({
 
 
 /**
- * Returns all SOAR patches applied by the auto-heal engine
  * @summary List all auto-applied patches
  */
 export const ListPatchesResponseItem = zod.object({
   "id": zod.number(),
   "attack": zod.string(),
   "fix": zod.string(),
+  "tactic": zod.string().nullish(),
   "appliedAt": zod.coerce.date()
 })
 export const ListPatchesResponse = zod.array(ListPatchesResponseItem)
 
 
 /**
- * Returns aggregated security metrics and recent activity
  * @summary Get dashboard summary
  */
 export const GetDashboardResponse = zod.object({
   "totalEvents": zod.number(),
   "totalPatches": zod.number(),
+  "openAlerts": zod.number(),
+  "resolvedAlerts": zod.number(),
   "actionCounts": zod.object({
   "ALLOW": zod.number(),
   "WARN": zod.number(),
   "ISOLATE": zod.number(),
   "PATCHED": zod.number()
+}),
+  "statusCounts": zod.object({
+  "NEW": zod.number(),
+  "ACKNOWLEDGED": zod.number(),
+  "INVESTIGATING": zod.number(),
+  "RESOLVED": zod.number()
 }),
   "systemStatus": zod.enum(['SECURE', 'MONITORING', 'ALERT', 'CRITICAL']),
   "avgRiskScore": zod.number(),
@@ -159,6 +222,11 @@ export const GetDashboardResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "tactic": zod.string().nullish(),
+  "technique": zod.string().nullish(),
+  "techniqueId": zod.string().nullish(),
+  "velocityFlag": zod.boolean(),
   "nodeId": zod.string(),
   "hash": zod.string(),
   "prevHash": zod.string(),
@@ -166,12 +234,15 @@ export const GetDashboardResponse = zod.object({
   "cpuUsage": zod.number().nullish(),
   "memUsage": zod.number().nullish()
 })),
-  "threatLevel": zod.number().describe('0-100 threat level indicator')
+  "threatLevel": zod.number(),
+  "topTactics": zod.array(zod.object({
+  "tactic": zod.string(),
+  "count": zod.number()
+}))
 })
 
 
 /**
- * Returns attack graph with nodes and edges for visualization
  * @summary Get threat graph
  */
 export const getThreatGraphResponseEdgesItemMin = 2;
@@ -185,9 +256,51 @@ export const GetThreatGraphResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.string(),
+  "tactic": zod.string().nullish(),
+  "status": zod.string(),
   "timestamp": zod.coerce.date()
 })),
   "edges": zod.array(zod.array(zod.string()).min(getThreatGraphResponseEdgesItemMin).max(getThreatGraphResponseEdgesItemMax))
 })
+
+
+/**
+ * Returns actual CPU, memory, and load average from the host system
+ * @summary Get real-time server system metrics
+ */
+export const GetSystemMetricsResponse = zod.object({
+  "cpuPercent": zod.number(),
+  "memPercent": zod.number(),
+  "memUsedMb": zod.number(),
+  "memTotalMb": zod.number(),
+  "loadAvg1m": zod.number(),
+  "loadAvg5m": zod.number(),
+  "loadAvg15m": zod.number(),
+  "uptimeSeconds": zod.number()
+})
+
+
+/**
+ * Returns event counts grouped by MITRE ATT&CK tactic
+ * @summary Get MITRE ATT&CK tactic breakdown
+ */
+export const GetMitreStatsResponseItem = zod.object({
+  "tactic": zod.string(),
+  "count": zod.number(),
+  "avgScore": zod.number()
+})
+export const GetMitreStatsResponse = zod.array(GetMitreStatsResponseItem)
+
+
+/**
+ * Returns avg risk score per hour for the last 24h
+ * @summary Get risk score over time
+ */
+export const GetRiskTimelineResponseItem = zod.object({
+  "hour": zod.coerce.date(),
+  "avgScore": zod.number(),
+  "count": zod.number()
+})
+export const GetRiskTimelineResponse = zod.array(GetRiskTimelineResponseItem)
 
 

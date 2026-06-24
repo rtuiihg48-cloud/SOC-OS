@@ -9,6 +9,7 @@ import Events from "@/pages/Events";
 import Simulation from "@/pages/Simulation";
 import Patches from "@/pages/Patches";
 import ThreatGraph from "@/pages/ThreatGraph";
+import Alerts from "@/pages/Alerts";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/simulate" component={Simulation} />
         <Route path="/patches" component={Patches} />
         <Route path="/threat-graph" component={ThreatGraph} />
+        <Route path="/alerts" component={Alerts} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

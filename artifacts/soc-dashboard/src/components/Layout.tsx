@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell } from "lucide-react";
 import { useGetDashboard } from "@workspace/api-client-react";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -11,6 +11,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/alerts", label: "Alerts", icon: Bell },
     { href: "/events", label: "Event Log", icon: Database },
     { href: "/simulate", label: "Simulation", icon: Cpu },
     { href: "/patches", label: "Patches", icon: GitCommit },
@@ -57,13 +58,18 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 <item.icon className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
                 <span className="font-medium tracking-wide">{item.label}</span>
+                {item.href === '/alerts' && dashboard && dashboard.openAlerts > 0 && (
+                  <span className="ml-auto bg-critical text-critical-foreground text-xs px-2 py-0.5 rounded-full font-mono">
+                    {dashboard.openAlerts}
+                  </span>
+                )}
               </Link>
             );
           })}
         </nav>
         
         <div className="p-4 border-t border-border text-xs font-mono text-muted-foreground">
-          v0.1.0-alpha / AUTONOMOUS
+          v0.2.0-beta / AUTONOMOUS
         </div>
       </aside>
 

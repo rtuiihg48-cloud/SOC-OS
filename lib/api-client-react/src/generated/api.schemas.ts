@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -19,11 +19,29 @@ export const SecurityEventAction = {
   PATCHED: 'PATCHED',
 } as const;
 
+export type SecurityEventStatus = typeof SecurityEventStatus[keyof typeof SecurityEventStatus];
+
+
+export const SecurityEventStatus = {
+  NEW: 'NEW',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  INVESTIGATING: 'INVESTIGATING',
+  RESOLVED: 'RESOLVED',
+} as const;
+
 export interface SecurityEvent {
   id: number;
   event: string;
   score: number;
   action: SecurityEventAction;
+  status: SecurityEventStatus;
+  /** @nullable */
+  tactic?: string | null;
+  /** @nullable */
+  technique?: string | null;
+  /** @nullable */
+  techniqueId?: string | null;
+  velocityFlag: boolean;
   nodeId: string;
   hash: string;
   prevHash: string;
@@ -43,10 +61,25 @@ export interface EventInput {
   memUsage?: number | null;
 }
 
+export type UpdateEventStatusBodyStatus = typeof UpdateEventStatusBodyStatus[keyof typeof UpdateEventStatusBodyStatus];
+
+
+export const UpdateEventStatusBodyStatus = {
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  INVESTIGATING: 'INVESTIGATING',
+  RESOLVED: 'RESOLVED',
+} as const;
+
+export interface UpdateEventStatusBody {
+  status: UpdateEventStatusBodyStatus;
+}
+
 export interface Patch {
   id: number;
   attack: string;
   fix: string;
+  /** @nullable */
+  tactic?: string | null;
   appliedAt: string;
 }
 
@@ -54,6 +87,10 @@ export type SelfTestResultVulnerabilitiesItem = {
   attack: string;
   score: number;
   action: string;
+  /** @nullable */
+  tactic?: string | null;
+  /** @nullable */
+  technique?: string | null;
   /** @nullable */
   fix?: string | null;
 };
@@ -66,6 +103,8 @@ export interface SelfTestResult {
 
 export type SimulationResultSelfHealingEventsItem = {
   attack: string;
+  /** @nullable */
+  tactic?: string | null;
   fix: string;
 };
 
@@ -83,6 +122,13 @@ export type DashboardSummaryActionCounts = {
   PATCHED: number;
 };
 
+export type DashboardSummaryStatusCounts = {
+  NEW: number;
+  ACKNOWLEDGED: number;
+  INVESTIGATING: number;
+  RESOLVED: number;
+};
+
 export type DashboardSummarySystemStatus = typeof DashboardSummarySystemStatus[keyof typeof DashboardSummarySystemStatus];
 
 
@@ -93,15 +139,23 @@ export const DashboardSummarySystemStatus = {
   CRITICAL: 'CRITICAL',
 } as const;
 
+export type DashboardSummaryTopTacticsItem = {
+  tactic: string;
+  count: number;
+};
+
 export interface DashboardSummary {
   totalEvents: number;
   totalPatches: number;
+  openAlerts: number;
+  resolvedAlerts: number;
   actionCounts: DashboardSummaryActionCounts;
+  statusCounts: DashboardSummaryStatusCounts;
   systemStatus: DashboardSummarySystemStatus;
   avgRiskScore: number;
   recentEvents: SecurityEvent[];
-  /** 0-100 threat level indicator */
   threatLevel: number;
+  topTactics: DashboardSummaryTopTacticsItem[];
 }
 
 export interface ThreatNode {
@@ -109,6 +163,9 @@ export interface ThreatNode {
   event: string;
   score: number;
   action: string;
+  /** @nullable */
+  tactic?: string | null;
+  status: string;
   timestamp: string;
 }
 
@@ -116,4 +173,34 @@ export interface ThreatGraph {
   nodes: ThreatNode[];
   edges: string[][];
 }
+
+export interface SystemMetrics {
+  cpuPercent: number;
+  memPercent: number;
+  memUsedMb: number;
+  memTotalMb: number;
+  loadAvg1m: number;
+  loadAvg5m: number;
+  loadAvg15m: number;
+  uptimeSeconds: number;
+}
+
+export interface MitreStat {
+  tactic: string;
+  count: number;
+  avgScore: number;
+}
+
+export interface RiskTimelinePoint {
+  hour: string;
+  avgScore: number;
+  count: number;
+}
+
+export type ListEventsParams = {
+action?: string;
+status?: string;
+tactic?: string;
+limit?: number;
+};
 

@@ -3,19 +3,24 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { DashboardSummaryActionCounts } from './dashboardSummaryActionCounts';
+import type { DashboardSummaryStatusCounts } from './dashboardSummaryStatusCounts';
 import type { DashboardSummarySystemStatus } from './dashboardSummarySystemStatus';
+import type { DashboardSummaryTopTacticsItem } from './dashboardSummaryTopTacticsItem';
 import type { SecurityEvent } from './securityEvent';
 
 export interface DashboardSummary {
   totalEvents: number;
   totalPatches: number;
+  openAlerts: number;
+  resolvedAlerts: number;
   actionCounts: DashboardSummaryActionCounts;
+  statusCounts: DashboardSummaryStatusCounts;
   systemStatus: DashboardSummarySystemStatus;
   avgRiskScore: number;
   recentEvents: SecurityEvent[];
-  /** 0-100 threat level indicator */
   threatLevel: number;
+  topTactics: DashboardSummaryTopTacticsItem[];
 }

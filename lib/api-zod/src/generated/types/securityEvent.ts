@@ -3,15 +3,24 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { SecurityEventAction } from './securityEventAction';
+import type { SecurityEventStatus } from './securityEventStatus';
 
 export interface SecurityEvent {
   id: number;
   event: string;
   score: number;
   action: SecurityEventAction;
+  status: SecurityEventStatus;
+  /** @nullable */
+  tactic?: string | null;
+  /** @nullable */
+  technique?: string | null;
+  /** @nullable */
+  techniqueId?: string | null;
+  velocityFlag: boolean;
   nodeId: string;
   hash: string;
   prevHash: string;

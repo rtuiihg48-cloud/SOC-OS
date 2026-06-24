@@ -3,10 +3,12 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export type SimulationResultSelfHealingEventsItem = {
   attack: string;
+  /** @nullable */
+  tactic?: string | null;
   fix: string;
 };

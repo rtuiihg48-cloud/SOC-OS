@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * SOC OS - Self-Healing Security Platform API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import {
   useMutation,
@@ -23,11 +23,16 @@ import type {
   DashboardSummary,
   EventInput,
   HealthStatus,
+  ListEventsParams,
+  MitreStat,
   Patch,
+  RiskTimelinePoint,
   SecurityEvent,
   SelfTestResult,
   SimulationResult,
-  ThreatGraph
+  SystemMetrics,
+  ThreatGraph,
+  UpdateEventStatusBody
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -51,7 +56,6 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
@@ -120,21 +124,27 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-export const getListEventsUrl = () => {
+export const getListEventsUrl = (params?: ListEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/events`
+  return stringifiedParams.length > 0 ? `/api/events?${stringifiedParams}` : `/api/events`
 }
 
 /**
- * Returns full memory chain of security events
  * @summary List all security events
  */
-export const listEvents = async ( options?: RequestInit): Promise<SecurityEvent[]> => {
+export const listEvents = async (params?: ListEventsParams, options?: RequestInit): Promise<SecurityEvent[]> => {
 
-  return customFetch<SecurityEvent[]>(getListEventsUrl(),
+  return customFetch<SecurityEvent[]>(getListEventsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -147,23 +157,23 @@ export const listEvents = async ( options?: RequestInit): Promise<SecurityEvent[
 
 
 
-export const getListEventsQueryKey = () => {
+export const getListEventsQueryKey = (params?: ListEventsParams,) => {
     return [
-    `/api/events`
+    `/api/events`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListEventsQueryOptions = <TData = Awaited<ReturnType<typeof listEvents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListEventsQueryOptions = <TData = Awaited<ReturnType<typeof listEvents>>, TError = ErrorType<unknown>>(params?: ListEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListEventsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListEventsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEvents>>> = ({ signal }) => listEvents({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEvents>>> = ({ signal }) => listEvents(params, { signal, ...requestOptions });
 
 
 
@@ -181,11 +191,11 @@ export type ListEventsQueryError = ErrorType<unknown>
  */
 
 export function useListEvents<TData = Awaited<ReturnType<typeof listEvents>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListEventsQueryOptions(options)
+  const queryOptions = getListEventsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -207,7 +217,6 @@ export const getProcessEventUrl = () => {
 }
 
 /**
- * Runs event through detection engine and returns risk score and action
  * @summary Process a security event
  */
 export const processEvent = async (eventInput: EventInput, options?: RequestInit): Promise<SecurityEvent> => {
@@ -347,6 +356,79 @@ export function useGetEvent<TData = Awaited<ReturnType<typeof getEvent>>, TError
 
 
 
+export const getUpdateEventStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/events/${id}/status`
+}
+
+/**
+ * Transition an event through NEW → ACKNOWLEDGED → INVESTIGATING → RESOLVED
+ * @summary Update alert lifecycle status
+ */
+export const updateEventStatus = async (id: number,
+    updateEventStatusBody: UpdateEventStatusBody, options?: RequestInit): Promise<SecurityEvent> => {
+
+  return customFetch<SecurityEvent>(getUpdateEventStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateEventStatusBody,)
+  }
+);}
+
+
+
+
+export const getUpdateEventStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventStatus>>, TError,{id: number;data: BodyType<UpdateEventStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEventStatus>>, TError,{id: number;data: BodyType<UpdateEventStatusBody>}, TContext> => {
+
+const mutationKey = ['updateEventStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEventStatus>>, {id: number;data: BodyType<UpdateEventStatusBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateEventStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEventStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateEventStatus>>>
+    export type UpdateEventStatusMutationBody = BodyType<UpdateEventStatusBody>
+    export type UpdateEventStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Update alert lifecycle status
+ */
+export const useUpdateEventStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventStatus>>, TError,{id: number;data: BodyType<UpdateEventStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEventStatus>>,
+        TError,
+        {id: number;data: BodyType<UpdateEventStatusBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateEventStatusMutationOptions(options));
+    }
+
 export const getRunSelfTestUrl = () => {
 
 
@@ -356,7 +438,6 @@ export const getRunSelfTestUrl = () => {
 }
 
 /**
- * Simulates attacks against own system and returns found vulnerabilities
  * @summary Run self red-team test
  */
 export const runSelfTest = async ( options?: RequestInit): Promise<SelfTestResult> => {
@@ -427,7 +508,6 @@ export const getRunSimulationUrl = () => {
 }
 
 /**
- * Runs complete SOC cycle with detection, response, self-red-team and auto-fix
  * @summary Run full self-healing simulation
  */
 export const runSimulation = async ( options?: RequestInit): Promise<SimulationResult> => {
@@ -498,7 +578,6 @@ export const getListPatchesUrl = () => {
 }
 
 /**
- * Returns all SOAR patches applied by the auto-heal engine
  * @summary List all auto-applied patches
  */
 export const listPatches = async ( options?: RequestInit): Promise<Patch[]> => {
@@ -576,7 +655,6 @@ export const getGetDashboardUrl = () => {
 }
 
 /**
- * Returns aggregated security metrics and recent activity
  * @summary Get dashboard summary
  */
 export const getDashboard = async ( options?: RequestInit): Promise<DashboardSummary> => {
@@ -654,7 +732,6 @@ export const getGetThreatGraphUrl = () => {
 }
 
 /**
- * Returns attack graph with nodes and edges for visualization
  * @summary Get threat graph
  */
 export const getThreatGraph = async ( options?: RequestInit): Promise<ThreatGraph> => {
@@ -711,6 +788,240 @@ export function useGetThreatGraph<TData = Awaited<ReturnType<typeof getThreatGra
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetThreatGraphQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSystemMetricsUrl = () => {
+
+
+
+
+  return `/api/system-metrics`
+}
+
+/**
+ * Returns actual CPU, memory, and load average from the host system
+ * @summary Get real-time server system metrics
+ */
+export const getSystemMetrics = async ( options?: RequestInit): Promise<SystemMetrics> => {
+
+  return customFetch<SystemMetrics>(getGetSystemMetricsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSystemMetricsQueryKey = () => {
+    return [
+    `/api/system-metrics`
+    ] as const;
+    }
+
+
+export const getGetSystemMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemMetricsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemMetrics>>> = ({ signal }) => getSystemMetrics({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSystemMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemMetrics>>>
+export type GetSystemMetricsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get real-time server system metrics
+ */
+
+export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSystemMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMitreStatsUrl = () => {
+
+
+
+
+  return `/api/mitre-stats`
+}
+
+/**
+ * Returns event counts grouped by MITRE ATT&CK tactic
+ * @summary Get MITRE ATT&CK tactic breakdown
+ */
+export const getMitreStats = async ( options?: RequestInit): Promise<MitreStat[]> => {
+
+  return customFetch<MitreStat[]>(getGetMitreStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMitreStatsQueryKey = () => {
+    return [
+    `/api/mitre-stats`
+    ] as const;
+    }
+
+
+export const getGetMitreStatsQueryOptions = <TData = Awaited<ReturnType<typeof getMitreStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMitreStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMitreStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMitreStats>>> = ({ signal }) => getMitreStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMitreStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMitreStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getMitreStats>>>
+export type GetMitreStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get MITRE ATT&CK tactic breakdown
+ */
+
+export function useGetMitreStats<TData = Awaited<ReturnType<typeof getMitreStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMitreStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMitreStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetRiskTimelineUrl = () => {
+
+
+
+
+  return `/api/risk-timeline`
+}
+
+/**
+ * Returns avg risk score per hour for the last 24h
+ * @summary Get risk score over time
+ */
+export const getRiskTimeline = async ( options?: RequestInit): Promise<RiskTimelinePoint[]> => {
+
+  return customFetch<RiskTimelinePoint[]>(getGetRiskTimelineUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRiskTimelineQueryKey = () => {
+    return [
+    `/api/risk-timeline`
+    ] as const;
+    }
+
+
+export const getGetRiskTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getRiskTimeline>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRiskTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRiskTimelineQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRiskTimeline>>> = ({ signal }) => getRiskTimeline({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRiskTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRiskTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof getRiskTimeline>>>
+export type GetRiskTimelineQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get risk score over time
+ */
+
+export function useGetRiskTimeline<TData = Awaited<ReturnType<typeof getRiskTimeline>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRiskTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRiskTimelineQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
