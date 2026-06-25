@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2 } from "lucide-react";
 import { useGetDashboard } from "@workspace/api-client-react";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -16,6 +16,9 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/simulate", label: "Simulation", icon: Cpu },
     { href: "/patches", label: "Patches", icon: GitCommit },
     { href: "/threat-graph", label: "Threat Graph", icon: ShieldAlert },
+    { href: "/rules", label: "Rules Engine", icon: Zap },
+    { href: "/correlations", label: "Correlations", icon: Link2 },
+    { href: "/tenants", label: "Tenants", icon: Building2 },
   ];
 
   const statusColor = 
@@ -69,7 +72,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </nav>
         
         <div className="p-4 border-t border-border text-xs font-mono text-muted-foreground">
-          v0.2.0-beta / AUTONOMOUS
+          v0.3.0-beta / V50 PIPELINE
         </div>
       </aside>
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, securityEventsTable, patchesTable } from "@workspace/db";
+import { db, securityEventsTable, patchesTable, correlationsTable } from "@workspace/db";
 import { desc, sql, count } from "drizzle-orm";
 import { getSystemMetrics } from "../lib/system-metrics";
 
@@ -20,6 +20,7 @@ router.get("/patches", async (req, res) => {
 router.get("/dashboard", async (req, res) => {
   const [totalEventsRow] = await db.select({ count: count() }).from(securityEventsTable);
   const [totalPatchesRow] = await db.select({ count: count() }).from(patchesTable);
+  const [totalCorrelationsRow] = await db.select({ count: count() }).from(correlationsTable);
 
   const actionRows = await db
     .select({ action: securityEventsTable.action, count: count() })
@@ -66,6 +67,7 @@ router.get("/dashboard", async (req, res) => {
 
   const totalEvents = Number(totalEventsRow?.count ?? 0);
   const totalPatches = Number(totalPatchesRow?.count ?? 0);
+  const totalCorrelations = Number(totalCorrelationsRow?.count ?? 0);
   const avgScore = Number(avgRow?.avg ?? 0);
   const threatLevel = Math.min(100, Math.round(avgScore * 5));
   const openAlerts = statusCounts.NEW + statusCounts.ACKNOWLEDGED + statusCounts.INVESTIGATING;
@@ -79,6 +81,7 @@ router.get("/dashboard", async (req, res) => {
   res.json({
     totalEvents,
     totalPatches,
+    totalCorrelations,
     openAlerts,
     resolvedAlerts,
     actionCounts,

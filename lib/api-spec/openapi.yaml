@@ -2,8 +2,8 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
-  description: SOC OS - Self-Healing Security Platform API
+  version: 0.3.0
+  description: SOC OS - SaaS Security Platform API (V30/V50)
 servers:
   - url: /api
     description: Base API path
@@ -16,6 +16,12 @@ tags:
     description: Self-healing simulation
   - name: dashboard
     description: Dashboard and analytics
+  - name: tenants
+    description: Multi-tenant management
+  - name: rules
+    description: Rules engine management
+  - name: correlations
+    description: Attack chain correlations
 paths:
   /healthz:
     get:
@@ -34,7 +40,7 @@ paths:
     get:
       operationId: listEvents
       tags: [events]
-      summary: List all security events
+      summary: List security events
       parameters:
         - name: action
           in: query
@@ -48,6 +54,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
         - name: limit
           in: query
           schema:
@@ -64,7 +74,7 @@ paths:
     post:
       operationId: processEvent
       tags: [events]
-      summary: Process a security event
+      summary: Process a security event through the full SOC pipeline
       requestBody:
         required: true
         content:
@@ -73,11 +83,11 @@ paths:
               $ref: "#/components/schemas/EventInput"
       responses:
         "200":
-          description: Processed event result
+          description: Pipeline result
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SecurityEvent"
+                $ref: "#/components/schemas/PipelineResult"
 
   /events/{id}:
     get:
@@ -105,7 +115,6 @@ paths:
       operationId: updateEventStatus
       tags: [events]
       summary: Update alert lifecycle status
-      description: Transition an event through NEW → ACKNOWLEDGED → INVESTIGATING → RESOLVED
       parameters:
         - name: id
           in: path
@@ -135,7 +144,7 @@ paths:
       summary: Run self red-team test
       responses:
         "200":
-          description: Self-test results with vulnerabilities and patches
+          description: Self-test results
           content:
             application/json:
               schema:
@@ -148,7 +157,7 @@ paths:
       summary: Run full self-healing simulation
       responses:
         "200":
-          description: Full simulation result
+          description: Simulation result
           content:
             application/json:
               schema:
@@ -161,7 +170,7 @@ paths:
       summary: List all auto-applied patches
       responses:
         "200":
-          description: List of applied patches
+          description: List of patches
           content:
             application/json:
               schema:
@@ -189,7 +198,7 @@ paths:
       summary: Get threat graph
       responses:
         "200":
-          description: Threat graph data
+          description: Threat graph
           content:
             application/json:
               schema:
@@ -200,7 +209,6 @@ paths:
       operationId: getSystemMetrics
       tags: [dashboard]
       summary: Get real-time server system metrics
-      description: Returns actual CPU, memory, and load average from the host system
       responses:
         "200":
           description: System metrics
@@ -214,7 +222,6 @@ paths:
       operationId: getMitreStats
       tags: [dashboard]
       summary: Get MITRE ATT&CK tactic breakdown
-      description: Returns event counts grouped by MITRE ATT&CK tactic
       responses:
         "200":
           description: MITRE stats
@@ -229,17 +236,245 @@ paths:
     get:
       operationId: getRiskTimeline
       tags: [dashboard]
-      summary: Get risk score over time
-      description: Returns avg risk score per hour for the last 24h
+      summary: Get risk score over time (last 24h)
       responses:
         "200":
-          description: Risk timeline data
+          description: Risk timeline
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/RiskTimelinePoint"
+
+  /queue-stats:
+    get:
+      operationId: getQueueStats
+      tags: [dashboard]
+      summary: Get ingest queue statistics
+      responses:
+        "200":
+          description: Queue stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueStats"
+
+  # ─── TENANTS ──────────────────────────────────────────────────────────────
+  /tenants:
+    get:
+      operationId: listTenants
+      tags: [tenants]
+      summary: List all tenants
+      responses:
+        "200":
+          description: List of tenants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tenant"
+    post:
+      operationId: createTenant
+      tags: [tenants]
+      summary: Create a new tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantBody"
+      responses:
+        "201":
+          description: Created tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+
+  /tenants/{id}:
+    get:
+      operationId: getTenant
+      tags: [tenants]
+      summary: Get a tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tenant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTenant
+      tags: [tenants]
+      summary: Delete a tenant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── RULES ────────────────────────────────────────────────────────────────
+  /rules:
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List detection rules
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rule"
+    post:
+      operationId: createRule
+      tags: [rules]
+      summary: Create a new detection rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRuleBody"
+      responses:
+        "201":
+          description: Created rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+
+  /rules/{id}:
+    patch:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update a detection rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRuleBody"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteRule
+      tags: [rules]
+      summary: Delete a detection rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /rules/{id}/toggle:
+    patch:
+      operationId: toggleRule
+      tags: [rules]
+      summary: Enable or disable a rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleRuleBody"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+
+  # ─── CORRELATIONS ─────────────────────────────────────────────────────────
+  /correlations:
+    get:
+      operationId: listCorrelations
+      tags: [correlations]
+      summary: List detected attack chain correlations
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of correlations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Correlation"
+
+  /correlations/{id}/resolve:
+    patch:
+      operationId: resolveCorrelation
+      tags: [correlations]
+      summary: Mark a correlation as resolved
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Resolved correlation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correlation"
+        "404":
+          description: Not found
 
 components:
   schemas:
@@ -255,6 +490,8 @@ components:
       properties:
         id:
           type: integer
+        tenantId:
+          type: ["integer", "null"]
         event:
           type: string
         score:
@@ -273,6 +510,8 @@ components:
           type: ["string", "null"]
         velocityFlag:
           type: boolean
+        correlationId:
+          type: ["integer", "null"]
         nodeId:
           type: string
         hash:
@@ -304,11 +543,33 @@ components:
         event:
           type: string
           minLength: 1
+        tenantId:
+          type: ["integer", "null"]
         cpuUsage:
           type: ["integer", "null"]
         memUsage:
           type: ["integer", "null"]
       required: [event]
+
+    PipelineResult:
+      type: object
+      properties:
+        event:
+          $ref: "#/components/schemas/SecurityEvent"
+        rulesMatched:
+          type: integer
+        scoreBoost:
+          type: integer
+        correlation:
+          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/Correlation"
+            - type: "null"
+        pipelineStages:
+          type: array
+          items:
+            type: string
+      required: [event, rulesMatched, scoreBoost, pipelineStages]
 
     UpdateEventStatusBody:
       type: object
@@ -323,6 +584,8 @@ components:
       properties:
         id:
           type: integer
+        tenantId:
+          type: ["integer", "null"]
         attack:
           type: string
         fix:
@@ -391,6 +654,8 @@ components:
           type: integer
         totalPatches:
           type: integer
+        totalCorrelations:
+          type: integer
         openAlerts:
           type: integer
         resolvedAlerts:
@@ -443,6 +708,7 @@ components:
       required:
         - totalEvents
         - totalPatches
+        - totalCorrelations
         - openAlerts
         - resolvedAlerts
         - actionCounts
@@ -509,15 +775,7 @@ components:
           type: number
         uptimeSeconds:
           type: number
-      required:
-        - cpuPercent
-        - memPercent
-        - memUsedMb
-        - memTotalMb
-        - loadAvg1m
-        - loadAvg5m
-        - loadAvg15m
-        - uptimeSeconds
+      required: [cpuPercent, memPercent, memUsedMb, memTotalMb, loadAvg1m, loadAvg5m, loadAvg15m, uptimeSeconds]
 
     MitreStat:
       type: object
@@ -541,3 +799,154 @@ components:
         count:
           type: integer
       required: [hour, avgScore, count]
+
+    QueueStats:
+      type: object
+      properties:
+        pending:
+          type: integer
+        maxSize:
+          type: integer
+        hasProcessor:
+          type: boolean
+        isProcessing:
+          type: boolean
+      required: [pending, maxSize, hasProcessor, isProcessing]
+
+    Tenant:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        apiKey:
+          type: string
+        plan:
+          type: string
+          enum: [starter, pro, enterprise]
+        createdAt:
+          type: string
+          format: date-time
+        eventCount:
+          type: integer
+      required: [id, name, apiKey, plan, createdAt]
+
+    CreateTenantBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        plan:
+          type: string
+          enum: [starter, pro, enterprise]
+      required: [name]
+
+    Rule:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        matchPattern:
+          type: string
+        scoreBoost:
+          type: integer
+        forceAction:
+          type: ["string", "null"]
+          enum: [WARN, ISOLATE, null]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        enabled:
+          type: boolean
+        hitCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, matchPattern, scoreBoost, severity, enabled, hitCount, createdAt]
+
+    CreateRuleBody:
+      type: object
+      properties:
+        tenantId:
+          type: ["integer", "null"]
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: ["string", "null"]
+        matchPattern:
+          type: string
+          minLength: 1
+        scoreBoost:
+          type: integer
+          minimum: 0
+          maximum: 20
+        forceAction:
+          type: ["string", "null"]
+          enum: [WARN, ISOLATE, null]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        enabled:
+          type: boolean
+      required: [name, matchPattern, scoreBoost, severity]
+
+    UpdateRuleBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        matchPattern:
+          type: string
+        scoreBoost:
+          type: integer
+        forceAction:
+          type: ["string", "null"]
+        severity:
+          type: string
+        enabled:
+          type: boolean
+
+    ToggleRuleBody:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required: [enabled]
+
+    Correlation:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        threatType:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        confidence:
+          type: number
+        summary:
+          type: string
+        eventIds:
+          type: string
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, threatType, severity, confidence, summary, eventIds, createdAt]

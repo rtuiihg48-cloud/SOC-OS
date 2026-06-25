@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, securityEventsTable, patchesTable } from "@workspace/db";
+import { db, securityEventsTable, patchesTable, correlationsTable } from "@workspace/db";
 import { desc, eq, and } from "drizzle-orm";
 import {
   buildEventResult,
@@ -8,6 +8,10 @@ import {
   computeNodeId,
   computeHash,
 } from "../lib/soc-engine";
+import { applyRules } from "../lib/rules-engine";
+import { correlate } from "../lib/correlation-engine";
+import { enqueue, queueStats } from "../lib/queue";
+import { broadcast } from "../lib/websocket";
 import {
   ProcessEventBody,
   UpdateEventStatusBody,
@@ -17,8 +21,6 @@ import {
 const router = Router();
 
 // ─── List Events ─────────────────────────────────────────────────────────────
-// Supports filtering by action, status, and tactic — essential for alert
-// management workflows (e.g. show only NEW ISOLATE events).
 router.get("/events", async (req, res) => {
   const parsed = ListEventsQueryParams.safeParse(req.query);
   const filters = parsed.success ? parsed.data : {};
@@ -32,14 +34,14 @@ router.get("/events", async (req, res) => {
   const filtered = events
     .filter((e) => !filters.action || e.action === filters.action)
     .filter((e) => !filters.status || e.status === filters.status)
-    .filter((e) => !filters.tactic || e.tactic === filters.tactic);
+    .filter((e) => !filters.tactic || e.tactic === filters.tactic)
+    .filter((e) => !filters.tenantId || e.tenantId === Number(filters.tenantId));
 
   res.json(filtered.map(formatEvent));
 });
 
-// ─── Process Event ────────────────────────────────────────────────────────────
-// Core SOC intake — runs detection engine, computes MITRE mapping and velocity,
-// writes to immutable chain, emits SSE to connected clients.
+// ─── V30/V50 Full SOC Pipeline ────────────────────────────────────────────────
+// Stages: Ingest → Rules Engine → Risk Engine → Correlation → Decision → Save → Broadcast
 router.post("/events", async (req, res) => {
   const parsed = ProcessEventBody.safeParse(req.body);
   if (!parsed.success) {
@@ -48,7 +50,16 @@ router.post("/events", async (req, res) => {
   }
 
   const { event, cpuUsage, memUsage } = parsed.data;
+  const tenantId = (req.body as Record<string, unknown>).tenantId as number | null ?? null;
 
+  const pipelineStages: string[] = [];
+
+  // ── Stage 1: Ingest ──────────────────────────────────────────────────────
+  pipelineStages.push("INGEST");
+  enqueue({ event, tenantId, cpuUsage: cpuUsage ?? undefined, memUsage: memUsage ?? undefined, enqueuedAt: Date.now(), source: "api" });
+
+  // ── Stage 2: Base Risk Engine (MITRE + Regex + Velocity) ─────────────────
+  pipelineStages.push("RISK_ENGINE");
   const last = await db
     .select({ hash: securityEventsTable.hash })
     .from(securityEventsTable)
@@ -56,19 +67,77 @@ router.post("/events", async (req, res) => {
     .limit(1);
 
   const prevHash = last[0]?.hash ?? "GENESIS";
-  const result = buildEventResult(event, prevHash, cpuUsage ?? 0, memUsage ?? 0);
+  let result = buildEventResult(event, prevHash, cpuUsage ?? 0, memUsage ?? 0);
 
+  // ── Stage 3: Rules Engine (DB-stored rules — V30 core feature) ───────────
+  pipelineStages.push("RULES_ENGINE");
+  const rulesResult = await applyRules(event, tenantId);
+
+  let finalScore = result.score + rulesResult.totalBoost;
+  let finalAction = rulesResult.forcedAction ?? result.action;
+
+  // Re-determine action from boosted score if no forced action
+  if (!rulesResult.forcedAction) {
+    if (finalScore >= 15) finalAction = "ISOLATE";
+    else if (finalScore >= 7) finalAction = "WARN";
+    else finalAction = "ALLOW";
+  }
+
+  // ── Stage 4: Correlation Engine (attack chain detection — V50 core value) ─
+  pipelineStages.push("CORRELATION_ENGINE");
+  const recentEvents = await db
+    .select({ event: securityEventsTable.event })
+    .from(securityEventsTable)
+    .orderBy(desc(securityEventsTable.timestamp))
+    .limit(20);
+  const recentTexts = [...recentEvents.map((e) => e.event), event];
+  const correlationResult = correlate(recentTexts);
+
+  let correlationId: number | null = null;
+  if (correlationResult) {
+    const [savedCorr] = await db
+      .insert(correlationsTable)
+      .values({
+        tenantId,
+        threatType: correlationResult.threatType,
+        severity: correlationResult.severity,
+        confidence: correlationResult.confidence,
+        summary: correlationResult.summary,
+        eventIds: JSON.stringify([]),
+      })
+      .returning();
+    correlationId = savedCorr.id;
+  }
+
+  // ── Stage 5: Decision Engine ─────────────────────────────────────────────
+  pipelineStages.push("DECISION_ENGINE");
+
+  // ── Stage 6: SOAR Auto-Fix ───────────────────────────────────────────────
+  pipelineStages.push("SOAR");
+  if (finalAction !== "ALLOW") {
+    const fix = autoFix(event);
+    if (fix) {
+      await db.insert(patchesTable).values({ tenantId, attack: event, fix, tactic: result.tactic });
+    }
+  }
+
+  // ── Stage 7: Persist to DB ───────────────────────────────────────────────
+  pipelineStages.push("PERSIST");
   const [inserted] = await db
     .insert(securityEventsTable)
     .values({
+      tenantId,
       event: result.event,
-      score: result.score,
-      action: result.action,
+      score: finalScore,
+      action: finalAction,
       status: "NEW",
       tactic: result.tactic,
       technique: result.technique,
       techniqueId: result.techniqueId,
       velocityFlag: result.velocityFlag,
+      severity: result.severity,
+      ruleMatches: result.matches.length > 0 ? JSON.stringify(result.matches) : null,
+      correlationId,
       nodeId: result.nodeId,
       hash: result.hash,
       prevHash: result.prevHash,
@@ -79,15 +148,42 @@ router.post("/events", async (req, res) => {
 
   const formatted = formatEvent(inserted);
 
-  // Emit SSE to all connected clients
+  // ── Stage 8: Broadcast (WebSocket + SSE) ─────────────────────────────────
+  pipelineStages.push("BROADCAST");
+  const broadcastPayload = {
+    type: "security_event",
+    event: formatted,
+    correlation: correlationResult ?? null,
+    rulesMatched: rulesResult.matches.length,
+    scoreBoost: rulesResult.totalBoost,
+  };
+
+  broadcast(broadcastPayload, tenantId ?? undefined);
   sseClients.forEach((send) => send(formatted));
 
-  res.json(formatted);
+  res.json({
+    event: formatted,
+    rulesMatched: rulesResult.matches.length,
+    scoreBoost: rulesResult.totalBoost,
+    correlation: correlationResult
+      ? {
+          id: correlationId,
+          tenantId,
+          threatType: correlationResult.threatType,
+          severity: correlationResult.severity,
+          confidence: correlationResult.confidence,
+          summary: correlationResult.summary,
+          eventIds: "[]",
+          resolvedAt: null,
+          createdAt: new Date().toISOString(),
+        }
+      : null,
+    pipelineStages,
+  });
 });
 
 // ─── SSE Stream ───────────────────────────────────────────────────────────────
-// MUST be registered before /events/:id so Express doesn't try to parse
-// the literal string "stream" as a numeric id param.
+// MUST be registered before /events/:id — "stream" would be parsed as NaN id
 type SseSend = (data: unknown) => void;
 export const sseClients = new Set<SseSend>();
 
@@ -113,37 +209,20 @@ router.get("/events/stream", (req, res) => {
 // ─── Get Single Event ─────────────────────────────────────────────────────────
 router.get("/events/:id", async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
-  const [event] = await db
-    .select()
-    .from(securityEventsTable)
-    .where(eq(securityEventsTable.id, id));
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  if (!event) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
+  const [event] = await db.select().from(securityEventsTable).where(eq(securityEventsTable.id, id));
+  if (!event) { res.status(404).json({ error: "Not found" }); return; }
   res.json(formatEvent(event));
 });
 
 // ─── Update Alert Status ──────────────────────────────────────────────────────
-// Alert lifecycle management: NEW → ACKNOWLEDGED → INVESTIGATING → RESOLVED
-// This is the key enterprise workflow feature — analysts triage and close alerts.
 router.patch("/events/:id/status", async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const parsed = UpdateEventStatusBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid status" });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: "Invalid status" }); return; }
 
   const [updated] = await db
     .update(securityEventsTable)
@@ -151,11 +230,16 @@ router.patch("/events/:id/status", async (req, res) => {
     .where(eq(securityEventsTable.id, id))
     .returning();
 
-  if (!updated) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Broadcast status change via WebSocket
+  broadcast({ type: "status_update", eventId: id, status: parsed.data.status });
   res.json(formatEvent(updated));
+});
+
+// ─── Queue Stats ──────────────────────────────────────────────────────────────
+router.get("/queue-stats", (_req, res) => {
+  res.json(queueStats());
 });
 
 // ─── Self Red-Team ────────────────────────────────────────────────────────────
@@ -178,6 +262,8 @@ router.post("/self-test", async (req, res) => {
       score: result.score,
       action: result.action,
       status: "NEW",
+      severity: result.severity,
+      ruleMatches: result.matches.length > 0 ? JSON.stringify(result.matches) : null,
       tactic: result.tactic,
       technique: result.technique,
       techniqueId: result.techniqueId,
@@ -194,6 +280,7 @@ router.post("/self-test", async (req, res) => {
         score: 0,
         action: "PATCHED",
         status: "RESOLVED",
+        severity: "LOW",
         tactic: result.tactic,
         technique: result.technique,
         techniqueId: result.techniqueId,
@@ -203,12 +290,7 @@ router.post("/self-test", async (req, res) => {
         prevHash: result.hash,
       });
 
-      await db.insert(patchesTable).values({
-        attack: result.event,
-        fix,
-        tactic: result.tactic,
-      });
-
+      await db.insert(patchesTable).values({ attack: result.event, fix, tactic: result.tactic });
       patchesApplied++;
     }
 
@@ -246,6 +328,8 @@ router.post("/simulate", async (req, res) => {
       score: baseResult.score,
       action: baseResult.action,
       status: "NEW",
+      severity: baseResult.severity,
+      ruleMatches: baseResult.matches.length > 0 ? JSON.stringify(baseResult.matches) : null,
       tactic: baseResult.tactic,
       technique: baseResult.technique,
       techniqueId: baseResult.techniqueId,
@@ -268,6 +352,8 @@ router.post("/simulate", async (req, res) => {
       score: result.score,
       action: result.action,
       status: "NEW",
+      severity: result.severity,
+      ruleMatches: result.matches.length > 0 ? JSON.stringify(result.matches) : null,
       tactic: result.tactic,
       technique: result.technique,
       techniqueId: result.techniqueId,

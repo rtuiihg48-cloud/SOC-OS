@@ -1,0 +1,128 @@
+// security-core.ts
+
+export type Severity =
+  | "LOW"
+  | "MEDIUM"
+  | "HIGH"
+  | "CRITICAL";
+
+export type Action =
+  | "ALLOW"
+  | "WARN"
+  | "ISOLATE";
+
+export interface SecurityEvent {
+  source: string;
+  message: string;
+  timestamp: number;
+}
+
+export interface DetectionResult {
+  score: number;
+  severity: Severity;
+  action: Action;
+  matches: string[];
+  timestamp: number;
+}
+
+const RULES = [
+  {
+    id: "xss",
+    pattern: /xss/i,
+    score: 5,
+  },
+  {
+    id: "sql_injection",
+    pattern: /(sql.*inject|union select)/i,
+    score: 7,
+  },
+  {
+    id: "bruteforce",
+    pattern: /bruteforce/i,
+    score: 6,
+  },
+  {
+    id: "malware",
+    pattern: /malware/i,
+    score: 8,
+  },
+  {
+    id: "ransomware",
+    pattern: /ransomware/i,
+    score: 10,
+  },
+];
+
+function evaluateRules(message: string) {
+  let score = 0;
+  const matches: string[] = [];
+
+  for (const rule of RULES) {
+    if (rule.pattern.test(message)) {
+      score += rule.score;
+      matches.push(rule.id);
+    }
+  }
+
+  return { score, matches };
+}
+
+function severityFromScore(score: number): Severity {
+  if (score >= 15) return "CRITICAL";
+  if (score >= 10) return "HIGH";
+  if (score >= 5) return "MEDIUM";
+  return "LOW";
+}
+
+function actionFromScore(score: number): Action {
+  if (score >= 15) return "ISOLATE";
+  if (score >= 5) return "WARN";
+  return "ALLOW";
+}
+
+export function processEvent(
+  event: SecurityEvent
+): DetectionResult {
+
+  const result = evaluateRules(event.message);
+
+  return {
+    score: result.score,
+    severity: severityFromScore(result.score),
+    action: actionFromScore(result.score),
+    matches: result.matches,
+    timestamp: Date.now(),
+  };
+}
+Ось приклад базового security-ядра (Security Core v1) — мінімальний, але цілісний рушій для обробки подій без БД, API та UI.
+TypeScript
+Приклад використання
+TypeScript
+import { processEvent } from "./security-core";
+
+const result = processEvent({
+  source: "web-app",
+  message: "possible sql inject attempt detected",
+  timestamp: Date.now(),
+});
+
+console.log(result);
+Результат:
+JSON
+{
+  "score": 7,
+  "severity": "MEDIUM",
+  "action": "WARN",
+  "matches": ["sql_injection"]
+}
+Це базове ядро виконує три ключові функції:
+Аналізує події за правилами.
+Розраховує рівень ризику.
+Приймає рішення (ALLOW, WARN, ISOLATE).
+Далі на нього можна накладати:
+REST API;
+WebSocket-потік;
+PostgreSQL;
+багатокористувацький режим;
+кореляцію подій;
+SOAR-автоматизацію.
