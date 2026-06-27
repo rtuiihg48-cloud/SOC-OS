@@ -370,7 +370,7 @@ paths:
       operationId: updateRule
       tags: [rules]
       summary: Update a detection rule
-      parameters:
+      parameters: як
         - name: id
           in: path
           required: true
