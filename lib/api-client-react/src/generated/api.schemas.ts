@@ -9,6 +9,20 @@ export interface HealthStatus {
   status: string;
 }
 
+export type VoiceTranscriptionFormat = typeof VoiceTranscriptionFormat[keyof typeof VoiceTranscriptionFormat];
+
+
+export const VoiceTranscriptionFormat = {
+  wav: 'wav',
+  mp3: 'mp3',
+} as const;
+
+export interface VoiceTranscription {
+  transcript: string;
+  format: VoiceTranscriptionFormat;
+  audioStored: false;
+}
+
 export type SecurityEventAction = typeof SecurityEventAction[keyof typeof SecurityEventAction];
 
 

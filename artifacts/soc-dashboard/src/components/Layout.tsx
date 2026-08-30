@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare } from "lucide-react";
 import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
+import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -82,7 +83,7 @@ export function Layout({ children }: { children: ReactNode }) {
         {/* Subtle grid background */}
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
         
-        <header className="h-16 flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-sm flex items-center px-8 z-10 justify-between">
+        <header className="h-16 flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-sm flex items-center px-8 z-30 justify-between">
           <h1 className="text-xl font-semibold tracking-wide capitalize">
             {navItems.find(n => n.href === location)?.label || "Dashboard"}
           </h1>
@@ -91,6 +92,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className={`font-bold ${dashboard?.threatLevel && dashboard.threatLevel > 75 ? 'text-critical' : dashboard?.threatLevel && dashboard.threatLevel > 50 ? 'text-warn' : 'text-safe'}`}>
               {dashboard?.threatLevel ?? 0}%
             </span>
+            <VoiceCommandPanel />
           </div>
         </header>
 

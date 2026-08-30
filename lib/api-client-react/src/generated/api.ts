@@ -50,7 +50,8 @@ import type {
   ThreatGraph,
   ToggleRuleBody,
   UpdateEventStatusBody,
-  UpdateRuleBody
+  UpdateRuleBody,
+  VoiceTranscription
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -584,6 +585,77 @@ export const useRunSimulation = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRunSimulationMutationOptions(options));
+    }
+
+export const getTranscribeVoiceUrl = () => {
+
+
+
+
+  return `/api/voice/transcribe`
+}
+
+/**
+ * @summary Transcribe an audio command without storing the audio
+ */
+export const transcribeVoice = async (transcribeVoiceBody: Blob, options?: RequestInit): Promise<VoiceTranscription> => {
+
+  return customFetch<VoiceTranscription>(getTranscribeVoiceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'audio/wav', ...options?.headers },
+    body: JSON.stringify(
+      transcribeVoiceBody,)
+  }
+);}
+
+
+
+
+export const getTranscribeVoiceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext> => {
+
+const mutationKey = ['transcribeVoice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transcribeVoice>>, {data: BodyType<Blob>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  transcribeVoice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TranscribeVoiceMutationResult = NonNullable<Awaited<ReturnType<typeof transcribeVoice>>>
+    export type TranscribeVoiceMutationBody = BodyType<Blob>
+    export type TranscribeVoiceMutationError = ErrorType<void>
+
+    /**
+ * @summary Transcribe an audio command without storing the audio
+ */
+export const useTranscribeVoice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transcribeVoice>>,
+        TError,
+        {data: BodyType<Blob>},
+        TContext
+      > => {
+      return useMutation(getTranscribeVoiceMutationOptions(options));
     }
 
 export const getListPatchesUrl = () => {

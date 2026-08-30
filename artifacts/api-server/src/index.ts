@@ -3,10 +3,11 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initWebSocket } from "./lib/websocket";
 import { setProcessor } from "./lib/queue";
-import { db, tenantsTable, rulesTable } from "@workspace/db";
+import { db, pool, tenantsTable, rulesTable } from "@workspace/db";
 import { eq, count } from "drizzle-orm";
 import { DEFAULT_SYSTEM_RULES } from "./lib/rules-engine";
 import crypto from "crypto";
+import { CpuSimulatorScheduler } from "./lib/cpu-simulator";
 
 const rawPort = process.env["PORT"];
 
@@ -21,6 +22,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const server = http.createServer(app);
+const cpuSimulator = new CpuSimulatorScheduler();
 
 // ── WebSocket (V30 realtime broadcast) ───────────────────────────────────────
 initWebSocket(server);
@@ -73,9 +75,20 @@ async function seedDefaultData() {
 server.listen(port, async () => {
   logger.info({ port }, "SOC-OS V50 server listening");
   await seedDefaultData();
+  cpuSimulator.start();
 });
 
 server.on("error", (err) => {
   logger.error({ err }, "Server error");
   process.exit(1);
 });
+
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, async () => {
+    logger.info({ signal }, "Stopping SOC-OS services");
+    await cpuSimulator.stop();
+    server.close(() => {
+      void pool.end().finally(() => process.exit(0));
+    });
+  });
+}

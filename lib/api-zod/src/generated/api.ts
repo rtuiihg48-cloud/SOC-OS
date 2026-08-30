@@ -210,6 +210,16 @@ export const RunSimulationResponse = zod.object({
 
 
 /**
+ * @summary Transcribe an audio command without storing the audio
+ */
+export const TranscribeVoiceResponse = zod.object({
+  "transcript": zod.string(),
+  "format": zod.enum(['wav', 'mp3']),
+  "audioStored": zod.literal(false)
+})
+
+
+/**
  * @summary List all auto-applied patches
  */
 export const ListPatchesResponseItem = zod.object({

@@ -165,6 +165,48 @@ paths:
               schema:
                 $ref: "#/components/schemas/SimulationResult"
 
+  /voice/transcribe:
+    post:
+      operationId: transcribeVoice
+      tags: [voice]
+      summary: Transcribe an audio command without storing the audio
+      requestBody:
+        required: true
+        content:
+          audio/wav:
+            schema:
+              type: string
+              format: binary
+          audio/webm:
+            schema:
+              type: string
+              format: binary
+          audio/mp4:
+            schema:
+              type: string
+              format: binary
+          audio/mpeg:
+            schema:
+              type: string
+              format: binary
+          audio/ogg:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Transcribed voice input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceTranscription"
+        "400":
+          description: Audio payload is missing
+        "415":
+          description: Unsupported audio format
+        "502":
+          description: Transcription provider unavailable
+
   /patches:
     get:
       operationId: listPatches
@@ -671,6 +713,19 @@ components:
         status:
           type: string
       required: [status]
+
+    VoiceTranscription:
+      type: object
+      properties:
+        transcript:
+          type: string
+        format:
+          type: string
+          enum: [wav, mp3]
+        audioStored:
+          type: boolean
+          enum: [false]
+      required: [transcript, format, audioStored]
 
     SecurityEvent:
       type: object

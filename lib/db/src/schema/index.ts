@@ -1,4 +1,5 @@
-import { pgTable, serial, text, integer, timestamp, boolean, real } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean, real, jsonb, index, check } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -77,6 +78,60 @@ export const patchesTable = pgTable("patches", {
   appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── DNA / Knowledge Memory ──────────────────────────────────────────────────
+// Predictions are immutable observations. Verification is appended separately
+// so the original prediction remains available for audits and future training.
+export const dnaPredictionsTable = pgTable("dna_predictions", {
+  id: serial("id").primaryKey(),
+  cycleId: text("cycle_id").notNull(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id),
+  attackFamily: text("attack_family").notNull(),
+  scenario: text("scenario").notNull(),
+  tactic: text("tactic"),
+  technique: text("technique"),
+  techniqueId: text("technique_id"),
+  riskScore: integer("risk_score").notNull(),
+  riskLevel: text("risk_level").notNull(),
+  confidence: real("confidence").notNull(),
+  predictedAction: text("predicted_action").notNull(),
+  proposedDefense: text("proposed_defense"),
+  predictedDefenseSucceeded: boolean("predicted_defense_succeeded").notNull(),
+  predictedResidualRisk: integer("predicted_residual_risk").notNull(),
+  predictedVulnerability: text("predicted_vulnerability"),
+  telemetrySnapshot: jsonb("telemetry_snapshot").$type<Record<string, number | string | boolean>>().notNull(),
+  historyFeatures: jsonb("history_features").$type<Record<string, number>>().notNull(),
+  observerNote: text("observer_note").notNull(),
+  modelVersion: text("model_version").notNull(),
+  predictionStatus: text("prediction_status").notNull().default("predicted"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("dna_predictions_tenant_id_idx").on(table.tenantId),
+  index("dna_predictions_family_created_at_idx").on(table.attackFamily, table.createdAt),
+  index("dna_predictions_created_at_idx").on(table.createdAt),
+  check("dna_predictions_confidence_check", sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`),
+  check("dna_predictions_predicted_residual_risk_check", sql`${table.predictedResidualRisk} >= 0`),
+  check("dna_predictions_prediction_status_check", sql`${table.predictionStatus} = 'predicted'`),
+]);
+
+export const dnaOutcomesTable = pgTable("dna_outcomes", {
+  id: serial("id").primaryKey(),
+  predictionId: integer("prediction_id").notNull().references(() => dnaPredictionsTable.id, { onDelete: "restrict" }),
+  source: text("source").notNull().default("simulation"),
+  verificationStatus: text("verification_status").notNull(),
+  defenseAction: text("defense_action"),
+  defenseSucceeded: boolean("defense_succeeded").notNull(),
+  residualRisk: integer("residual_risk").notNull(),
+  vulnerabilityPattern: text("vulnerability_pattern"),
+  reflection: text("reflection").notNull(),
+  details: jsonb("details").$type<Record<string, number | string | boolean | null>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("dna_outcomes_prediction_id_idx").on(table.predictionId),
+  index("dna_outcomes_status_created_at_idx").on(table.verificationStatus, table.createdAt),
+  check("dna_outcomes_verification_status_check", sql`${table.verificationStatus} IN ('verified', 'rejected', 'inconclusive')`),
+  check("dna_outcomes_residual_risk_check", sql`${table.residualRisk} >= 0`),
+]);
+
 // ─── Derived types ────────────────────────────────────────────────────────────
 export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -97,3 +152,11 @@ export type SecurityEvent = typeof securityEventsTable.$inferSelect;
 export const insertPatchSchema = createInsertSchema(patchesTable).omit({ id: true, appliedAt: true });
 export type InsertPatch = z.infer<typeof insertPatchSchema>;
 export type Patch = typeof patchesTable.$inferSelect;
+
+export const insertDnaPredictionSchema = createInsertSchema(dnaPredictionsTable).omit({ id: true, createdAt: true });
+export type InsertDnaPrediction = z.infer<typeof insertDnaPredictionSchema>;
+export type DnaPrediction = typeof dnaPredictionsTable.$inferSelect;
+
+export const insertDnaOutcomeSchema = createInsertSchema(dnaOutcomesTable).omit({ id: true, createdAt: true });
+export type InsertDnaOutcome = z.infer<typeof insertDnaOutcomeSchema>;
+export type DnaOutcome = typeof dnaOutcomesTable.$inferSelect;

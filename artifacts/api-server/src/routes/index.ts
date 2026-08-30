@@ -6,6 +6,7 @@ import tenantsRouter from "./tenants";
 import rulesRouter from "./rules";
 import correlationsRouter from "./correlations";
 import metaCubeRouter from "./meta-cube";
+import voiceRouter from "./voice";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
 
 const router: IRouter = Router();
@@ -17,6 +18,7 @@ router.use(tenantsRouter);
 router.use(rulesRouter);
 router.use(correlationsRouter);
 router.use(metaCubeRouter);
+router.use(voiceRouter);
 router.post("/scan/lockfile", async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {
