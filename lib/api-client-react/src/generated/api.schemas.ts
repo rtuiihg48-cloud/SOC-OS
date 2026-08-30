@@ -141,6 +141,7 @@ export const SecurityEventStatus = {
   NEW: 'NEW',
   ACKNOWLEDGED: 'ACKNOWLEDGED',
   INVESTIGATING: 'INVESTIGATING',
+  QUARANTINED: 'QUARANTINED',
   RESOLVED: 'RESOLVED',
 } as const;
 
@@ -212,6 +213,40 @@ export interface PipelineResult {
   scoreBoost: number;
   correlation?: Correlation | null;
   pipelineStages: string[];
+}
+
+export type SandboxQuarantineStatus = typeof SandboxQuarantineStatus[keyof typeof SandboxQuarantineStatus];
+
+
+export const SandboxQuarantineStatus = {
+  QUARANTINED: 'QUARANTINED',
+  RELEASED: 'RELEASED',
+  DISCARDED: 'DISCARDED',
+} as const;
+
+export type SandboxQuarantineShellType = typeof SandboxQuarantineShellType[keyof typeof SandboxQuarantineShellType];
+
+
+export const SandboxQuarantineShellType = {
+  LOGICAL_QUARANTINE: 'LOGICAL_QUARANTINE',
+} as const;
+
+export type SandboxQuarantineSnapshot = { [key: string]: unknown };
+
+export interface SandboxQuarantine {
+  id: number;
+  eventId: number;
+  /** @nullable */
+  tenantId?: number | null;
+  isolationId: string;
+  status: SandboxQuarantineStatus;
+  shellType: SandboxQuarantineShellType;
+  reason: string;
+  snapshot: SandboxQuarantineSnapshot;
+  executionAllowed: false;
+  createdAt: string;
+  /** @nullable */
+  releasedAt?: string | null;
 }
 
 export type UpdateEventStatusBodyStatus = typeof UpdateEventStatusBodyStatus[keyof typeof UpdateEventStatusBodyStatus];
@@ -587,6 +622,24 @@ tactic?: string;
 tenantId?: number;
 limit?: number;
 };
+
+export type ListQuarantineCapturesParams = {
+status?: ListQuarantineCapturesStatus;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListQuarantineCapturesStatus = typeof ListQuarantineCapturesStatus[keyof typeof ListQuarantineCapturesStatus];
+
+
+export const ListQuarantineCapturesStatus = {
+  QUARANTINED: 'QUARANTINED',
+  RELEASED: 'RELEASED',
+  DISCARDED: 'DISCARDED',
+} as const;
 
 export type ListMetaCubeExecutionsParams = {
 status?: ListMetaCubeExecutionsStatus;

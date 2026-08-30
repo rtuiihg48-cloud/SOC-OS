@@ -32,9 +32,14 @@ export default function Alerts() {
     { query: { queryKey: getListEventsQueryKey({ action: "WARN", status: "ACKNOWLEDGED", limit: 20 }), refetchInterval: 10000 } }
   );
 
+  const { data: isolateQuarantined, isLoading: load5 } = useListEvents(
+    { action: "ISOLATE", status: "QUARANTINED", limit: 20 },
+    { query: { queryKey: getListEventsQueryKey({ action: "ISOLATE", status: "QUARANTINED", limit: 20 }), refetchInterval: 10000 } }
+  );
+
   const updateStatus = useUpdateEventStatus();
 
-  if (load1 || load2 || load3 || load4) {
+  if (load1 || load2 || load3 || load4 || load5) {
     return (
       <div className="w-full h-full flex items-center justify-center font-mono text-primary animate-pulse">
         [ FETCHING ACTIVE ALERTS... ]
@@ -46,7 +51,8 @@ export default function Alerts() {
     ...(isolateNew || []), 
     ...(warnNew || []),
     ...(isolateAck || []),
-    ...(warnAck || [])
+    ...(warnAck || []),
+    ...(isolateQuarantined || [])
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const handleUpdateStatus = (id: number, status: 'ACKNOWLEDGED' | 'INVESTIGATING' | 'RESOLVED') => {

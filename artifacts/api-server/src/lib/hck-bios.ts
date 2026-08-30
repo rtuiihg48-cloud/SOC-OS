@@ -47,6 +47,7 @@ const REQUIRED_TABLES = [
   "dna_attack_links",
   "dna_prediction_layer_observations",
   "agent_observer_runs",
+  "sandbox_quarantines",
 ];
 
 const CAPABILITIES: HckBiosStatus["capabilities"] = [

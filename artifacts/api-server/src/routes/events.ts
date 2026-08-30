@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, securityEventsTable, patchesTable, correlationsTable } from "@workspace/db";
+import { db, securityEventsTable, patchesTable, correlationsTable, sandboxQuarantinesTable } from "@workspace/db";
 import { desc, eq, and } from "drizzle-orm";
 import {
   buildEventResult,
@@ -12,6 +12,7 @@ import { applyRules } from "../lib/rules-engine";
 import { correlate } from "../lib/correlation-engine";
 import { enqueue, queueStats } from "../lib/queue";
 import { broadcast } from "../lib/websocket";
+import { buildQuarantineCapture } from "../lib/quarantine-shell";
 import {
   ProcessEventBody,
   UpdateEventStatusBody,
@@ -123,28 +124,76 @@ router.post("/events", async (req, res) => {
 
   // ── Stage 7: Persist to DB ───────────────────────────────────────────────
   pipelineStages.push("PERSIST");
-  const [inserted] = await db
-    .insert(securityEventsTable)
-    .values({
+  const persisted = await db.transaction(async (tx) => {
+    const [eventRow] = await tx
+      .insert(securityEventsTable)
+      .values({
+        tenantId,
+        event: result.event,
+        score: finalScore,
+        action: finalAction,
+        status: "NEW",
+        tactic: result.tactic,
+        technique: result.technique,
+        techniqueId: result.techniqueId,
+        velocityFlag: result.velocityFlag,
+        severity: result.severity,
+        ruleMatches: result.matches.length > 0 ? JSON.stringify(result.matches) : null,
+        correlationId,
+        nodeId: result.nodeId,
+        hash: result.hash,
+        prevHash: result.prevHash,
+        cpuUsage: cpuUsage ?? null,
+        memUsage: memUsage ?? null,
+      })
+      .returning();
+
+    if (finalAction !== "ISOLATE") {
+      return { event: eventRow, quarantine: null };
+    }
+
+    const capture = buildQuarantineCapture({
+      eventId: eventRow.id,
       tenantId,
-      event: result.event,
-      score: finalScore,
-      action: finalAction,
-      status: "NEW",
-      tactic: result.tactic,
-      technique: result.technique,
-      techniqueId: result.techniqueId,
-      velocityFlag: result.velocityFlag,
-      severity: result.severity,
-      ruleMatches: result.matches.length > 0 ? JSON.stringify(result.matches) : null,
-      correlationId,
-      nodeId: result.nodeId,
-      hash: result.hash,
-      prevHash: result.prevHash,
-      cpuUsage: cpuUsage ?? null,
-      memUsage: memUsage ?? null,
-    })
-    .returning();
+      event: eventRow.event,
+      score: eventRow.score,
+      action: eventRow.action,
+      status: "QUARANTINED",
+      severity: eventRow.severity,
+      tactic: eventRow.tactic,
+      technique: eventRow.technique,
+      techniqueId: eventRow.techniqueId,
+      velocityFlag: eventRow.velocityFlag,
+      ruleMatches: eventRow.ruleMatches,
+      hash: eventRow.hash,
+      prevHash: eventRow.prevHash,
+      nodeId: eventRow.nodeId,
+    });
+
+    const [quarantine] = await tx
+      .insert(sandboxQuarantinesTable)
+      .values({
+        eventId: eventRow.id,
+        tenantId,
+        isolationId: capture.isolationId,
+        status: capture.status,
+        shellType: capture.shellType,
+        reason: capture.reason,
+        snapshot: capture.snapshot,
+        executionAllowed: capture.executionAllowed,
+      })
+      .returning();
+
+    const [quarantinedEvent] = await tx
+      .update(securityEventsTable)
+      .set({ status: "QUARANTINED" })
+      .where(eq(securityEventsTable.id, eventRow.id))
+      .returning();
+
+    return { event: quarantinedEvent ?? eventRow, quarantine };
+  });
+
+  const inserted = persisted.event;
 
   const formatted = formatEvent(inserted);
 
@@ -176,6 +225,15 @@ router.post("/events", async (req, res) => {
           eventIds: "[]",
           resolvedAt: null,
           createdAt: new Date().toISOString(),
+        }
+      : null,
+    quarantine: persisted.quarantine
+      ? {
+          id: persisted.quarantine.id,
+          isolationId: persisted.quarantine.isolationId,
+          status: persisted.quarantine.status,
+          shellType: persisted.quarantine.shellType,
+          executionAllowed: persisted.quarantine.executionAllowed,
         }
       : null,
     pipelineStages,

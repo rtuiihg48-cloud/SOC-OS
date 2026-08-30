@@ -46,13 +46,14 @@ export default function Events() {
     ACK: events?.filter(e => e.status === 'ACKNOWLEDGED').length || 0,
     INV: events?.filter(e => e.status === 'INVESTIGATING').length || 0,
     RES: events?.filter(e => e.status === 'RESOLVED').length || 0,
+    QUAR: events?.filter(e => e.status === 'QUARANTINED').length || 0,
   };
 
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-8rem)]">
       
       {/* Triage Summary */}
-      <div className="grid grid-cols-4 gap-4 shrink-0">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 shrink-0">
         <Card className="bg-critical/5 border-critical/20">
           <CardContent className="p-4 flex flex-col items-center">
             <div className="text-2xl font-mono font-bold text-critical">{counts.NEW}</div>
@@ -77,6 +78,12 @@ export default function Events() {
             <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground">RESOLVED</div>
           </CardContent>
         </Card>
+        <Card className="bg-critical/5 border-critical/20">
+          <CardContent className="p-4 flex flex-col items-center">
+            <div className="text-2xl font-mono font-bold text-critical">{counts.QUAR}</div>
+            <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground">QUARANTINED</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filter Bar */}
@@ -96,6 +103,7 @@ export default function Events() {
               <SelectItem value="NEW">NEW</SelectItem>
               <SelectItem value="ACKNOWLEDGED">ACKNOWLEDGED</SelectItem>
               <SelectItem value="INVESTIGATING">INVESTIGATING</SelectItem>
+              <SelectItem value="QUARANTINED">QUARANTINED</SelectItem>
               <SelectItem value="RESOLVED">RESOLVED</SelectItem>
             </SelectContent>
           </Select>
@@ -170,7 +178,8 @@ export default function Events() {
                         <Badge variant="outline" className={`font-mono text-[10px] ${
                           ev.status === 'NEW' ? 'border-critical text-critical' :
                           ev.status === 'ACKNOWLEDGED' ? 'border-warn text-warn' :
-                          ev.status === 'INVESTIGATING' ? 'border-primary text-primary' : 'border-safe text-safe'
+                           ev.status === 'INVESTIGATING' ? 'border-primary text-primary' :
+                           ev.status === 'QUARANTINED' ? 'border-critical text-critical' : 'border-safe text-safe'
                         }`}>
                           {ev.status}
                         </Badge>

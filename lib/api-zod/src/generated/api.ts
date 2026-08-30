@@ -90,7 +90,7 @@ export const ListEventsResponseItem = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),
@@ -126,7 +126,7 @@ export const ProcessEventResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),
@@ -157,6 +157,56 @@ export const ProcessEventResponse = zod.object({
 
 
 /**
+ * @summary List logical sandbox quarantine captures
+ */
+export const listQuarantineCapturesQueryLimitMax = 100;
+
+
+
+export const ListQuarantineCapturesQueryParams = zod.object({
+  "status": zod.enum(['QUARANTINED', 'RELEASED', 'DISCARDED']).optional(),
+  "limit": zod.coerce.number().min(1).max(listQuarantineCapturesQueryLimitMax).optional()
+})
+
+export const ListQuarantineCapturesResponseItem = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "isolationId": zod.string(),
+  "status": zod.enum(['QUARANTINED', 'RELEASED', 'DISCARDED']),
+  "shellType": zod.enum(['LOGICAL_QUARANTINE']),
+  "reason": zod.string(),
+  "snapshot": zod.record(zod.string(), zod.unknown()),
+  "executionAllowed": zod.literal(false),
+  "createdAt": zod.coerce.date(),
+  "releasedAt": zod.coerce.date().nullish()
+})
+export const ListQuarantineCapturesResponse = zod.array(ListQuarantineCapturesResponseItem)
+
+
+/**
+ * @summary Get one logical sandbox quarantine capture
+ */
+export const GetQuarantineCaptureParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetQuarantineCaptureResponse = zod.object({
+  "id": zod.number(),
+  "eventId": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "isolationId": zod.string(),
+  "status": zod.enum(['QUARANTINED', 'RELEASED', 'DISCARDED']),
+  "shellType": zod.enum(['LOGICAL_QUARANTINE']),
+  "reason": zod.string(),
+  "snapshot": zod.record(zod.string(), zod.unknown()),
+  "executionAllowed": zod.literal(false),
+  "createdAt": zod.coerce.date(),
+  "releasedAt": zod.coerce.date().nullish()
+})
+
+
+/**
  * @summary Get a single security event
  */
 export const GetEventParams = zod.object({
@@ -169,7 +219,7 @@ export const GetEventResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),
@@ -201,7 +251,7 @@ export const UpdateEventStatusResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),
@@ -243,7 +293,7 @@ export const RunSimulationResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),
@@ -319,7 +369,7 @@ export const GetDashboardResponse = zod.object({
   "event": zod.string(),
   "score": zod.number(),
   "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE', 'PATCHED']),
-  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'RESOLVED']),
+  "status": zod.enum(['NEW', 'ACKNOWLEDGED', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED']),
   "tactic": zod.string().nullish(),
   "technique": zod.string().nullish(),
   "techniqueId": zod.string().nullish(),

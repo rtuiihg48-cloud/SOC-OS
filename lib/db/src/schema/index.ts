@@ -68,6 +68,31 @@ export const securityEventsTable = pgTable("security_events", {
   memUsage: integer("mem_usage"),
 });
 
+// ─── Sandbox Quarantine Captures ──────────────────────────────────────────────
+// A logical isolation envelope for detected events. It captures evidence and
+// explicitly forbids execution; the future container phase must not bypass it.
+export const sandboxQuarantinesTable = pgTable("sandbox_quarantines", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => securityEventsTable.id, { onDelete: "restrict" }),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  isolationId: text("isolation_id").notNull(),
+  status: text("status").notNull().default("QUARANTINED"),
+  shellType: text("shell_type").notNull().default("LOGICAL_QUARANTINE"),
+  reason: text("reason").notNull(),
+  snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+  executionAllowed: boolean("execution_allowed").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("sandbox_quarantines_event_id_uidx").on(table.eventId),
+  uniqueIndex("sandbox_quarantines_isolation_id_uidx").on(table.isolationId),
+  index("sandbox_quarantines_tenant_created_at_idx").on(table.tenantId, table.createdAt),
+  index("sandbox_quarantines_status_created_at_idx").on(table.status, table.createdAt),
+  check("sandbox_quarantines_status_check", sql`${table.status} IN ('QUARANTINED', 'RELEASED', 'DISCARDED')`),
+  check("sandbox_quarantines_shell_type_check", sql`${table.shellType} = 'LOGICAL_QUARANTINE'`),
+  check("sandbox_quarantines_execution_disabled_check", sql`${table.executionAllowed} = false`),
+]);
+
 // ─── Patches ─────────────────────────────────────────────────────────────────
 export const patchesTable = pgTable("patches", {
   id: serial("id").primaryKey(),
@@ -206,6 +231,10 @@ export type Correlation = typeof correlationsTable.$inferSelect;
 export const insertSecurityEventSchema = createInsertSchema(securityEventsTable).omit({ id: true, timestamp: true });
 export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
 export type SecurityEvent = typeof securityEventsTable.$inferSelect;
+
+export const insertSandboxQuarantineSchema = createInsertSchema(sandboxQuarantinesTable).omit({ id: true, createdAt: true });
+export type InsertSandboxQuarantine = z.infer<typeof insertSandboxQuarantineSchema>;
+export type SandboxQuarantine = typeof sandboxQuarantinesTable.$inferSelect;
 
 export const insertPatchSchema = createInsertSchema(patchesTable).omit({ id: true, appliedAt: true });
 export type InsertPatch = z.infer<typeof insertPatchSchema>;

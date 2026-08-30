@@ -28,6 +28,8 @@ tags:
     description: Observer-only agent analysis
   - name: boot
     description: HCK-BIOS runtime diagnostics
+  - name: quarantine
+    description: Logical sandbox quarantine captures
 paths:
   /healthz:
     get:
@@ -136,6 +138,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PipelineResult"
+
+  /quarantine:
+    get:
+      operationId: listQuarantineCaptures
+      tags: [quarantine]
+      summary: List logical sandbox quarantine captures
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [QUARANTINED, RELEASED, DISCARDED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Quarantine captures
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SandboxQuarantine"
+
+  /quarantine/{id}:
+    get:
+      operationId: getQuarantineCapture
+      tags: [quarantine]
+      summary: Get one logical sandbox quarantine capture
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quarantine capture
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxQuarantine"
+        "404":
+          description: Quarantine capture not found
 
   /events/{id}:
     get:
@@ -875,7 +925,7 @@ components:
           enum: [ALLOW, WARN, ISOLATE, PATCHED]
         status:
           type: string
-          enum: [NEW, ACKNOWLEDGED, INVESTIGATING, RESOLVED]
+          enum: [NEW, ACKNOWLEDGED, INVESTIGATING, QUARANTINED, RESOLVED]
         tactic:
           type: ["string", "null"]
         technique:
@@ -944,6 +994,39 @@ components:
           items:
             type: string
       required: [event, rulesMatched, scoreBoost, pipelineStages]
+
+    SandboxQuarantine:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        isolationId:
+          type: string
+        status:
+          type: string
+          enum: [QUARANTINED, RELEASED, DISCARDED]
+        shellType:
+          type: string
+          enum: [LOGICAL_QUARANTINE]
+        reason:
+          type: string
+        snapshot:
+          type: object
+          additionalProperties: true
+        executionAllowed:
+          type: boolean
+          enum: [false]
+        createdAt:
+          type: string
+          format: date-time
+        releasedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, eventId, isolationId, status, shellType, reason, snapshot, executionAllowed, createdAt]
 
     UpdateEventStatusBody:
       type: object

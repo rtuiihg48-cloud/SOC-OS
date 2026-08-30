@@ -9,6 +9,7 @@ import metaCubeRouter from "./meta-cube";
 import voiceRouter from "./voice";
 import agentObserverRouter from "./agent-observer";
 import bootRouter from "./boot";
+import quarantineRouter from "./quarantine";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
 
 const router: IRouter = Router();
@@ -23,6 +24,7 @@ router.use(metaCubeRouter);
 router.use(voiceRouter);
 router.use(agentObserverRouter);
 router.use(bootRouter);
+router.use(quarantineRouter);
 router.post("/scan/lockfile", async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {

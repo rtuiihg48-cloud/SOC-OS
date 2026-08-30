@@ -32,6 +32,7 @@ import type {
   ListMetaCubeCheckpointsParams,
   ListMetaCubeDlqParams,
   ListMetaCubeExecutionsParams,
+  ListQuarantineCapturesParams,
   ListRulesParams,
   MetaCubeCheckpoint,
   MetaCubeExecution,
@@ -45,6 +46,7 @@ import type {
   QueueStats,
   RiskTimelinePoint,
   Rule,
+  SandboxQuarantine,
   SecurityEvent,
   SelfTestResult,
   SimulationResult,
@@ -448,6 +450,167 @@ export const useProcessEvent = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getProcessEventMutationOptions(options));
     }
+
+export const getListQuarantineCapturesUrl = (params?: ListQuarantineCapturesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/quarantine?${stringifiedParams}` : `/api/quarantine`
+}
+
+/**
+ * @summary List logical sandbox quarantine captures
+ */
+export const listQuarantineCaptures = async (params?: ListQuarantineCapturesParams, options?: RequestInit): Promise<SandboxQuarantine[]> => {
+
+  return customFetch<SandboxQuarantine[]>(getListQuarantineCapturesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListQuarantineCapturesQueryKey = (params?: ListQuarantineCapturesParams,) => {
+    return [
+    `/api/quarantine`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListQuarantineCapturesQueryOptions = <TData = Awaited<ReturnType<typeof listQuarantineCaptures>>, TError = ErrorType<unknown>>(params?: ListQuarantineCapturesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuarantineCaptures>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListQuarantineCapturesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listQuarantineCaptures>>> = ({ signal }) => listQuarantineCaptures(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listQuarantineCaptures>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListQuarantineCapturesQueryResult = NonNullable<Awaited<ReturnType<typeof listQuarantineCaptures>>>
+export type ListQuarantineCapturesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List logical sandbox quarantine captures
+ */
+
+export function useListQuarantineCaptures<TData = Awaited<ReturnType<typeof listQuarantineCaptures>>, TError = ErrorType<unknown>>(
+ params?: ListQuarantineCapturesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listQuarantineCaptures>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListQuarantineCapturesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetQuarantineCaptureUrl = (id: number,) => {
+
+
+
+
+  return `/api/quarantine/${id}`
+}
+
+/**
+ * @summary Get one logical sandbox quarantine capture
+ */
+export const getQuarantineCapture = async (id: number, options?: RequestInit): Promise<SandboxQuarantine> => {
+
+  return customFetch<SandboxQuarantine>(getGetQuarantineCaptureUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetQuarantineCaptureQueryKey = (id: number,) => {
+    return [
+    `/api/quarantine/${id}`
+    ] as const;
+    }
+
+
+export const getGetQuarantineCaptureQueryOptions = <TData = Awaited<ReturnType<typeof getQuarantineCapture>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarantineCapture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetQuarantineCaptureQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getQuarantineCapture>>> = ({ signal }) => getQuarantineCapture(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getQuarantineCapture>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetQuarantineCaptureQueryResult = NonNullable<Awaited<ReturnType<typeof getQuarantineCapture>>>
+export type GetQuarantineCaptureQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get one logical sandbox quarantine capture
+ */
+
+export function useGetQuarantineCapture<TData = Awaited<ReturnType<typeof getQuarantineCapture>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getQuarantineCapture>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetQuarantineCaptureQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetEventUrl = (id: number,) => {
 

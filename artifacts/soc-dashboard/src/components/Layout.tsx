@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box } from "lucide-react";
 import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 
@@ -21,6 +21,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/correlations", label: "Correlations", icon: Link2 },
     { href: "/tenants", label: "Tenants", icon: Building2 },
     { href: "/runtime", label: "Runtime", icon: TerminalSquare },
+    { href: "/quarantine", label: "Quarantine", icon: Box },
   ];
 
   const statusColor = 

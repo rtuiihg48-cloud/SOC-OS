@@ -14,6 +14,7 @@ import RulesEngine from "@/pages/RulesEngine";
 import Correlations from "@/pages/Correlations";
 import Tenants from "@/pages/Tenants";
 import Runtime from "@/pages/Runtime";
+import Quarantine from "@/pages/Quarantine";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ function Router() {
         <Route path="/correlations" component={Correlations} />
         <Route path="/tenants" component={Tenants} />
         <Route path="/runtime" component={Runtime} />
+        <Route path="/quarantine" component={Quarantine} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
