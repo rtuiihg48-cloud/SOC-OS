@@ -61,6 +61,7 @@ const REQUIRED_TABLES = [
   "virus_matches",
   "virus_scan_runs",
   "virus_database_audit",
+  "traffic_observations",
 ];
 
 const CAPABILITIES: HckBiosStatus["capabilities"] = [

@@ -9,6 +9,195 @@ export interface HealthStatus {
   status: string;
 }
 
+export type TrafficTelemetryInputObservationType = typeof TrafficTelemetryInputObservationType[keyof typeof TrafficTelemetryInputObservationType];
+
+
+export const TrafficTelemetryInputObservationType = {
+  FLOW: 'FLOW',
+  HEARTBEAT: 'HEARTBEAT',
+} as const;
+
+export type TrafficTelemetryInputDirection = typeof TrafficTelemetryInputDirection[keyof typeof TrafficTelemetryInputDirection];
+
+
+export const TrafficTelemetryInputDirection = {
+  INBOUND: 'INBOUND',
+  OUTBOUND: 'OUTBOUND',
+  INTERNAL: 'INTERNAL',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type TrafficTelemetryInputHeartbeatStatus = typeof TrafficTelemetryInputHeartbeatStatus[keyof typeof TrafficTelemetryInputHeartbeatStatus];
+
+
+export const TrafficTelemetryInputHeartbeatStatus = {
+  HEALTHY: 'HEALTHY',
+  DEGRADED: 'DEGRADED',
+  OFFLINE: 'OFFLINE',
+} as const;
+
+export interface TrafficTelemetryInput {
+  /** @minimum 1 */
+  tenantId?: number;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  gatewayId: string;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  observationId: string;
+  observationType?: TrafficTelemetryInputObservationType;
+  observedAt: string;
+  /** @maxLength 24 */
+  protocol?: string;
+  direction?: TrafficTelemetryInputDirection;
+  /** @maxLength 160 */
+  sourceAsset?: string;
+  /** @maxLength 160 */
+  destinationAsset?: string;
+  /**
+     * @minimum 0
+     * @maximum 65535
+     */
+  sourcePort?: number;
+  /**
+     * @minimum 0
+     * @maximum 65535
+     */
+  destinationPort?: number;
+  /**
+     * @minimum 0
+     * @maximum 1073741824
+     */
+  bytesOut?: number;
+  /**
+     * @minimum 0
+     * @maximum 1073741824
+     */
+  bytesIn?: number;
+  /**
+     * @minimum 0
+     * @maximum 10000000
+     */
+  packets?: number;
+  /**
+     * @minimum 0
+     * @maximum 86400000
+     */
+  durationMs?: number;
+  /** @maxLength 253 */
+  dnsQueryName?: string;
+  /** @maxLength 253 */
+  tlsServerName?: string;
+  /** @maxLength 253 */
+  httpHost?: string;
+  heartbeatStatus?: TrafficTelemetryInputHeartbeatStatus;
+  /**
+     * @minimum 0
+     * @maximum 120000
+     */
+  heartbeatLatencyMs?: number;
+}
+
+export type TrafficObservationObservationType = typeof TrafficObservationObservationType[keyof typeof TrafficObservationObservationType];
+
+
+export const TrafficObservationObservationType = {
+  FLOW: 'FLOW',
+  HEARTBEAT: 'HEARTBEAT',
+} as const;
+
+export type TrafficObservationSeverity = typeof TrafficObservationSeverity[keyof typeof TrafficObservationSeverity];
+
+
+export const TrafficObservationSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export type TrafficObservationRecommendedAction = typeof TrafficObservationRecommendedAction[keyof typeof TrafficObservationRecommendedAction];
+
+
+export const TrafficObservationRecommendedAction = {
+  ALLOW: 'ALLOW',
+  WARN: 'WARN',
+  ISOLATE: 'ISOLATE',
+} as const;
+
+export interface TrafficObservation {
+  id: number;
+  /** @nullable */
+  tenantId: number | null;
+  gatewayId: string;
+  observationId: string;
+  observationType: TrafficObservationObservationType;
+  observedAt: string;
+  protocol: string;
+  direction: string;
+  /** @nullable */
+  sourceAsset?: string | null;
+  /** @nullable */
+  destinationAsset?: string | null;
+  /** @nullable */
+  sourcePort?: number | null;
+  /** @nullable */
+  destinationPort?: number | null;
+  bytesOut: number;
+  bytesIn: number;
+  packets: number;
+  durationMs: number;
+  /** @nullable */
+  dnsQueryName?: string | null;
+  /** @nullable */
+  tlsServerName?: string | null;
+  /** @nullable */
+  httpHost?: string | null;
+  /** @nullable */
+  heartbeatStatus?: string | null;
+  /** @nullable */
+  heartbeatLatencyMs?: number | null;
+  isSynthetic: boolean;
+  riskScore: number;
+  severity: TrafficObservationSeverity;
+  signals: string[];
+  recommendedAction: TrafficObservationRecommendedAction;
+  analysisVersion: string;
+  createdAt: string;
+}
+
+export type TrafficSummaryProtocolBreakdown = {[key: string]: number};
+
+export type TrafficSummarySignalBreakdown = {[key: string]: number};
+
+export type TrafficSummaryGatewayHealth = {
+  total: number;
+  healthy: number;
+  degraded: number;
+  offline: number;
+  /** @nullable */
+  lastSeenAt: string | null;
+};
+
+export interface TrafficSummary {
+  totalObservations: number;
+  flowCount: number;
+  heartbeatCount: number;
+  highRiskCount: number;
+  isolatedCount: number;
+  warnedCount: number;
+  bytesOut: number;
+  bytesIn: number;
+  protocolBreakdown: TrafficSummaryProtocolBreakdown;
+  signalBreakdown: TrafficSummarySignalBreakdown;
+  gatewayHealth: TrafficSummaryGatewayHealth;
+  generatedAt: string;
+}
+
 export type ObserverAgentInputTaskType = typeof ObserverAgentInputTaskType[keyof typeof ObserverAgentInputTaskType];
 
 
@@ -1361,6 +1550,57 @@ limit?: number;
 export type ApplyRestorePointBody = {
   eventId?: number;
 };
+
+export type ListTrafficFlowsParams = {
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+protocol?: string;
+action?: ListTrafficFlowsAction;
+severity?: ListTrafficFlowsSeverity;
+direction?: ListTrafficFlowsDirection;
+observationType?: ListTrafficFlowsObservationType;
+gatewayId?: string;
+};
+
+export type ListTrafficFlowsAction = typeof ListTrafficFlowsAction[keyof typeof ListTrafficFlowsAction];
+
+
+export const ListTrafficFlowsAction = {
+  ALLOW: 'ALLOW',
+  WARN: 'WARN',
+  ISOLATE: 'ISOLATE',
+} as const;
+
+export type ListTrafficFlowsSeverity = typeof ListTrafficFlowsSeverity[keyof typeof ListTrafficFlowsSeverity];
+
+
+export const ListTrafficFlowsSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export type ListTrafficFlowsDirection = typeof ListTrafficFlowsDirection[keyof typeof ListTrafficFlowsDirection];
+
+
+export const ListTrafficFlowsDirection = {
+  INBOUND: 'INBOUND',
+  OUTBOUND: 'OUTBOUND',
+  INTERNAL: 'INTERNAL',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+
+export type ListTrafficFlowsObservationType = typeof ListTrafficFlowsObservationType[keyof typeof ListTrafficFlowsObservationType];
+
+
+export const ListTrafficFlowsObservationType = {
+  FLOW: 'FLOW',
+  HEARTBEAT: 'HEARTBEAT',
+} as const;
 
 export type ListMetaCubeExecutionsParams = {
 status?: ListMetaCubeExecutionsStatus;

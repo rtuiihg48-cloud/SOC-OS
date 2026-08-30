@@ -34,6 +34,8 @@ tags:
     description: Verified restore points for managed logical resources
   - name: virus-database
     description: Virus intelligence catalog and private sample metadata
+  - name: traffic
+    description: Normalized Node Gateway traffic telemetry and deterministic analysis
 paths:
   /healthz:
     get:
@@ -397,6 +399,108 @@ paths:
                 $ref: "#/components/schemas/SecurityEvent"
         "404":
           description: Not found
+
+  /traffic/telemetry:
+    post:
+      operationId: ingestTrafficTelemetry
+      tags: [traffic]
+      summary: Ingest a normalized Node Gateway heartbeat or flow summary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrafficTelemetryInput"
+      responses:
+        "201":
+          description: Stored and analyzed traffic observation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficObservation"
+        "400":
+          description: Invalid or unsafe telemetry
+        "409":
+          description: Observation already exists for this gateway
+
+  /traffic/flows:
+    get:
+      operationId: listTrafficFlows
+      tags: [traffic]
+      summary: List analyzed Node Gateway flow summaries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: protocol
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [ALLOW, WARN, ISOLATE]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [INBOUND, OUTBOUND, INTERNAL, UNKNOWN]
+        - name: observationType
+          in: query
+          schema:
+            type: string
+            enum: [FLOW, HEARTBEAT]
+        - name: gatewayId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Analyzed traffic observations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrafficObservation"
+
+  /traffic/summary:
+    get:
+      operationId: getTrafficSummary
+      tags: [traffic]
+      summary: Get traffic risk and gateway health summary
+      responses:
+        "200":
+          description: Traffic analysis summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficSummary"
+
+  /traffic/synthetic:
+    post:
+      operationId: generateSyntheticTraffic
+      tags: [traffic]
+      summary: Generate harmless synthetic flow summaries for analysis validation
+      responses:
+        "201":
+          description: Synthetic observations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrafficObservation"
 
   /self-test:
     post:
@@ -1317,6 +1421,202 @@ components:
         status:
           type: string
       required: [status]
+
+    TrafficTelemetryInput:
+      type: object
+      properties:
+        tenantId:
+          type: integer
+          minimum: 1
+        gatewayId:
+          type: string
+          minLength: 1
+          maxLength: 120
+        observationId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        observationType:
+          type: string
+          enum: [FLOW, HEARTBEAT]
+          default: FLOW
+        observedAt:
+          type: string
+          format: date-time
+        protocol:
+          type: string
+          maxLength: 24
+          default: UNKNOWN
+        direction:
+          type: string
+          enum: [INBOUND, OUTBOUND, INTERNAL, UNKNOWN]
+          default: UNKNOWN
+        sourceAsset:
+          type: string
+          maxLength: 160
+        destinationAsset:
+          type: string
+          maxLength: 160
+        sourcePort:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        destinationPort:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        bytesOut:
+          type: integer
+          minimum: 0
+          maximum: 1073741824
+          default: 0
+        bytesIn:
+          type: integer
+          minimum: 0
+          maximum: 1073741824
+          default: 0
+        packets:
+          type: integer
+          minimum: 0
+          maximum: 10000000
+          default: 0
+        durationMs:
+          type: integer
+          minimum: 0
+          maximum: 86400000
+          default: 0
+        dnsQueryName:
+          type: string
+          maxLength: 253
+        tlsServerName:
+          type: string
+          maxLength: 253
+        httpHost:
+          type: string
+          maxLength: 253
+        heartbeatStatus:
+          type: string
+          enum: [HEALTHY, DEGRADED, OFFLINE]
+        heartbeatLatencyMs:
+          type: integer
+          minimum: 0
+          maximum: 120000
+      required: [gatewayId, observationId, observedAt]
+
+    TrafficObservation:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        gatewayId:
+          type: string
+        observationId:
+          type: string
+        observationType:
+          type: string
+          enum: [FLOW, HEARTBEAT]
+        observedAt:
+          type: string
+          format: date-time
+        protocol:
+          type: string
+        direction:
+          type: string
+        sourceAsset:
+          type: ["string", "null"]
+        destinationAsset:
+          type: ["string", "null"]
+        sourcePort:
+          type: ["integer", "null"]
+        destinationPort:
+          type: ["integer", "null"]
+        bytesOut:
+          type: integer
+        bytesIn:
+          type: integer
+        packets:
+          type: integer
+        durationMs:
+          type: integer
+        dnsQueryName:
+          type: ["string", "null"]
+        tlsServerName:
+          type: ["string", "null"]
+        httpHost:
+          type: ["string", "null"]
+        heartbeatStatus:
+          type: ["string", "null"]
+        heartbeatLatencyMs:
+          type: ["integer", "null"]
+        isSynthetic:
+          type: boolean
+        riskScore:
+          type: integer
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        signals:
+          type: array
+          items:
+            type: string
+        recommendedAction:
+          type: string
+          enum: [ALLOW, WARN, ISOLATE]
+        analysisVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, gatewayId, observationId, observationType, observedAt, protocol, direction, bytesOut, bytesIn, packets, durationMs, isSynthetic, riskScore, severity, signals, recommendedAction, analysisVersion, createdAt]
+
+    TrafficSummary:
+      type: object
+      properties:
+        totalObservations:
+          type: integer
+        flowCount:
+          type: integer
+        heartbeatCount:
+          type: integer
+        highRiskCount:
+          type: integer
+        isolatedCount:
+          type: integer
+        warnedCount:
+          type: integer
+        bytesOut:
+          type: integer
+        bytesIn:
+          type: integer
+        protocolBreakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        signalBreakdown:
+          type: object
+          additionalProperties:
+            type: integer
+        gatewayHealth:
+          type: object
+          properties:
+            total:
+              type: integer
+            healthy:
+              type: integer
+            degraded:
+              type: integer
+            offline:
+              type: integer
+            lastSeenAt:
+              type: ["string", "null"]
+              format: date-time
+          required: [total, healthy, degraded, offline, lastSeenAt]
+        generatedAt:
+          type: string
+          format: date-time
+      required: [totalObservations, flowCount, heartbeatCount, highRiskCount, isolatedCount, warnedCount, bytesOut, bytesIn, protocolBreakdown, signalBreakdown, gatewayHealth, generatedAt]
 
     ObserverAgentInput:
       type: object

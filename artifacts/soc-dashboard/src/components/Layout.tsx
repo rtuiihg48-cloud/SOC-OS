@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network } from "lucide-react";
 import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 
@@ -54,6 +54,7 @@ export function Layout({ children }: { children: ReactNode }) {
       label: "Platform",
       items: [
         { href: "/runtime", label: "Runtime", icon: TerminalSquare },
+        { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
         { href: "/tenants", label: "Tenants", icon: Building2 },
       ],
     },

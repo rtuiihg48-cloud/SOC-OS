@@ -12,6 +12,7 @@ import bootRouter from "./boot";
 import quarantineRouter from "./quarantine";
 import selfHealingRouter from "./self-healing";
 import virusDatabaseRouter from "./virus-database";
+import trafficRouter from "./traffic";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
 
 const router: IRouter = Router();
@@ -29,6 +30,7 @@ router.use(bootRouter);
 router.use(quarantineRouter);
 router.use(selfHealingRouter);
 router.use(virusDatabaseRouter);
+router.use(trafficRouter);
 router.post("/scan/lockfile", async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {

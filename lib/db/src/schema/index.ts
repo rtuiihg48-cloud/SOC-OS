@@ -68,6 +68,53 @@ export const securityEventsTable = pgTable("security_events", {
   memUsage: integer("mem_usage"),
 });
 
+// ─── Node Gateway Traffic Observations ────────────────────────────────────────
+// Only normalized flow/heartbeat metadata is retained. Packet payloads and raw
+// captures are intentionally not represented by this model.
+export const trafficObservationsTable = pgTable("traffic_observations", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  gatewayId: text("gateway_id").notNull(),
+  observationId: text("observation_id").notNull(),
+  observationType: text("observation_type").notNull().default("FLOW"),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  protocol: text("protocol").notNull().default("UNKNOWN"),
+  direction: text("direction").notNull().default("UNKNOWN"),
+  sourceAsset: text("source_asset"),
+  destinationAsset: text("destination_asset"),
+  sourcePort: integer("source_port"),
+  destinationPort: integer("destination_port"),
+  bytesOut: integer("bytes_out").notNull().default(0),
+  bytesIn: integer("bytes_in").notNull().default(0),
+  packets: integer("packets").notNull().default(0),
+  durationMs: integer("duration_ms").notNull().default(0),
+  dnsQueryName: text("dns_query_name"),
+  tlsServerName: text("tls_server_name"),
+  httpHost: text("http_host"),
+  heartbeatStatus: text("heartbeat_status"),
+  heartbeatLatencyMs: integer("heartbeat_latency_ms"),
+  isSynthetic: boolean("is_synthetic").notNull().default(false),
+  riskScore: integer("risk_score").notNull().default(0),
+  severity: text("severity").notNull().default("LOW"),
+  signals: jsonb("signals").$type<string[]>().notNull().default([]),
+  recommendedAction: text("recommended_action").notNull().default("ALLOW"),
+  analysisVersion: text("analysis_version").notNull().default("traffic-v1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("traffic_observations_tenant_gateway_observation_uidx").on(sql`coalesce(${table.tenantId}, 0)`, table.gatewayId, table.observationId),
+  index("traffic_observations_tenant_observed_idx").on(table.tenantId, table.observedAt),
+  index("traffic_observations_action_observed_idx").on(table.recommendedAction, table.observedAt),
+  index("traffic_observations_protocol_observed_idx").on(table.protocol, table.observedAt),
+  check("traffic_observations_type_check", sql`${table.observationType} IN ('FLOW','HEARTBEAT')`),
+  check("traffic_observations_direction_check", sql`${table.direction} IN ('INBOUND','OUTBOUND','INTERNAL','UNKNOWN')`),
+  check("traffic_observations_ports_check", sql`(${table.sourcePort} IS NULL OR ${table.sourcePort} BETWEEN 0 AND 65535) AND (${table.destinationPort} IS NULL OR ${table.destinationPort} BETWEEN 0 AND 65535)`),
+  check("traffic_observations_counters_check", sql`${table.bytesOut} >= 0 AND ${table.bytesIn} >= 0 AND ${table.packets} >= 0 AND ${table.durationMs} >= 0`),
+  check("traffic_observations_score_check", sql`${table.riskScore} BETWEEN 0 AND 100`),
+  check("traffic_observations_severity_check", sql`${table.severity} IN ('LOW','MEDIUM','HIGH','CRITICAL')`),
+  check("traffic_observations_action_check", sql`${table.recommendedAction} IN ('ALLOW','WARN','ISOLATE')`),
+  check("traffic_observations_metadata_only_check", sql`${table.observationType} IN ('FLOW','HEARTBEAT')`),
+]);
+
 // ─── Sandbox Quarantine Captures ──────────────────────────────────────────────
 // A logical isolation envelope for detected events. It captures evidence and
 // explicitly forbids execution; the future container phase must not bypass it.
@@ -455,6 +502,10 @@ export type Correlation = typeof correlationsTable.$inferSelect;
 export const insertSecurityEventSchema = createInsertSchema(securityEventsTable).omit({ id: true, timestamp: true });
 export type InsertSecurityEvent = z.infer<typeof insertSecurityEventSchema>;
 export type SecurityEvent = typeof securityEventsTable.$inferSelect;
+
+export const insertTrafficObservationSchema = createInsertSchema(trafficObservationsTable).omit({ id: true, createdAt: true, riskScore: true, severity: true, signals: true, recommendedAction: true, analysisVersion: true });
+export type InsertTrafficObservation = z.infer<typeof insertTrafficObservationSchema>;
+export type TrafficObservation = typeof trafficObservationsTable.$inferSelect;
 
 export const insertSandboxQuarantineSchema = createInsertSchema(sandboxQuarantinesTable).omit({ id: true, createdAt: true });
 export type InsertSandboxQuarantine = z.infer<typeof insertSandboxQuarantineSchema>;

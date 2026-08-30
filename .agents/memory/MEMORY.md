@@ -8,3 +8,4 @@
 - [Self-healing boundary](self-healing-boundary.md) — recovery restores verified managed:// snapshots to the same logical location; host-level rollback and payload execution stay forbidden.
 - [Virus intelligence boundary](virus-intelligence-boundary.md) — verified catalog metadata is separate from private sample bytes; matching never grants execution.
 - [Voice command safety](voice-command-safety.md) — spoken requests become typed, previewed, confirmed actions; transcripts never become executable input.
+- [Traffic analysis boundary](traffic-analysis-boundary.md) — gateway metadata only; signals stay advisory until authenticated tenant scope and temporal baselines exist.

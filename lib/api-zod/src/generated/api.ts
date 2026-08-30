@@ -452,6 +452,156 @@ export const UpdateEventStatusResponse = zod.object({
 
 
 /**
+ * @summary Ingest a normalized Node Gateway heartbeat or flow summary
+ */
+
+export const ingestTrafficTelemetryBodyGatewayIdMax = 120;
+
+export const ingestTrafficTelemetryBodyObservationIdMax = 160;
+
+export const ingestTrafficTelemetryBodyObservationTypeDefault = `FLOW`;
+export const ingestTrafficTelemetryBodyProtocolDefault = `UNKNOWN`;
+export const ingestTrafficTelemetryBodyProtocolMax = 24;
+
+export const ingestTrafficTelemetryBodyDirectionDefault = `UNKNOWN`;
+export const ingestTrafficTelemetryBodySourceAssetMax = 160;
+
+export const ingestTrafficTelemetryBodyDestinationAssetMax = 160;
+
+export const ingestTrafficTelemetryBodySourcePortMin = 0;
+export const ingestTrafficTelemetryBodySourcePortMax = 65535;
+
+export const ingestTrafficTelemetryBodyDestinationPortMin = 0;
+export const ingestTrafficTelemetryBodyDestinationPortMax = 65535;
+
+export const ingestTrafficTelemetryBodyBytesOutDefault = 0;
+export const ingestTrafficTelemetryBodyBytesOutMin = 0;
+export const ingestTrafficTelemetryBodyBytesOutMax = 1073741824;
+
+export const ingestTrafficTelemetryBodyBytesInDefault = 0;
+export const ingestTrafficTelemetryBodyBytesInMin = 0;
+export const ingestTrafficTelemetryBodyBytesInMax = 1073741824;
+
+export const ingestTrafficTelemetryBodyPacketsDefault = 0;
+export const ingestTrafficTelemetryBodyPacketsMin = 0;
+export const ingestTrafficTelemetryBodyPacketsMax = 10000000;
+
+export const ingestTrafficTelemetryBodyDurationMsDefault = 0;
+export const ingestTrafficTelemetryBodyDurationMsMin = 0;
+export const ingestTrafficTelemetryBodyDurationMsMax = 86400000;
+
+export const ingestTrafficTelemetryBodyDnsQueryNameMax = 253;
+
+export const ingestTrafficTelemetryBodyTlsServerNameMax = 253;
+
+export const ingestTrafficTelemetryBodyHttpHostMax = 253;
+
+export const ingestTrafficTelemetryBodyHeartbeatLatencyMsMin = 0;
+export const ingestTrafficTelemetryBodyHeartbeatLatencyMsMax = 120000;
+
+
+
+export const IngestTrafficTelemetryBody = zod.object({
+  "tenantId": zod.number().min(1).optional(),
+  "gatewayId": zod.string().min(1).max(ingestTrafficTelemetryBodyGatewayIdMax),
+  "observationId": zod.string().min(1).max(ingestTrafficTelemetryBodyObservationIdMax),
+  "observationType": zod.enum(['FLOW', 'HEARTBEAT']).default(ingestTrafficTelemetryBodyObservationTypeDefault),
+  "observedAt": zod.coerce.date(),
+  "protocol": zod.string().max(ingestTrafficTelemetryBodyProtocolMax).default(ingestTrafficTelemetryBodyProtocolDefault),
+  "direction": zod.enum(['INBOUND', 'OUTBOUND', 'INTERNAL', 'UNKNOWN']).default(ingestTrafficTelemetryBodyDirectionDefault),
+  "sourceAsset": zod.string().max(ingestTrafficTelemetryBodySourceAssetMax).optional(),
+  "destinationAsset": zod.string().max(ingestTrafficTelemetryBodyDestinationAssetMax).optional(),
+  "sourcePort": zod.number().min(ingestTrafficTelemetryBodySourcePortMin).max(ingestTrafficTelemetryBodySourcePortMax).optional(),
+  "destinationPort": zod.number().min(ingestTrafficTelemetryBodyDestinationPortMin).max(ingestTrafficTelemetryBodyDestinationPortMax).optional(),
+  "bytesOut": zod.number().min(ingestTrafficTelemetryBodyBytesOutMin).max(ingestTrafficTelemetryBodyBytesOutMax).default(ingestTrafficTelemetryBodyBytesOutDefault),
+  "bytesIn": zod.number().min(ingestTrafficTelemetryBodyBytesInMin).max(ingestTrafficTelemetryBodyBytesInMax).default(ingestTrafficTelemetryBodyBytesInDefault),
+  "packets": zod.number().min(ingestTrafficTelemetryBodyPacketsMin).max(ingestTrafficTelemetryBodyPacketsMax).default(ingestTrafficTelemetryBodyPacketsDefault),
+  "durationMs": zod.number().min(ingestTrafficTelemetryBodyDurationMsMin).max(ingestTrafficTelemetryBodyDurationMsMax).default(ingestTrafficTelemetryBodyDurationMsDefault),
+  "dnsQueryName": zod.string().max(ingestTrafficTelemetryBodyDnsQueryNameMax).optional(),
+  "tlsServerName": zod.string().max(ingestTrafficTelemetryBodyTlsServerNameMax).optional(),
+  "httpHost": zod.string().max(ingestTrafficTelemetryBodyHttpHostMax).optional(),
+  "heartbeatStatus": zod.enum(['HEALTHY', 'DEGRADED', 'OFFLINE']).optional(),
+  "heartbeatLatencyMs": zod.number().min(ingestTrafficTelemetryBodyHeartbeatLatencyMsMin).max(ingestTrafficTelemetryBodyHeartbeatLatencyMsMax).optional()
+})
+
+
+/**
+ * @summary List analyzed Node Gateway flow summaries
+ */
+export const listTrafficFlowsQueryLimitDefault = 50;
+export const listTrafficFlowsQueryLimitMax = 100;
+
+
+
+export const ListTrafficFlowsQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listTrafficFlowsQueryLimitMax).default(listTrafficFlowsQueryLimitDefault),
+  "protocol": zod.coerce.string().optional(),
+  "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE']).optional(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  "direction": zod.enum(['INBOUND', 'OUTBOUND', 'INTERNAL', 'UNKNOWN']).optional(),
+  "observationType": zod.enum(['FLOW', 'HEARTBEAT']).optional(),
+  "gatewayId": zod.coerce.string().optional()
+})
+
+export const ListTrafficFlowsResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullable(),
+  "gatewayId": zod.string(),
+  "observationId": zod.string(),
+  "observationType": zod.enum(['FLOW', 'HEARTBEAT']),
+  "observedAt": zod.coerce.date(),
+  "protocol": zod.string(),
+  "direction": zod.string(),
+  "sourceAsset": zod.string().nullish(),
+  "destinationAsset": zod.string().nullish(),
+  "sourcePort": zod.number().nullish(),
+  "destinationPort": zod.number().nullish(),
+  "bytesOut": zod.number(),
+  "bytesIn": zod.number(),
+  "packets": zod.number(),
+  "durationMs": zod.number(),
+  "dnsQueryName": zod.string().nullish(),
+  "tlsServerName": zod.string().nullish(),
+  "httpHost": zod.string().nullish(),
+  "heartbeatStatus": zod.string().nullish(),
+  "heartbeatLatencyMs": zod.number().nullish(),
+  "isSynthetic": zod.boolean(),
+  "riskScore": zod.number(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "signals": zod.array(zod.string()),
+  "recommendedAction": zod.enum(['ALLOW', 'WARN', 'ISOLATE']),
+  "analysisVersion": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListTrafficFlowsResponse = zod.array(ListTrafficFlowsResponseItem)
+
+
+/**
+ * @summary Get traffic risk and gateway health summary
+ */
+export const GetTrafficSummaryResponse = zod.object({
+  "totalObservations": zod.number(),
+  "flowCount": zod.number(),
+  "heartbeatCount": zod.number(),
+  "highRiskCount": zod.number(),
+  "isolatedCount": zod.number(),
+  "warnedCount": zod.number(),
+  "bytesOut": zod.number(),
+  "bytesIn": zod.number(),
+  "protocolBreakdown": zod.record(zod.string(), zod.number()),
+  "signalBreakdown": zod.record(zod.string(), zod.number()),
+  "gatewayHealth": zod.object({
+  "total": zod.number(),
+  "healthy": zod.number(),
+  "degraded": zod.number(),
+  "offline": zod.number(),
+  "lastSeenAt": zod.coerce.date().nullable()
+}),
+  "generatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Run self red-team test
  */
 export const RunSelfTestResponse = zod.object({

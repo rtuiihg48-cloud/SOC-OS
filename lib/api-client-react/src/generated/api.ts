@@ -39,6 +39,7 @@ import type {
   ListRestorePointsParams,
   ListRulesParams,
   ListSelfHealingActionsParams,
+  ListTrafficFlowsParams,
   ListVirusDatabaseAuditParams,
   ListVirusEntriesParams,
   ListVirusMatchesParams,
@@ -71,6 +72,9 @@ import type {
   Tenant,
   ThreatGraph,
   ToggleRuleBody,
+  TrafficObservation,
+  TrafficSummary,
+  TrafficTelemetryInput,
   UpdateEventStatusBody,
   UpdateRuleBody,
   VirusCatalogEntry,
@@ -315,7 +319,6 @@ export function useGetBootStatus<TData = Awaited<ReturnType<typeof getBootStatus
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
 
 
 
@@ -1250,6 +1253,308 @@ export const useUpdateEventStatus = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateEventStatusMutationOptions(options));
+    }
+
+export const getIngestTrafficTelemetryUrl = () => {
+
+
+
+
+  return `/api/traffic/telemetry`
+}
+
+/**
+ * @summary Ingest a normalized Node Gateway heartbeat or flow summary
+ */
+export const ingestTrafficTelemetry = async (trafficTelemetryInput: TrafficTelemetryInput, options?: RequestInit): Promise<TrafficObservation> => {
+
+  return customFetch<TrafficObservation>(getIngestTrafficTelemetryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      trafficTelemetryInput,)
+  }
+);}
+
+
+
+
+export const getIngestTrafficTelemetryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ingestTrafficTelemetry>>, TError,{data: BodyType<TrafficTelemetryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ingestTrafficTelemetry>>, TError,{data: BodyType<TrafficTelemetryInput>}, TContext> => {
+
+const mutationKey = ['ingestTrafficTelemetry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ingestTrafficTelemetry>>, {data: BodyType<TrafficTelemetryInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  ingestTrafficTelemetry(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IngestTrafficTelemetryMutationResult = NonNullable<Awaited<ReturnType<typeof ingestTrafficTelemetry>>>
+    export type IngestTrafficTelemetryMutationBody = BodyType<TrafficTelemetryInput>
+    export type IngestTrafficTelemetryMutationError = ErrorType<void>
+
+    /**
+ * @summary Ingest a normalized Node Gateway heartbeat or flow summary
+ */
+export const useIngestTrafficTelemetry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ingestTrafficTelemetry>>, TError,{data: BodyType<TrafficTelemetryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ingestTrafficTelemetry>>,
+        TError,
+        {data: BodyType<TrafficTelemetryInput>},
+        TContext
+      > => {
+      return useMutation(getIngestTrafficTelemetryMutationOptions(options));
+    }
+
+export const getListTrafficFlowsUrl = (params?: ListTrafficFlowsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/traffic/flows?${stringifiedParams}` : `/api/traffic/flows`
+}
+
+/**
+ * @summary List analyzed Node Gateway flow summaries
+ */
+export const listTrafficFlows = async (params?: ListTrafficFlowsParams, options?: RequestInit): Promise<TrafficObservation[]> => {
+
+  return customFetch<TrafficObservation[]>(getListTrafficFlowsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTrafficFlowsQueryKey = (params?: ListTrafficFlowsParams,) => {
+    return [
+    `/api/traffic/flows`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListTrafficFlowsQueryOptions = <TData = Awaited<ReturnType<typeof listTrafficFlows>>, TError = ErrorType<unknown>>(params?: ListTrafficFlowsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrafficFlows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTrafficFlowsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTrafficFlows>>> = ({ signal }) => listTrafficFlows(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTrafficFlows>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTrafficFlowsQueryResult = NonNullable<Awaited<ReturnType<typeof listTrafficFlows>>>
+export type ListTrafficFlowsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List analyzed Node Gateway flow summaries
+ */
+
+export function useListTrafficFlows<TData = Awaited<ReturnType<typeof listTrafficFlows>>, TError = ErrorType<unknown>>(
+ params?: ListTrafficFlowsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTrafficFlows>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTrafficFlowsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTrafficSummaryUrl = () => {
+
+
+
+
+  return `/api/traffic/summary`
+}
+
+/**
+ * @summary Get traffic risk and gateway health summary
+ */
+export const getTrafficSummary = async ( options?: RequestInit): Promise<TrafficSummary> => {
+
+  return customFetch<TrafficSummary>(getGetTrafficSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTrafficSummaryQueryKey = () => {
+    return [
+    `/api/traffic/summary`
+    ] as const;
+    }
+
+
+export const getGetTrafficSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getTrafficSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrafficSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTrafficSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTrafficSummary>>> = ({ signal }) => getTrafficSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTrafficSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTrafficSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getTrafficSummary>>>
+export type GetTrafficSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get traffic risk and gateway health summary
+ */
+
+export function useGetTrafficSummary<TData = Awaited<ReturnType<typeof getTrafficSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTrafficSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTrafficSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGenerateSyntheticTrafficUrl = () => {
+
+
+
+
+  return `/api/traffic/synthetic`
+}
+
+/**
+ * @summary Generate harmless synthetic flow summaries for analysis validation
+ */
+export const generateSyntheticTraffic = async ( options?: RequestInit): Promise<TrafficObservation[]> => {
+
+  return customFetch<TrafficObservation[]>(getGenerateSyntheticTrafficUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getGenerateSyntheticTrafficMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateSyntheticTraffic>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof generateSyntheticTraffic>>, TError,void, TContext> => {
+
+const mutationKey = ['generateSyntheticTraffic'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof generateSyntheticTraffic>>, void> = () => {
+
+
+          return  generateSyntheticTraffic(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GenerateSyntheticTrafficMutationResult = NonNullable<Awaited<ReturnType<typeof generateSyntheticTraffic>>>
+
+    export type GenerateSyntheticTrafficMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Generate harmless synthetic flow summaries for analysis validation
+ */
+export const useGenerateSyntheticTraffic = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateSyntheticTraffic>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof generateSyntheticTraffic>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getGenerateSyntheticTrafficMutationOptions(options));
     }
 
 export const getRunSelfTestUrl = () => {
