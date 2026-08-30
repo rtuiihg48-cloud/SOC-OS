@@ -5,3 +5,4 @@
 - [Observer-only agent loop](observer-only-agent-loop.md) — agent tools are read-only, policy-gated, audited, and isolated from live detection state.
 - [HCK-BIOS boundary](hck-bios-boundary.md) — boot stages report real readiness; hardware-like layers stay diagnostic and never replace execution or storage semantics.
 - [Quarantine boundary](quarantine-boundary.md) — detected ISOLATE events enter an atomic logical envelope; payload execution stays disabled until an authorized container phase.
+- [Self-healing boundary](self-healing-boundary.md) — recovery restores verified managed:// snapshots to the same logical location; host-level rollback and payload execution stay forbidden.

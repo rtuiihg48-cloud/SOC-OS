@@ -172,6 +172,8 @@ export interface SecurityEvent {
   memUsage?: number | null;
 }
 
+export type EventInputObservedManagedState = { [key: string]: unknown };
+
 export interface EventInput {
   /** @minLength 1 */
   event: string;
@@ -181,6 +183,9 @@ export interface EventInput {
   cpuUsage?: number | null;
   /** @nullable */
   memUsage?: number | null;
+  /** @pattern ^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$ */
+  managedResourceKey?: string;
+  observedManagedState?: EventInputObservedManagedState;
 }
 
 export type CorrelationSeverity = typeof CorrelationSeverity[keyof typeof CorrelationSeverity];
@@ -207,12 +212,55 @@ export interface Correlation {
   createdAt: string;
 }
 
+export type SelfHealingActionMode = typeof SelfHealingActionMode[keyof typeof SelfHealingActionMode];
+
+
+export const SelfHealingActionMode = {
+  PREVIEW: 'PREVIEW',
+  APPLY: 'APPLY',
+  AUTO: 'AUTO',
+} as const;
+
+export type SelfHealingActionStatus = typeof SelfHealingActionStatus[keyof typeof SelfHealingActionStatus];
+
+
+export const SelfHealingActionStatus = {
+  READY: 'READY',
+  RESTORED: 'RESTORED',
+  NO_RESTORE_POINT: 'NO_RESTORE_POINT',
+  REJECTED: 'REJECTED',
+  FAILED: 'FAILED',
+} as const;
+
+export interface SelfHealingAction {
+  id: number;
+  /** @nullable */
+  tenantId?: number | null;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  restorePointId?: number | null;
+  resourceKey: string;
+  location: string;
+  mode: SelfHealingActionMode;
+  status: SelfHealingActionStatus;
+  /** @nullable */
+  previousStateHash?: string | null;
+  /** @nullable */
+  restoredStateHash?: string | null;
+  message: string;
+  createdAt: string;
+  /** @nullable */
+  completedAt?: string | null;
+}
+
 export interface PipelineResult {
   event: SecurityEvent;
   rulesMatched: number;
   scoreBoost: number;
   correlation?: Correlation | null;
   pipelineStages: string[];
+  selfHealing?: SelfHealingAction | null;
 }
 
 export type SandboxQuarantineStatus = typeof SandboxQuarantineStatus[keyof typeof SandboxQuarantineStatus];
@@ -247,6 +295,92 @@ export interface SandboxQuarantine {
   createdAt: string;
   /** @nullable */
   releasedAt?: string | null;
+}
+
+export type ManagedResourceState = { [key: string]: unknown };
+
+export type ManagedResourceIntegrityStatus = typeof ManagedResourceIntegrityStatus[keyof typeof ManagedResourceIntegrityStatus];
+
+
+export const ManagedResourceIntegrityStatus = {
+  VERIFIED: 'VERIFIED',
+  QUARANTINED: 'QUARANTINED',
+  RESTORING: 'RESTORING',
+  DEGRADED: 'DEGRADED',
+} as const;
+
+export interface ManagedResource {
+  id: number;
+  /** @nullable */
+  tenantId?: number | null;
+  resourceKey: string;
+  /** @pattern ^managed:// */
+  location: string;
+  state: ManagedResourceState;
+  stateHash: string;
+  integrityStatus: ManagedResourceIntegrityStatus;
+  updatedAt: string;
+}
+
+export type RegisterManagedResourceInputState = { [key: string]: unknown };
+
+export interface RegisterManagedResourceInput {
+  /** @nullable */
+  tenantId?: number | null;
+  /** @pattern ^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$ */
+  resourceKey: string;
+  /** @pattern ^managed://[a-zA-Z0-9][a-zA-Z0-9._/-]{0,191}$ */
+  location: string;
+  state: RegisterManagedResourceInputState;
+}
+
+export type SelfHealingRestorePointStatus = typeof SelfHealingRestorePointStatus[keyof typeof SelfHealingRestorePointStatus];
+
+
+export const SelfHealingRestorePointStatus = {
+  VERIFIED: 'VERIFIED',
+  USED: 'USED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export type SelfHealingRestorePointState = { [key: string]: unknown };
+
+export interface SelfHealingRestorePoint {
+  id: number;
+  /** @nullable */
+  tenantId?: number | null;
+  resourceKey: string;
+  location: string;
+  state: SelfHealingRestorePointState;
+  stateHash: string;
+  status: SelfHealingRestorePointStatus;
+  source: string;
+  createdAt: string;
+  verifiedAt: string;
+}
+
+export interface RegisterManagedResourceResult {
+  resource: ManagedResource;
+  restorePoint: SelfHealingRestorePoint;
+}
+
+export interface RestorePreview {
+  canRestore: boolean;
+  restorePointId: number;
+  resourceKey: string;
+  location: string;
+  currentStateHash: string;
+  targetStateHash: string;
+  sameLocation: boolean;
+  integrityVerified: boolean;
+  executionAllowed: false;
+}
+
+export interface RestoreResult {
+  resource: ManagedResource;
+  action: SelfHealingAction;
+  integrityVerified: boolean;
+  executionAllowed: false;
 }
 
 export type UpdateEventStatusBodyStatus = typeof UpdateEventStatusBodyStatus[keyof typeof UpdateEventStatusBodyStatus];
@@ -640,6 +774,39 @@ export const ListQuarantineCapturesStatus = {
   RELEASED: 'RELEASED',
   DISCARDED: 'DISCARDED',
 } as const;
+
+export type ListManagedResourcesParams = {
+tenantId?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListRestorePointsParams = {
+resourceKey?: string;
+tenantId?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListSelfHealingActionsParams = {
+resourceKey?: string;
+tenantId?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ApplyRestorePointBody = {
+  eventId?: number;
+};
 
 export type ListMetaCubeExecutionsParams = {
 status?: ListMetaCubeExecutionsStatus;

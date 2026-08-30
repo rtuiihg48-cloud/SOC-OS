@@ -110,13 +110,16 @@ export const ListEventsResponse = zod.array(ListEventsResponseItem)
  * @summary Process a security event through the full SOC pipeline
  */
 
+export const processEventBodyManagedResourceKeyRegExp = new RegExp('^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$');
 
 
 export const ProcessEventBody = zod.object({
   "event": zod.string().min(1),
   "tenantId": zod.number().nullish(),
   "cpuUsage": zod.number().nullish(),
-  "memUsage": zod.number().nullish()
+  "memUsage": zod.number().nullish(),
+  "managedResourceKey": zod.string().regex(processEventBodyManagedResourceKeyRegExp).optional(),
+  "observedManagedState": zod.record(zod.string(), zod.unknown()).optional()
 })
 
 export const ProcessEventResponse = zod.object({
@@ -152,7 +155,22 @@ export const ProcessEventResponse = zod.object({
   "resolvedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 }),zod.null()]).nullish(),
-  "pipelineStages": zod.array(zod.string())
+  "pipelineStages": zod.array(zod.string()),
+  "selfHealing": zod.union([zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "restorePointId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string(),
+  "mode": zod.enum(['PREVIEW', 'APPLY', 'AUTO']),
+  "status": zod.enum(['READY', 'RESTORED', 'NO_RESTORE_POINT', 'REJECTED', 'FAILED']),
+  "previousStateHash": zod.string().nullish(),
+  "restoredStateHash": zod.string().nullish(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullish()
+}),zod.null()]).nullish()
 })
 
 
@@ -203,6 +221,173 @@ export const GetQuarantineCaptureResponse = zod.object({
   "executionAllowed": zod.literal(false),
   "createdAt": zod.coerce.date(),
   "releasedAt": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary List resources governed by the self-healing boundary
+ */
+export const listManagedResourcesQueryLimitMax = 100;
+
+
+
+export const ListManagedResourcesQueryParams = zod.object({
+  "tenantId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().min(1).max(listManagedResourcesQueryLimitMax).optional()
+})
+
+export const listManagedResourcesResponseLocationRegExp = new RegExp('^managed:\/');
+
+
+export const ListManagedResourcesResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string().regex(listManagedResourcesResponseLocationRegExp),
+  "state": zod.record(zod.string(), zod.unknown()),
+  "stateHash": zod.string(),
+  "integrityStatus": zod.enum(['VERIFIED', 'QUARANTINED', 'RESTORING', 'DEGRADED']),
+  "updatedAt": zod.coerce.date()
+})
+export const ListManagedResourcesResponse = zod.array(ListManagedResourcesResponseItem)
+
+
+/**
+ * @summary Register a verified managed resource and create a restore point
+ */
+export const registerManagedResourceBodyResourceKeyRegExp = new RegExp('^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$');
+export const registerManagedResourceBodyLocationRegExp = new RegExp('^managed:\/\/[a-zA-Z0-9][a-zA-Z0-9._\/-]{0,191}$');
+
+
+export const RegisterManagedResourceBody = zod.object({
+  "tenantId": zod.number().nullish(),
+  "resourceKey": zod.string().regex(registerManagedResourceBodyResourceKeyRegExp),
+  "location": zod.string().regex(registerManagedResourceBodyLocationRegExp),
+  "state": zod.record(zod.string(), zod.unknown())
+})
+
+
+/**
+ * @summary List immutable verified restore points
+ */
+export const listRestorePointsQueryLimitMax = 100;
+
+
+
+export const ListRestorePointsQueryParams = zod.object({
+  "resourceKey": zod.coerce.string().optional(),
+  "tenantId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().min(1).max(listRestorePointsQueryLimitMax).optional()
+})
+
+export const ListRestorePointsResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string(),
+  "state": zod.record(zod.string(), zod.unknown()),
+  "stateHash": zod.string(),
+  "status": zod.enum(['VERIFIED', 'USED', 'REJECTED']),
+  "source": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "verifiedAt": zod.coerce.date()
+})
+export const ListRestorePointsResponse = zod.array(ListRestorePointsResponseItem)
+
+
+/**
+ * @summary List self-healing audit actions
+ */
+export const listSelfHealingActionsQueryLimitMax = 100;
+
+
+
+export const ListSelfHealingActionsQueryParams = zod.object({
+  "resourceKey": zod.coerce.string().optional(),
+  "tenantId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().min(1).max(listSelfHealingActionsQueryLimitMax).optional()
+})
+
+export const ListSelfHealingActionsResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "restorePointId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string(),
+  "mode": zod.enum(['PREVIEW', 'APPLY', 'AUTO']),
+  "status": zod.enum(['READY', 'RESTORED', 'NO_RESTORE_POINT', 'REJECTED', 'FAILED']),
+  "previousStateHash": zod.string().nullish(),
+  "restoredStateHash": zod.string().nullish(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullish()
+})
+export const ListSelfHealingActionsResponse = zod.array(ListSelfHealingActionsResponseItem)
+
+
+/**
+ * @summary Verify that a restore point can safely return to its original location
+ */
+export const PreviewRestorePointParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const PreviewRestorePointResponse = zod.object({
+  "canRestore": zod.boolean(),
+  "restorePointId": zod.number(),
+  "resourceKey": zod.string(),
+  "location": zod.string(),
+  "currentStateHash": zod.string(),
+  "targetStateHash": zod.string(),
+  "sameLocation": zod.boolean(),
+  "integrityVerified": zod.boolean(),
+  "executionAllowed": zod.literal(false)
+})
+
+
+/**
+ * @summary Atomically restore a verified point to the same managed location
+ */
+export const ApplyRestorePointParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApplyRestorePointBody = zod.object({
+  "eventId": zod.number().optional()
+})
+
+export const applyRestorePointResponseResourceLocationRegExp = new RegExp('^managed:\/');
+
+
+export const ApplyRestorePointResponse = zod.object({
+  "resource": zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string().regex(applyRestorePointResponseResourceLocationRegExp),
+  "state": zod.record(zod.string(), zod.unknown()),
+  "stateHash": zod.string(),
+  "integrityStatus": zod.enum(['VERIFIED', 'QUARANTINED', 'RESTORING', 'DEGRADED']),
+  "updatedAt": zod.coerce.date()
+}),
+  "action": zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullish(),
+  "eventId": zod.number().nullish(),
+  "restorePointId": zod.number().nullish(),
+  "resourceKey": zod.string(),
+  "location": zod.string(),
+  "mode": zod.enum(['PREVIEW', 'APPLY', 'AUTO']),
+  "status": zod.enum(['READY', 'RESTORED', 'NO_RESTORE_POINT', 'REJECTED', 'FAILED']),
+  "previousStateHash": zod.string().nullish(),
+  "restoredStateHash": zod.string().nullish(),
+  "message": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "completedAt": zod.coerce.date().nullish()
+}),
+  "integrityVerified": zod.boolean(),
+  "executionAllowed": zod.literal(false)
 })
 
 

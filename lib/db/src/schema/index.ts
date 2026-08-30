@@ -93,6 +93,62 @@ export const sandboxQuarantinesTable = pgTable("sandbox_quarantines", {
   check("sandbox_quarantines_execution_disabled_check", sql`${table.executionAllowed} = false`),
 ]);
 
+// ─── Managed Resources / Self-Healing ─────────────────────────────────────────
+// Self-healing is limited to explicit logical resources. It never addresses the
+// host filesystem and every restore is backed by a verified immutable snapshot.
+export const managedResourcesTable = pgTable("managed_resources", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  resourceKey: text("resource_key").notNull(),
+  location: text("location").notNull(),
+  state: jsonb("state").$type<Record<string, unknown>>().notNull(),
+  stateHash: text("state_hash").notNull(),
+  integrityStatus: text("integrity_status").notNull().default("VERIFIED"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("managed_resources_tenant_key_uidx").on(sql`coalesce(${table.tenantId}, 0)`, table.resourceKey),
+  index("managed_resources_integrity_idx").on(table.integrityStatus),
+  check("managed_resources_integrity_status_check", sql`${table.integrityStatus} IN ('VERIFIED', 'QUARANTINED', 'RESTORING', 'DEGRADED')`),
+]);
+
+export const selfHealingRestorePointsTable = pgTable("self_healing_restore_points", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  resourceKey: text("resource_key").notNull(),
+  location: text("location").notNull(),
+  state: jsonb("state").$type<Record<string, unknown>>().notNull(),
+  stateHash: text("state_hash").notNull(),
+  status: text("status").notNull().default("VERIFIED"),
+  source: text("source").notNull().default("managed_resource"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("self_healing_restore_points_resource_created_idx").on(table.tenantId, table.resourceKey, table.createdAt),
+  index("self_healing_restore_points_status_idx").on(table.status, table.createdAt),
+  check("self_healing_restore_points_status_check", sql`${table.status} IN ('VERIFIED', 'USED', 'REJECTED')`),
+]);
+
+export const selfHealingActionsTable = pgTable("self_healing_actions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  eventId: integer("event_id").references(() => securityEventsTable.id, { onDelete: "restrict" }),
+  restorePointId: integer("restore_point_id").references(() => selfHealingRestorePointsTable.id, { onDelete: "restrict" }),
+  resourceKey: text("resource_key").notNull(),
+  location: text("location").notNull(),
+  mode: text("mode").notNull(),
+  status: text("status").notNull(),
+  previousStateHash: text("previous_state_hash"),
+  restoredStateHash: text("restored_state_hash"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("self_healing_actions_resource_created_idx").on(table.tenantId, table.resourceKey, table.createdAt),
+  index("self_healing_actions_event_idx").on(table.eventId),
+  check("self_healing_actions_mode_check", sql`${table.mode} IN ('PREVIEW', 'APPLY', 'AUTO')`),
+  check("self_healing_actions_status_check", sql`${table.status} IN ('READY', 'RESTORED', 'NO_RESTORE_POINT', 'REJECTED', 'FAILED')`),
+]);
+
 // ─── Patches ─────────────────────────────────────────────────────────────────
 export const patchesTable = pgTable("patches", {
   id: serial("id").primaryKey(),
@@ -235,6 +291,18 @@ export type SecurityEvent = typeof securityEventsTable.$inferSelect;
 export const insertSandboxQuarantineSchema = createInsertSchema(sandboxQuarantinesTable).omit({ id: true, createdAt: true });
 export type InsertSandboxQuarantine = z.infer<typeof insertSandboxQuarantineSchema>;
 export type SandboxQuarantine = typeof sandboxQuarantinesTable.$inferSelect;
+
+export const insertManagedResourceSchema = createInsertSchema(managedResourcesTable).omit({ id: true, updatedAt: true });
+export type InsertManagedResource = z.infer<typeof insertManagedResourceSchema>;
+export type ManagedResource = typeof managedResourcesTable.$inferSelect;
+
+export const insertSelfHealingRestorePointSchema = createInsertSchema(selfHealingRestorePointsTable).omit({ id: true, createdAt: true, verifiedAt: true });
+export type InsertSelfHealingRestorePoint = z.infer<typeof insertSelfHealingRestorePointSchema>;
+export type SelfHealingRestorePoint = typeof selfHealingRestorePointsTable.$inferSelect;
+
+export const insertSelfHealingActionSchema = createInsertSchema(selfHealingActionsTable).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertSelfHealingAction = z.infer<typeof insertSelfHealingActionSchema>;
+export type SelfHealingAction = typeof selfHealingActionsTable.$inferSelect;
 
 export const insertPatchSchema = createInsertSchema(patchesTable).omit({ id: true, appliedAt: true });
 export type InsertPatch = z.infer<typeof insertPatchSchema>;

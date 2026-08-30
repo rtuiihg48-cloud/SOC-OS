@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApplyRestorePointBody,
   Correlation,
   CreateRuleBody,
   CreateTenantBody,
@@ -29,11 +30,15 @@ import type {
   HealthStatus,
   ListCorrelationsParams,
   ListEventsParams,
+  ListManagedResourcesParams,
   ListMetaCubeCheckpointsParams,
   ListMetaCubeDlqParams,
   ListMetaCubeExecutionsParams,
   ListQuarantineCapturesParams,
+  ListRestorePointsParams,
   ListRulesParams,
+  ListSelfHealingActionsParams,
+  ManagedResource,
   MetaCubeCheckpoint,
   MetaCubeExecution,
   MetaCubeExecutionInput,
@@ -44,10 +49,16 @@ import type {
   Patch,
   PipelineResult,
   QueueStats,
+  RegisterManagedResourceInput,
+  RegisterManagedResourceResult,
+  RestorePreview,
+  RestoreResult,
   RiskTimelinePoint,
   Rule,
   SandboxQuarantine,
   SecurityEvent,
+  SelfHealingAction,
+  SelfHealingRestorePoint,
   SelfTestResult,
   SimulationResult,
   SystemMetrics,
@@ -611,6 +622,471 @@ export function useGetQuarantineCapture<TData = Awaited<ReturnType<typeof getQua
 
 
 
+
+export const getListManagedResourcesUrl = (params?: ListManagedResourcesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/self-healing/resources?${stringifiedParams}` : `/api/self-healing/resources`
+}
+
+/**
+ * @summary List resources governed by the self-healing boundary
+ */
+export const listManagedResources = async (params?: ListManagedResourcesParams, options?: RequestInit): Promise<ManagedResource[]> => {
+
+  return customFetch<ManagedResource[]>(getListManagedResourcesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListManagedResourcesQueryKey = (params?: ListManagedResourcesParams,) => {
+    return [
+    `/api/self-healing/resources`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListManagedResourcesQueryOptions = <TData = Awaited<ReturnType<typeof listManagedResources>>, TError = ErrorType<unknown>>(params?: ListManagedResourcesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagedResources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListManagedResourcesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listManagedResources>>> = ({ signal }) => listManagedResources(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listManagedResources>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListManagedResourcesQueryResult = NonNullable<Awaited<ReturnType<typeof listManagedResources>>>
+export type ListManagedResourcesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List resources governed by the self-healing boundary
+ */
+
+export function useListManagedResources<TData = Awaited<ReturnType<typeof listManagedResources>>, TError = ErrorType<unknown>>(
+ params?: ListManagedResourcesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listManagedResources>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListManagedResourcesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegisterManagedResourceUrl = () => {
+
+
+
+
+  return `/api/self-healing/resources`
+}
+
+/**
+ * @summary Register a verified managed resource and create a restore point
+ */
+export const registerManagedResource = async (registerManagedResourceInput: RegisterManagedResourceInput, options?: RequestInit): Promise<RegisterManagedResourceResult> => {
+
+  return customFetch<RegisterManagedResourceResult>(getRegisterManagedResourceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      registerManagedResourceInput,)
+  }
+);}
+
+
+
+
+export const getRegisterManagedResourceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerManagedResource>>, TError,{data: BodyType<RegisterManagedResourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerManagedResource>>, TError,{data: BodyType<RegisterManagedResourceInput>}, TContext> => {
+
+const mutationKey = ['registerManagedResource'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerManagedResource>>, {data: BodyType<RegisterManagedResourceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerManagedResource(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterManagedResourceMutationResult = NonNullable<Awaited<ReturnType<typeof registerManagedResource>>>
+    export type RegisterManagedResourceMutationBody = BodyType<RegisterManagedResourceInput>
+    export type RegisterManagedResourceMutationError = ErrorType<void>
+
+    /**
+ * @summary Register a verified managed resource and create a restore point
+ */
+export const useRegisterManagedResource = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerManagedResource>>, TError,{data: BodyType<RegisterManagedResourceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerManagedResource>>,
+        TError,
+        {data: BodyType<RegisterManagedResourceInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterManagedResourceMutationOptions(options));
+    }
+
+export const getListRestorePointsUrl = (params?: ListRestorePointsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/self-healing/restore-points?${stringifiedParams}` : `/api/self-healing/restore-points`
+}
+
+/**
+ * @summary List immutable verified restore points
+ */
+export const listRestorePoints = async (params?: ListRestorePointsParams, options?: RequestInit): Promise<SelfHealingRestorePoint[]> => {
+
+  return customFetch<SelfHealingRestorePoint[]>(getListRestorePointsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRestorePointsQueryKey = (params?: ListRestorePointsParams,) => {
+    return [
+    `/api/self-healing/restore-points`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListRestorePointsQueryOptions = <TData = Awaited<ReturnType<typeof listRestorePoints>>, TError = ErrorType<unknown>>(params?: ListRestorePointsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRestorePoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRestorePointsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRestorePoints>>> = ({ signal }) => listRestorePoints(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRestorePoints>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListRestorePointsQueryResult = NonNullable<Awaited<ReturnType<typeof listRestorePoints>>>
+export type ListRestorePointsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List immutable verified restore points
+ */
+
+export function useListRestorePoints<TData = Awaited<ReturnType<typeof listRestorePoints>>, TError = ErrorType<unknown>>(
+ params?: ListRestorePointsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRestorePoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListRestorePointsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListSelfHealingActionsUrl = (params?: ListSelfHealingActionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/self-healing/actions?${stringifiedParams}` : `/api/self-healing/actions`
+}
+
+/**
+ * @summary List self-healing audit actions
+ */
+export const listSelfHealingActions = async (params?: ListSelfHealingActionsParams, options?: RequestInit): Promise<SelfHealingAction[]> => {
+
+  return customFetch<SelfHealingAction[]>(getListSelfHealingActionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSelfHealingActionsQueryKey = (params?: ListSelfHealingActionsParams,) => {
+    return [
+    `/api/self-healing/actions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSelfHealingActionsQueryOptions = <TData = Awaited<ReturnType<typeof listSelfHealingActions>>, TError = ErrorType<unknown>>(params?: ListSelfHealingActionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSelfHealingActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSelfHealingActionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSelfHealingActions>>> = ({ signal }) => listSelfHealingActions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSelfHealingActions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSelfHealingActionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSelfHealingActions>>>
+export type ListSelfHealingActionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List self-healing audit actions
+ */
+
+export function useListSelfHealingActions<TData = Awaited<ReturnType<typeof listSelfHealingActions>>, TError = ErrorType<unknown>>(
+ params?: ListSelfHealingActionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSelfHealingActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSelfHealingActionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPreviewRestorePointUrl = (id: number,) => {
+
+
+
+
+  return `/api/self-healing/restore-points/${id}/preview`
+}
+
+/**
+ * @summary Verify that a restore point can safely return to its original location
+ */
+export const previewRestorePoint = async (id: number, options?: RequestInit): Promise<RestorePreview> => {
+
+  return customFetch<RestorePreview>(getPreviewRestorePointUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPreviewRestorePointMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewRestorePoint>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewRestorePoint>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['previewRestorePoint'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewRestorePoint>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  previewRestorePoint(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewRestorePointMutationResult = NonNullable<Awaited<ReturnType<typeof previewRestorePoint>>>
+
+    export type PreviewRestorePointMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify that a restore point can safely return to its original location
+ */
+export const usePreviewRestorePoint = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewRestorePoint>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewRestorePoint>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getPreviewRestorePointMutationOptions(options));
+    }
+
+export const getApplyRestorePointUrl = (id: number,) => {
+
+
+
+
+  return `/api/self-healing/restore-points/${id}/apply`
+}
+
+/**
+ * @summary Atomically restore a verified point to the same managed location
+ */
+export const applyRestorePoint = async (id: number,
+    applyRestorePointBody?: ApplyRestorePointBody, options?: RequestInit): Promise<RestoreResult> => {
+
+  return customFetch<RestoreResult>(getApplyRestorePointUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      applyRestorePointBody,)
+  }
+);}
+
+
+
+
+export const getApplyRestorePointMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyRestorePoint>>, TError,{id: number;data?: BodyType<ApplyRestorePointBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyRestorePoint>>, TError,{id: number;data?: BodyType<ApplyRestorePointBody>}, TContext> => {
+
+const mutationKey = ['applyRestorePoint'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyRestorePoint>>, {id: number;data?: BodyType<ApplyRestorePointBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  applyRestorePoint(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyRestorePointMutationResult = NonNullable<Awaited<ReturnType<typeof applyRestorePoint>>>
+    export type ApplyRestorePointMutationBody = BodyType<ApplyRestorePointBody> | undefined
+    export type ApplyRestorePointMutationError = ErrorType<void>
+
+    /**
+ * @summary Atomically restore a verified point to the same managed location
+ */
+export const useApplyRestorePoint = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyRestorePoint>>, TError,{id: number;data?: BodyType<ApplyRestorePointBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof applyRestorePoint>>,
+        TError,
+        {id: number;data?: BodyType<ApplyRestorePointBody>},
+        TContext
+      > => {
+      return useMutation(getApplyRestorePointMutationOptions(options));
+    }
 
 export const getGetEventUrl = (id: number,) => {
 

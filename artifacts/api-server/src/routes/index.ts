@@ -10,6 +10,7 @@ import voiceRouter from "./voice";
 import agentObserverRouter from "./agent-observer";
 import bootRouter from "./boot";
 import quarantineRouter from "./quarantine";
+import selfHealingRouter from "./self-healing";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
 
 const router: IRouter = Router();
@@ -25,6 +26,7 @@ router.use(voiceRouter);
 router.use(agentObserverRouter);
 router.use(bootRouter);
 router.use(quarantineRouter);
+router.use(selfHealingRouter);
 router.post("/scan/lockfile", async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {

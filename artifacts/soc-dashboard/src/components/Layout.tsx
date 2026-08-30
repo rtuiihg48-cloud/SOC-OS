@@ -22,6 +22,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/tenants", label: "Tenants", icon: Building2 },
     { href: "/runtime", label: "Runtime", icon: TerminalSquare },
     { href: "/quarantine", label: "Quarantine", icon: Box },
+    { href: "/self-healing", label: "Self-Healing", icon: Shield },
   ];
 
   const statusColor = 

@@ -14,6 +14,11 @@ import { enqueue, queueStats } from "../lib/queue";
 import { broadcast } from "../lib/websocket";
 import { buildQuarantineCapture } from "../lib/quarantine-shell";
 import {
+  automaticallyRestoreManagedResource,
+  managedStateSize,
+  SELF_HEALING_POLICY,
+} from "../lib/self-healing";
+import {
   ProcessEventBody,
   UpdateEventStatusBody,
   ListEventsQueryParams,
@@ -50,8 +55,21 @@ router.post("/events", async (req, res) => {
     return;
   }
 
-  const { event, cpuUsage, memUsage } = parsed.data;
+  const {
+    event,
+    cpuUsage,
+    memUsage,
+    managedResourceKey,
+    observedManagedState,
+  } = parsed.data;
   const tenantId = (req.body as Record<string, unknown>).tenantId as number | null ?? null;
+  if (
+    observedManagedState &&
+    managedStateSize(observedManagedState) > SELF_HEALING_POLICY.maxStateBytes
+  ) {
+    res.status(400).json({ error: "Observed managed state exceeds the 64 KB policy limit" });
+    return;
+  }
 
   const pipelineStages: string[] = [];
 
@@ -197,7 +215,27 @@ router.post("/events", async (req, res) => {
 
   const formatted = formatEvent(inserted);
 
-  // ── Stage 8: Broadcast (WebSocket + SSE) ─────────────────────────────────
+  // ── Stage 8: Verified Self-Healing ────────────────────────────────────────
+  // Recovery never suppresses or rolls back the event/quarantine evidence.
+  let selfHealing = null;
+  if (finalAction === "ISOLATE" && managedResourceKey) {
+    pipelineStages.push("SELF_HEALING");
+    const recovery = await automaticallyRestoreManagedResource({
+      resourceKey: managedResourceKey,
+      tenantId,
+      eventId: inserted.id,
+      observedState: observedManagedState,
+    });
+    if (recovery) {
+      selfHealing = {
+        ...recovery.action,
+        createdAt: recovery.action.createdAt.toISOString(),
+        completedAt: recovery.action.completedAt?.toISOString() ?? null,
+      };
+    }
+  }
+
+  // ── Stage 9: Broadcast (WebSocket + SSE) ─────────────────────────────────
   pipelineStages.push("BROADCAST");
   const broadcastPayload = {
     type: "security_event",
@@ -236,6 +274,7 @@ router.post("/events", async (req, res) => {
           executionAllowed: persisted.quarantine.executionAllowed,
         }
       : null,
+    selfHealing,
     pipelineStages,
   });
 });

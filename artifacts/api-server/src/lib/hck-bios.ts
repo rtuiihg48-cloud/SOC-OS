@@ -48,6 +48,9 @@ const REQUIRED_TABLES = [
   "dna_prediction_layer_observations",
   "agent_observer_runs",
   "sandbox_quarantines",
+  "managed_resources",
+  "self_healing_restore_points",
+  "self_healing_actions",
 ];
 
 const CAPABILITIES: HckBiosStatus["capabilities"] = [

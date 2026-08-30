@@ -30,6 +30,8 @@ tags:
     description: HCK-BIOS runtime diagnostics
   - name: quarantine
     description: Logical sandbox quarantine captures
+  - name: self-healing
+    description: Verified restore points for managed logical resources
 paths:
   /healthz:
     get:
@@ -186,6 +188,165 @@ paths:
                 $ref: "#/components/schemas/SandboxQuarantine"
         "404":
           description: Quarantine capture not found
+
+  /self-healing/resources:
+    get:
+      operationId: listManagedResources
+      tags: [self-healing]
+      summary: List resources governed by the self-healing boundary
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Managed resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManagedResource"
+    post:
+      operationId: registerManagedResource
+      tags: [self-healing]
+      summary: Register a verified managed resource and create a restore point
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterManagedResourceInput"
+      responses:
+        "201":
+          description: Resource and verified restore point
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterManagedResourceResult"
+        "400":
+          description: Invalid or oversized resource state
+
+  /self-healing/restore-points:
+    get:
+      operationId: listRestorePoints
+      tags: [self-healing]
+      summary: List immutable verified restore points
+      parameters:
+        - name: resourceKey
+          in: query
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Restore points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SelfHealingRestorePoint"
+
+  /self-healing/actions:
+    get:
+      operationId: listSelfHealingActions
+      tags: [self-healing]
+      summary: List self-healing audit actions
+      parameters:
+        - name: resourceKey
+          in: query
+          schema:
+            type: string
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Self-healing actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SelfHealingAction"
+
+  /self-healing/restore-points/{id}/preview:
+    post:
+      operationId: previewRestorePoint
+      tags: [self-healing]
+      summary: Verify that a restore point can safely return to its original location
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Restore preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestorePreview"
+        "404":
+          description: Restore point or managed resource not found
+        "409":
+          description: Restore point failed integrity or location verification
+
+  /self-healing/restore-points/{id}/apply:
+    post:
+      operationId: applyRestorePoint
+      tags: [self-healing]
+      summary: Atomically restore a verified point to the same managed location
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                eventId:
+                  type: integer
+      responses:
+        "200":
+          description: Verified restore result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestoreResult"
+        "404":
+          description: Restore point or managed resource not found
+        "409":
+          description: Restore point failed integrity or location verification
 
   /events/{id}:
     get:
@@ -973,6 +1134,12 @@ components:
           type: ["integer", "null"]
         memUsage:
           type: ["integer", "null"]
+        managedResourceKey:
+          type: string
+          pattern: "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
+        observedManagedState:
+          type: object
+          additionalProperties: true
       required: [event]
 
     PipelineResult:
@@ -993,6 +1160,11 @@ components:
           type: array
           items:
             type: string
+        selfHealing:
+          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/SelfHealingAction"
+            - type: "null"
       required: [event, rulesMatched, scoreBoost, pipelineStages]
 
     SandboxQuarantine:
@@ -1027,6 +1199,158 @@ components:
           type: ["string", "null"]
           format: date-time
       required: [id, eventId, isolationId, status, shellType, reason, snapshot, executionAllowed, createdAt]
+
+    ManagedResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        resourceKey:
+          type: string
+        location:
+          type: string
+          pattern: "^managed://"
+        state:
+          type: object
+          additionalProperties: true
+        stateHash:
+          type: string
+        integrityStatus:
+          type: string
+          enum: [VERIFIED, QUARANTINED, RESTORING, DEGRADED]
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, resourceKey, location, state, stateHash, integrityStatus, updatedAt]
+
+    RegisterManagedResourceInput:
+      type: object
+      properties:
+        tenantId:
+          type: ["integer", "null"]
+        resourceKey:
+          type: string
+          pattern: "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$"
+        location:
+          type: string
+          pattern: "^managed://[a-zA-Z0-9][a-zA-Z0-9._/-]{0,191}$"
+        state:
+          type: object
+          additionalProperties: true
+      required: [resourceKey, location, state]
+
+    RegisterManagedResourceResult:
+      type: object
+      properties:
+        resource:
+          $ref: "#/components/schemas/ManagedResource"
+        restorePoint:
+          $ref: "#/components/schemas/SelfHealingRestorePoint"
+      required: [resource, restorePoint]
+
+    SelfHealingRestorePoint:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        resourceKey:
+          type: string
+        location:
+          type: string
+        state:
+          type: object
+          additionalProperties: true
+        stateHash:
+          type: string
+        status:
+          type: string
+          enum: [VERIFIED, USED, REJECTED]
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+      required: [id, resourceKey, location, state, stateHash, status, source, createdAt, verifiedAt]
+
+    SelfHealingAction:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        eventId:
+          type: ["integer", "null"]
+        restorePointId:
+          type: ["integer", "null"]
+        resourceKey:
+          type: string
+        location:
+          type: string
+        mode:
+          type: string
+          enum: [PREVIEW, APPLY, AUTO]
+        status:
+          type: string
+          enum: [READY, RESTORED, NO_RESTORE_POINT, REJECTED, FAILED]
+        previousStateHash:
+          type: ["string", "null"]
+        restoredStateHash:
+          type: ["string", "null"]
+        message:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, resourceKey, location, mode, status, message, createdAt]
+
+    RestorePreview:
+      type: object
+      properties:
+        canRestore:
+          type: boolean
+        restorePointId:
+          type: integer
+        resourceKey:
+          type: string
+        location:
+          type: string
+        currentStateHash:
+          type: string
+        targetStateHash:
+          type: string
+        sameLocation:
+          type: boolean
+        integrityVerified:
+          type: boolean
+        executionAllowed:
+          type: boolean
+          enum: [false]
+      required: [canRestore, restorePointId, resourceKey, location, currentStateHash, targetStateHash, sameLocation, integrityVerified, executionAllowed]
+
+    RestoreResult:
+      type: object
+      properties:
+        resource:
+          $ref: "#/components/schemas/ManagedResource"
+        action:
+          $ref: "#/components/schemas/SelfHealingAction"
+        integrityVerified:
+          type: boolean
+        executionAllowed:
+          type: boolean
+          enum: [false]
+      required: [resource, action, integrityVerified, executionAllowed]
 
     UpdateEventStatusBody:
       type: object
