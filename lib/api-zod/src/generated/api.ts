@@ -993,3 +993,397 @@ export const ResolveCorrelationResponse = zod.object({
 })
 
 
+/**
+ * @summary Get virus catalog and quarantine vault statistics
+ */
+export const GetVirusDatabaseStatsResponse = zod.object({
+  "catalogEntries": zod.number(),
+  "activeIndicators": zod.number(),
+  "quarantinedSamples": zod.number(),
+  "exactMatches": zod.number(),
+  "activeFeeds": zod.number(),
+  "binaryStorageReady": zod.boolean(),
+  "executionAllowed": zod.boolean()
+})
+
+
+/**
+ * @summary List virus catalog entries
+ */
+export const listVirusEntriesQueryLimitMax = 500;
+
+
+
+export const ListVirusEntriesQueryParams = zod.object({
+  "search": zod.coerce.string().optional(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']).optional(),
+  "limit": zod.coerce.number().min(1).max(listVirusEntriesQueryLimitMax).optional()
+})
+
+export const ListVirusEntriesResponseItem = zod.object({
+  "id": zod.number(),
+  "familyId": zod.number().nullable(),
+  "familyName": zod.string().nullable(),
+  "familyAliases": zod.array(zod.string()),
+  "canonicalName": zod.string(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "description": zod.string().nullable(),
+  "firstSeen": zod.coerce.date().nullable(),
+  "lastSeen": zod.coerce.date().nullable(),
+  "indicators": zod.array(zod.object({
+  "id": zod.number(),
+  "catalogEntryId": zod.number(),
+  "sourceId": zod.number().nullable(),
+  "indicatorType": zod.enum(['SHA256', 'BYTE_FINGERPRINT', 'SIGNATURE']),
+  "normalizedValue": zod.string(),
+  "ruleVersion": zod.string().nullable(),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListVirusEntriesResponse = zod.array(ListVirusEntriesResponseItem)
+
+
+/**
+ * @summary Add a verified SHA-256 indicator to the catalog
+ */
+export const createVirusEntryBodyCanonicalNameMax = 200;
+
+export const createVirusEntryBodyFamilyNameMax = 200;
+
+export const createVirusEntryBodyFamilyAliasesItemMax = 200;
+
+export const createVirusEntryBodyFamilyAliasesMax = 50;
+
+export const createVirusEntryBodyDescriptionMax = 4000;
+
+export const createVirusEntryBodyConfidenceMin = 0;
+export const createVirusEntryBodyConfidenceMax = 1;
+
+export const createVirusEntryBodySha256RegExp = new RegExp('^[0-9A-Fa-f]{64}$');
+export const createVirusEntryBodySourceNameMax = 200;
+
+
+
+export const CreateVirusEntryBody = zod.object({
+  "canonicalName": zod.string().min(1).max(createVirusEntryBodyCanonicalNameMax),
+  "familyName": zod.string().max(createVirusEntryBodyFamilyNameMax).optional(),
+  "familyAliases": zod.array(zod.string().max(createVirusEntryBodyFamilyAliasesItemMax)).max(createVirusEntryBodyFamilyAliasesMax).optional(),
+  "description": zod.string().max(createVirusEntryBodyDescriptionMax).optional(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "confidence": zod.number().min(createVirusEntryBodyConfidenceMin).max(createVirusEntryBodyConfidenceMax),
+  "sha256": zod.string().regex(createVirusEntryBodySha256RegExp),
+  "sourceName": zod.string().max(createVirusEntryBodySourceNameMax).optional()
+})
+
+
+/**
+ * @summary Get one virus catalog entry
+ */
+export const GetVirusEntryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetVirusEntryResponse = zod.object({
+  "id": zod.number(),
+  "familyId": zod.number().nullable(),
+  "familyName": zod.string().nullable(),
+  "familyAliases": zod.array(zod.string()),
+  "canonicalName": zod.string(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "description": zod.string().nullable(),
+  "firstSeen": zod.coerce.date().nullable(),
+  "lastSeen": zod.coerce.date().nullable(),
+  "indicators": zod.array(zod.object({
+  "id": zod.number(),
+  "catalogEntryId": zod.number(),
+  "sourceId": zod.number().nullable(),
+  "indicatorType": zod.enum(['SHA256', 'BYTE_FINGERPRINT', 'SIGNATURE']),
+  "normalizedValue": zod.string(),
+  "ruleVersion": zod.string().nullable(),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Look up an exact SHA-256 indicator
+ */
+export const lookupVirusIndicatorBodySha256RegExp = new RegExp('^[0-9A-Fa-f]{64}$');
+
+
+export const lookupVirusIndicatorBodyNodeIdMax = 200;
+
+export const lookupVirusIndicatorBodyHostIdMax = 200;
+
+export const lookupVirusIndicatorBodyVmIdMax = 200;
+
+
+
+export const LookupVirusIndicatorBody = zod.object({
+  "sha256": zod.string().regex(lookupVirusIndicatorBodySha256RegExp),
+  "tenantId": zod.number().min(1).optional(),
+  "eventId": zod.number().min(1).optional(),
+  "nodeId": zod.string().max(lookupVirusIndicatorBodyNodeIdMax).optional(),
+  "hostId": zod.string().max(lookupVirusIndicatorBodyHostIdMax).optional(),
+  "vmId": zod.string().max(lookupVirusIndicatorBodyVmIdMax).optional()
+})
+
+export const LookupVirusIndicatorResponse = zod.object({
+  "matched": zod.boolean(),
+  "sha256": zod.string(),
+  "entry": zod.union([zod.object({
+  "id": zod.number(),
+  "familyId": zod.number().nullable(),
+  "familyName": zod.string().nullable(),
+  "familyAliases": zod.array(zod.string()),
+  "canonicalName": zod.string(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "description": zod.string().nullable(),
+  "firstSeen": zod.coerce.date().nullable(),
+  "lastSeen": zod.coerce.date().nullable(),
+  "indicators": zod.array(zod.object({
+  "id": zod.number(),
+  "catalogEntryId": zod.number(),
+  "sourceId": zod.number().nullable(),
+  "indicatorType": zod.enum(['SHA256', 'BYTE_FINGERPRINT', 'SIGNATURE']),
+  "normalizedValue": zod.string(),
+  "ruleVersion": zod.string().nullable(),
+  "confidence": zod.number(),
+  "status": zod.enum(['ACTIVE', 'REVOKED', 'SUPERSEDED']),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()]),
+  "match": zod.union([zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullable(),
+  "eventId": zod.number().nullable(),
+  "sampleId": zod.number().nullable(),
+  "indicatorId": zod.number(),
+  "matchType": zod.enum(['EXACT_HASH', 'BYTE_FINGERPRINT', 'SIGNATURE']),
+  "matchedValue": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "sourceId": zod.number().nullable(),
+  "nodeId": zod.string().nullable(),
+  "hostId": zod.string().nullable(),
+  "vmId": zod.string().nullable(),
+  "evidenceReference": zod.string(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "recommendedAction": zod.enum(['NONE', 'WARN', 'ISOLATE']),
+  "executionAllowed": zod.boolean()
+})
+
+
+/**
+ * @summary List private sample metadata without binary content
+ */
+export const listVirusSamplesQueryLimitMax = 500;
+
+
+
+export const ListVirusSamplesQueryParams = zod.object({
+  "tenantId": zod.coerce.number().optional(),
+  "status": zod.enum(['UPLOADING', 'QUARANTINED', 'HASH_VERIFIED', 'REJECTED', 'TOMBSTONED']).optional(),
+  "limit": zod.coerce.number().min(1).max(listVirusSamplesQueryLimitMax).optional()
+})
+
+export const ListVirusSamplesResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullable(),
+  "catalogEntryId": zod.number().nullable(),
+  "sha256": zod.string(),
+  "objectPath": zod.string().nullable(),
+  "sizeBytes": zod.number(),
+  "declaredName": zod.string().nullable(),
+  "declaredContentType": zod.string().nullable(),
+  "sourceType": zod.enum(['MANUAL', 'NODE', 'VIRTUALBOX', 'FEED']),
+  "sourceReference": zod.string().nullable(),
+  "status": zod.enum(['UPLOADING', 'QUARANTINED', 'HASH_VERIFIED', 'REJECTED', 'TOMBSTONED']),
+  "retentionUntil": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "verifiedAt": zod.coerce.date().nullable(),
+  "executionAllowed": zod.boolean()
+})
+export const ListVirusSamplesResponse = zod.array(ListVirusSamplesResponseItem)
+
+
+/**
+ * @summary Register quarantined sample metadata
+ */
+
+
+export const registerVirusSampleBodySha256RegExp = new RegExp('^[0-9A-Fa-f]{64}$');
+export const registerVirusSampleBodySizeBytesMin = 0;
+export const registerVirusSampleBodySizeBytesMax = 52428800;
+
+export const registerVirusSampleBodyDeclaredNameMax = 500;
+
+export const registerVirusSampleBodyDeclaredContentTypeMax = 200;
+
+export const registerVirusSampleBodySourceReferenceMax = 1000;
+
+
+
+export const RegisterVirusSampleBody = zod.object({
+  "tenantId": zod.number().min(1).optional(),
+  "catalogEntryId": zod.number().min(1).optional(),
+  "sha256": zod.string().regex(registerVirusSampleBodySha256RegExp),
+  "sizeBytes": zod.number().min(registerVirusSampleBodySizeBytesMin).max(registerVirusSampleBodySizeBytesMax),
+  "declaredName": zod.string().max(registerVirusSampleBodyDeclaredNameMax).optional(),
+  "declaredContentType": zod.string().max(registerVirusSampleBodyDeclaredContentTypeMax).optional(),
+  "sourceType": zod.enum(['MANUAL', 'NODE', 'VIRTUALBOX', 'FEED']),
+  "sourceReference": zod.string().max(registerVirusSampleBodySourceReferenceMax).optional()
+})
+
+
+/**
+ * @summary Request authorized private sample access
+ */
+export const RequestVirusSampleDownloadParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const requestVirusSampleDownloadBodyPurposeMax = 500;
+
+
+
+export const RequestVirusSampleDownloadBody = zod.object({
+  "purpose": zod.string().min(1).max(requestVirusSampleDownloadBodyPurposeMax)
+})
+
+
+/**
+ * @summary List approved threat-intelligence feed sources
+ */
+export const ListVirusFeedsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "adapterKind": zod.enum(['MANUAL', 'JSON', 'STIX', 'TAXII', 'CUSTOM']),
+  "status": zod.enum(['ACTIVE', 'PAUSED', 'DISABLED']),
+  "description": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListVirusFeedsResponse = zod.array(ListVirusFeedsResponseItem)
+
+
+/**
+ * @summary Register an approved feed source
+ */
+export const createVirusFeedBodyNameMax = 200;
+
+export const createVirusFeedBodyDescriptionMax = 2000;
+
+
+
+export const CreateVirusFeedBody = zod.object({
+  "name": zod.string().min(1).max(createVirusFeedBodyNameMax),
+  "adapterKind": zod.enum(['MANUAL', 'JSON', 'STIX', 'TAXII', 'CUSTOM']),
+  "description": zod.string().max(createVirusFeedBodyDescriptionMax).optional()
+})
+
+
+/**
+ * @summary Record an idempotent manual feed import
+ */
+export const SyncVirusFeedParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const syncVirusFeedBodySourceVersionMax = 200;
+
+export const syncVirusFeedBodyCursorMax = 500;
+
+export const syncVirusFeedBodyImportedCountMin = 0;
+
+export const syncVirusFeedBodyRejectedCountMin = 0;
+
+export const syncVirusFeedBodyDeduplicatedCountMin = 0;
+
+
+
+export const SyncVirusFeedBody = zod.object({
+  "sourceVersion": zod.string().min(1).max(syncVirusFeedBodySourceVersionMax),
+  "cursor": zod.string().max(syncVirusFeedBodyCursorMax).optional(),
+  "importedCount": zod.number().min(syncVirusFeedBodyImportedCountMin).optional(),
+  "rejectedCount": zod.number().min(syncVirusFeedBodyRejectedCountMin).optional(),
+  "deduplicatedCount": zod.number().min(syncVirusFeedBodyDeduplicatedCountMin).optional()
+})
+
+
+/**
+ * @summary List virus matches linked to SOC evidence
+ */
+export const listVirusMatchesQueryLimitMax = 500;
+
+
+
+export const ListVirusMatchesQueryParams = zod.object({
+  "tenantId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().min(1).max(listVirusMatchesQueryLimitMax).optional()
+})
+
+export const ListVirusMatchesResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullable(),
+  "eventId": zod.number().nullable(),
+  "sampleId": zod.number().nullable(),
+  "indicatorId": zod.number(),
+  "matchType": zod.enum(['EXACT_HASH', 'BYTE_FINGERPRINT', 'SIGNATURE']),
+  "matchedValue": zod.string(),
+  "confidence": zod.number(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "sourceId": zod.number().nullable(),
+  "nodeId": zod.string().nullable(),
+  "hostId": zod.string().nullable(),
+  "vmId": zod.string().nullable(),
+  "evidenceReference": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVirusMatchesResponse = zod.array(ListVirusMatchesResponseItem)
+
+
+/**
+ * @summary List append-only virus database audit events
+ */
+export const listVirusDatabaseAuditQueryLimitMax = 500;
+
+
+
+export const ListVirusDatabaseAuditQueryParams = zod.object({
+  "tenantId": zod.coerce.number().optional(),
+  "limit": zod.coerce.number().min(1).max(listVirusDatabaseAuditQueryLimitMax).optional()
+})
+
+export const ListVirusDatabaseAuditResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number().nullable(),
+  "action": zod.string(),
+  "entityType": zod.string(),
+  "entityId": zod.number().nullable(),
+  "principalRef": zod.string(),
+  "outcome": zod.enum(['ALLOWED', 'DENIED', 'COMPLETED', 'FAILED']),
+  "details": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+})
+export const ListVirusDatabaseAuditResponse = zod.array(ListVirusDatabaseAuditResponseItem)
+
+

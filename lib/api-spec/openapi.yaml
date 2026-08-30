@@ -32,6 +32,8 @@ tags:
     description: Logical sandbox quarantine captures
   - name: self-healing
     description: Verified restore points for managed logical resources
+  - name: virus-database
+    description: Virus intelligence catalog and private sample metadata
 paths:
   /healthz:
     get:
@@ -962,6 +964,309 @@ paths:
         "404":
           description: Not found
 
+  # ─── VIRUS INTELLIGENCE DATABASE ───────────────────────────────────────────
+  /virus-db/stats:
+    get:
+      operationId: getVirusDatabaseStats
+      tags: [virus-database]
+      summary: Get virus catalog and quarantine vault statistics
+      responses:
+        "200":
+          description: Virus database statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusDatabaseStats"
+
+  /virus-db/entries:
+    get:
+      operationId: listVirusEntries
+      tags: [virus-database]
+      summary: List virus catalog entries
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, REVOKED, SUPERSEDED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Virus catalog entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VirusCatalogEntry"
+    post:
+      operationId: createVirusEntry
+      tags: [virus-database]
+      summary: Add a verified SHA-256 indicator to the catalog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusEntryInput"
+      responses:
+        "201":
+          description: Created virus entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusCatalogEntry"
+        "400":
+          description: Invalid catalog entry
+        "409":
+          description: Indicator already exists
+
+  /virus-db/entries/{id}:
+    get:
+      operationId: getVirusEntry
+      tags: [virus-database]
+      summary: Get one virus catalog entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Virus catalog entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusCatalogEntry"
+        "404":
+          description: Not found
+
+  /virus-db/indicators/lookup:
+    post:
+      operationId: lookupVirusIndicator
+      tags: [virus-database]
+      summary: Look up an exact SHA-256 indicator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusLookupInput"
+      responses:
+        "200":
+          description: Indicator lookup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusLookupResult"
+        "400":
+          description: Invalid SHA-256
+
+  /virus-db/samples:
+    get:
+      operationId: listVirusSamples
+      tags: [virus-database]
+      summary: List private sample metadata without binary content
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [UPLOADING, QUARANTINED, HASH_VERIFIED, REJECTED, TOMBSTONED]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Sample metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VirusSample"
+
+  /virus-db/samples/intake:
+    post:
+      operationId: registerVirusSample
+      tags: [virus-database]
+      summary: Register quarantined sample metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusSampleInput"
+      responses:
+        "201":
+          description: Registered sample metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusSample"
+        "400":
+          description: Invalid or oversized sample metadata
+        "409":
+          description: Sample hash already registered
+
+  /virus-db/samples/{id}/download-request:
+    post:
+      operationId: requestVirusSampleDownload
+      tags: [virus-database]
+      summary: Request authorized private sample access
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusSampleAccessInput"
+      responses:
+        "403":
+          description: Binary access remains disabled until authorization is configured
+
+  /virus-db/feeds:
+    get:
+      operationId: listVirusFeeds
+      tags: [virus-database]
+      summary: List approved threat-intelligence feed sources
+      responses:
+        "200":
+          description: Feed sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VirusFeedSource"
+    post:
+      operationId: createVirusFeed
+      tags: [virus-database]
+      summary: Register an approved feed source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusFeedInput"
+      responses:
+        "201":
+          description: Created feed source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusFeedSource"
+        "400":
+          description: Invalid feed source
+
+  /virus-db/feeds/{id}/sync:
+    post:
+      operationId: syncVirusFeed
+      tags: [virus-database]
+      summary: Record an idempotent manual feed import
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VirusFeedSyncInput"
+      responses:
+        "201":
+          description: Feed import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VirusFeedImport"
+        "404":
+          description: Feed source not found
+        "409":
+          description: Feed version already imported
+
+  /virus-db/matches:
+    get:
+      operationId: listVirusMatches
+      tags: [virus-database]
+      summary: List virus matches linked to SOC evidence
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Virus matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VirusMatch"
+
+  /virus-db/audit:
+    get:
+      operationId: listVirusDatabaseAudit
+      tags: [virus-database]
+      summary: List append-only virus database audit events
+      parameters:
+        - name: tenantId
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Virus database audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VirusDatabaseAudit"
+
 components:
   schemas:
     HealthStatus:
@@ -1731,6 +2036,405 @@ components:
           type: string
           format: date-time
       required: [id, threatType, severity, confidence, summary, eventIds, createdAt]
+
+    VirusIndicator:
+      type: object
+      properties:
+        id:
+          type: integer
+        catalogEntryId:
+          type: integer
+        sourceId:
+          type: ["integer", "null"]
+        indicatorType:
+          type: string
+          enum: [SHA256, BYTE_FINGERPRINT, SIGNATURE]
+        normalizedValue:
+          type: string
+        ruleVersion:
+          type: ["string", "null"]
+        confidence:
+          type: number
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, SUPERSEDED]
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, catalogEntryId, sourceId, indicatorType, normalizedValue, ruleVersion, confidence, status, createdAt]
+
+    VirusCatalogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        familyId:
+          type: ["integer", "null"]
+        familyName:
+          type: ["string", "null"]
+        familyAliases:
+          type: array
+          items:
+            type: string
+        canonicalName:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        confidence:
+          type: number
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, SUPERSEDED]
+        description:
+          type: ["string", "null"]
+        firstSeen:
+          type: ["string", "null"]
+          format: date-time
+        lastSeen:
+          type: ["string", "null"]
+          format: date-time
+        indicators:
+          type: array
+          items:
+            $ref: "#/components/schemas/VirusIndicator"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, familyId, familyName, familyAliases, canonicalName, severity, confidence, status, description, firstSeen, lastSeen, indicators, createdAt, updatedAt]
+
+    VirusEntryInput:
+      type: object
+      properties:
+        canonicalName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        familyName:
+          type: string
+          maxLength: 200
+        familyAliases:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            maxLength: 200
+        description:
+          type: string
+          maxLength: 4000
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        sha256:
+          type: string
+          pattern: "^[0-9A-Fa-f]{64}$"
+        sourceName:
+          type: string
+          maxLength: 200
+      required: [canonicalName, severity, confidence, sha256]
+
+    VirusLookupInput:
+      type: object
+      properties:
+        sha256:
+          type: string
+          pattern: "^[0-9A-Fa-f]{64}$"
+        tenantId:
+          type: integer
+          minimum: 1
+        eventId:
+          type: integer
+          minimum: 1
+        nodeId:
+          type: string
+          maxLength: 200
+        hostId:
+          type: string
+          maxLength: 200
+        vmId:
+          type: string
+          maxLength: 200
+      required: [sha256]
+
+    VirusLookupResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        sha256:
+          type: string
+        entry:
+          oneOf:
+            - $ref: "#/components/schemas/VirusCatalogEntry"
+            - type: "null"
+        match:
+          oneOf:
+            - $ref: "#/components/schemas/VirusMatch"
+            - type: "null"
+        recommendedAction:
+          type: string
+          enum: [NONE, WARN, ISOLATE]
+        executionAllowed:
+          type: boolean
+      required: [matched, sha256, entry, match, recommendedAction, executionAllowed]
+
+    VirusSample:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        catalogEntryId:
+          type: ["integer", "null"]
+        sha256:
+          type: string
+        objectPath:
+          type: ["string", "null"]
+        sizeBytes:
+          type: integer
+        declaredName:
+          type: ["string", "null"]
+        declaredContentType:
+          type: ["string", "null"]
+        sourceType:
+          type: string
+          enum: [MANUAL, NODE, VIRTUALBOX, FEED]
+        sourceReference:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [UPLOADING, QUARANTINED, HASH_VERIFIED, REJECTED, TOMBSTONED]
+        retentionUntil:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: ["string", "null"]
+          format: date-time
+        executionAllowed:
+          type: boolean
+      required: [id, tenantId, catalogEntryId, sha256, objectPath, sizeBytes, declaredName, declaredContentType, sourceType, sourceReference, status, retentionUntil, createdAt, verifiedAt, executionAllowed]
+
+    VirusSampleInput:
+      type: object
+      properties:
+        tenantId:
+          type: integer
+          minimum: 1
+        catalogEntryId:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+          pattern: "^[0-9A-Fa-f]{64}$"
+        sizeBytes:
+          type: integer
+          minimum: 0
+          maximum: 52428800
+        declaredName:
+          type: string
+          maxLength: 500
+        declaredContentType:
+          type: string
+          maxLength: 200
+        sourceType:
+          type: string
+          enum: [MANUAL, NODE, VIRTUALBOX, FEED]
+        sourceReference:
+          type: string
+          maxLength: 1000
+      required: [sha256, sizeBytes, sourceType]
+
+    VirusSampleAccessInput:
+      type: object
+      properties:
+        purpose:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required: [purpose]
+
+    VirusFeedSource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        adapterKind:
+          type: string
+          enum: [MANUAL, JSON, STIX, TAXII, CUSTOM]
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, DISABLED]
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, adapterKind, status, description, createdAt, updatedAt]
+
+    VirusFeedInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        adapterKind:
+          type: string
+          enum: [MANUAL, JSON, STIX, TAXII, CUSTOM]
+        description:
+          type: string
+          maxLength: 2000
+      required: [name, adapterKind]
+
+    VirusFeedImport:
+      type: object
+      properties:
+        id:
+          type: integer
+        sourceId:
+          type: integer
+        sourceVersion:
+          type: string
+        cursor:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [RUNNING, COMPLETED, PARTIAL, FAILED]
+        importedCount:
+          type: integer
+        rejectedCount:
+          type: integer
+        deduplicatedCount:
+          type: integer
+        errorCode:
+          type: ["string", "null"]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, sourceId, sourceVersion, cursor, status, importedCount, rejectedCount, deduplicatedCount, errorCode, startedAt, completedAt]
+
+    VirusFeedSyncInput:
+      type: object
+      properties:
+        sourceVersion:
+          type: string
+          minLength: 1
+          maxLength: 200
+        cursor:
+          type: string
+          maxLength: 500
+        importedCount:
+          type: integer
+          minimum: 0
+        rejectedCount:
+          type: integer
+          minimum: 0
+        deduplicatedCount:
+          type: integer
+          minimum: 0
+      required: [sourceVersion]
+
+    VirusMatch:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        eventId:
+          type: ["integer", "null"]
+        sampleId:
+          type: ["integer", "null"]
+        indicatorId:
+          type: integer
+        matchType:
+          type: string
+          enum: [EXACT_HASH, BYTE_FINGERPRINT, SIGNATURE]
+        matchedValue:
+          type: string
+        confidence:
+          type: number
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        sourceId:
+          type: ["integer", "null"]
+        nodeId:
+          type: ["string", "null"]
+        hostId:
+          type: ["string", "null"]
+        vmId:
+          type: ["string", "null"]
+        evidenceReference:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, eventId, sampleId, indicatorId, matchType, matchedValue, confidence, severity, sourceId, nodeId, hostId, vmId, evidenceReference, createdAt]
+
+    VirusDatabaseAudit:
+      type: object
+      properties:
+        id:
+          type: integer
+        tenantId:
+          type: ["integer", "null"]
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: ["integer", "null"]
+        principalRef:
+          type: string
+        outcome:
+          type: string
+          enum: [ALLOWED, DENIED, COMPLETED, FAILED]
+        details:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tenantId, action, entityType, entityId, principalRef, outcome, details, createdAt]
+
+    VirusDatabaseStats:
+      type: object
+      properties:
+        catalogEntries:
+          type: integer
+        activeIndicators:
+          type: integer
+        quarantinedSamples:
+          type: integer
+        exactMatches:
+          type: integer
+        activeFeeds:
+          type: integer
+        binaryStorageReady:
+          type: boolean
+        executionAllowed:
+          type: boolean
+      required: [catalogEntries, activeIndicators, quarantinedSamples, exactMatches, activeFeeds, binaryStorageReady, executionAllowed]
 
     MetaCubeHealth:
       type: object

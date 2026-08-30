@@ -657,6 +657,408 @@ export interface ToggleRuleBody {
   enabled: boolean;
 }
 
+export type VirusIndicatorIndicatorType = typeof VirusIndicatorIndicatorType[keyof typeof VirusIndicatorIndicatorType];
+
+
+export const VirusIndicatorIndicatorType = {
+  SHA256: 'SHA256',
+  BYTE_FINGERPRINT: 'BYTE_FINGERPRINT',
+  SIGNATURE: 'SIGNATURE',
+} as const;
+
+export type VirusIndicatorStatus = typeof VirusIndicatorStatus[keyof typeof VirusIndicatorStatus];
+
+
+export const VirusIndicatorStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const;
+
+export interface VirusIndicator {
+  id: number;
+  catalogEntryId: number;
+  /** @nullable */
+  sourceId: number | null;
+  indicatorType: VirusIndicatorIndicatorType;
+  normalizedValue: string;
+  /** @nullable */
+  ruleVersion: string | null;
+  confidence: number;
+  status: VirusIndicatorStatus;
+  createdAt: string;
+}
+
+export type VirusCatalogEntrySeverity = typeof VirusCatalogEntrySeverity[keyof typeof VirusCatalogEntrySeverity];
+
+
+export const VirusCatalogEntrySeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export type VirusCatalogEntryStatus = typeof VirusCatalogEntryStatus[keyof typeof VirusCatalogEntryStatus];
+
+
+export const VirusCatalogEntryStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const;
+
+export interface VirusCatalogEntry {
+  id: number;
+  /** @nullable */
+  familyId: number | null;
+  /** @nullable */
+  familyName: string | null;
+  familyAliases: string[];
+  canonicalName: string;
+  severity: VirusCatalogEntrySeverity;
+  confidence: number;
+  status: VirusCatalogEntryStatus;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  firstSeen: string | null;
+  /** @nullable */
+  lastSeen: string | null;
+  indicators: VirusIndicator[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VirusEntryInputSeverity = typeof VirusEntryInputSeverity[keyof typeof VirusEntryInputSeverity];
+
+
+export const VirusEntryInputSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export interface VirusEntryInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  canonicalName: string;
+  /** @maxLength 200 */
+  familyName?: string;
+  /** @maxItems 50 */
+  familyAliases?: string[];
+  /** @maxLength 4000 */
+  description?: string;
+  severity: VirusEntryInputSeverity;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  confidence: number;
+  /** @pattern ^[0-9A-Fa-f]{64}$ */
+  sha256: string;
+  /** @maxLength 200 */
+  sourceName?: string;
+}
+
+export interface VirusLookupInput {
+  /** @pattern ^[0-9A-Fa-f]{64}$ */
+  sha256: string;
+  /** @minimum 1 */
+  tenantId?: number;
+  /** @minimum 1 */
+  eventId?: number;
+  /** @maxLength 200 */
+  nodeId?: string;
+  /** @maxLength 200 */
+  hostId?: string;
+  /** @maxLength 200 */
+  vmId?: string;
+}
+
+export type VirusLookupResultRecommendedAction = typeof VirusLookupResultRecommendedAction[keyof typeof VirusLookupResultRecommendedAction];
+
+
+export const VirusLookupResultRecommendedAction = {
+  NONE: 'NONE',
+  WARN: 'WARN',
+  ISOLATE: 'ISOLATE',
+} as const;
+
+export type VirusMatchMatchType = typeof VirusMatchMatchType[keyof typeof VirusMatchMatchType];
+
+
+export const VirusMatchMatchType = {
+  EXACT_HASH: 'EXACT_HASH',
+  BYTE_FINGERPRINT: 'BYTE_FINGERPRINT',
+  SIGNATURE: 'SIGNATURE',
+} as const;
+
+export type VirusMatchSeverity = typeof VirusMatchSeverity[keyof typeof VirusMatchSeverity];
+
+
+export const VirusMatchSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export interface VirusMatch {
+  id: number;
+  /** @nullable */
+  tenantId: number | null;
+  /** @nullable */
+  eventId: number | null;
+  /** @nullable */
+  sampleId: number | null;
+  indicatorId: number;
+  matchType: VirusMatchMatchType;
+  matchedValue: string;
+  confidence: number;
+  severity: VirusMatchSeverity;
+  /** @nullable */
+  sourceId: number | null;
+  /** @nullable */
+  nodeId: string | null;
+  /** @nullable */
+  hostId: string | null;
+  /** @nullable */
+  vmId: string | null;
+  evidenceReference: string;
+  createdAt: string;
+}
+
+export interface VirusLookupResult {
+  matched: boolean;
+  sha256: string;
+  entry: VirusCatalogEntry | null;
+  match: VirusMatch | null;
+  recommendedAction: VirusLookupResultRecommendedAction;
+  executionAllowed: boolean;
+}
+
+export type VirusSampleSourceType = typeof VirusSampleSourceType[keyof typeof VirusSampleSourceType];
+
+
+export const VirusSampleSourceType = {
+  MANUAL: 'MANUAL',
+  NODE: 'NODE',
+  VIRTUALBOX: 'VIRTUALBOX',
+  FEED: 'FEED',
+} as const;
+
+export type VirusSampleStatus = typeof VirusSampleStatus[keyof typeof VirusSampleStatus];
+
+
+export const VirusSampleStatus = {
+  UPLOADING: 'UPLOADING',
+  QUARANTINED: 'QUARANTINED',
+  HASH_VERIFIED: 'HASH_VERIFIED',
+  REJECTED: 'REJECTED',
+  TOMBSTONED: 'TOMBSTONED',
+} as const;
+
+export interface VirusSample {
+  id: number;
+  /** @nullable */
+  tenantId: number | null;
+  /** @nullable */
+  catalogEntryId: number | null;
+  sha256: string;
+  /** @nullable */
+  objectPath: string | null;
+  sizeBytes: number;
+  /** @nullable */
+  declaredName: string | null;
+  /** @nullable */
+  declaredContentType: string | null;
+  sourceType: VirusSampleSourceType;
+  /** @nullable */
+  sourceReference: string | null;
+  status: VirusSampleStatus;
+  /** @nullable */
+  retentionUntil: string | null;
+  createdAt: string;
+  /** @nullable */
+  verifiedAt: string | null;
+  executionAllowed: boolean;
+}
+
+export type VirusSampleInputSourceType = typeof VirusSampleInputSourceType[keyof typeof VirusSampleInputSourceType];
+
+
+export const VirusSampleInputSourceType = {
+  MANUAL: 'MANUAL',
+  NODE: 'NODE',
+  VIRTUALBOX: 'VIRTUALBOX',
+  FEED: 'FEED',
+} as const;
+
+export interface VirusSampleInput {
+  /** @minimum 1 */
+  tenantId?: number;
+  /** @minimum 1 */
+  catalogEntryId?: number;
+  /** @pattern ^[0-9A-Fa-f]{64}$ */
+  sha256: string;
+  /**
+     * @minimum 0
+     * @maximum 52428800
+     */
+  sizeBytes: number;
+  /** @maxLength 500 */
+  declaredName?: string;
+  /** @maxLength 200 */
+  declaredContentType?: string;
+  sourceType: VirusSampleInputSourceType;
+  /** @maxLength 1000 */
+  sourceReference?: string;
+}
+
+export interface VirusSampleAccessInput {
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  purpose: string;
+}
+
+export type VirusFeedSourceAdapterKind = typeof VirusFeedSourceAdapterKind[keyof typeof VirusFeedSourceAdapterKind];
+
+
+export const VirusFeedSourceAdapterKind = {
+  MANUAL: 'MANUAL',
+  JSON: 'JSON',
+  STIX: 'STIX',
+  TAXII: 'TAXII',
+  CUSTOM: 'CUSTOM',
+} as const;
+
+export type VirusFeedSourceStatus = typeof VirusFeedSourceStatus[keyof typeof VirusFeedSourceStatus];
+
+
+export const VirusFeedSourceStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  DISABLED: 'DISABLED',
+} as const;
+
+export interface VirusFeedSource {
+  id: number;
+  name: string;
+  adapterKind: VirusFeedSourceAdapterKind;
+  status: VirusFeedSourceStatus;
+  /** @nullable */
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VirusFeedInputAdapterKind = typeof VirusFeedInputAdapterKind[keyof typeof VirusFeedInputAdapterKind];
+
+
+export const VirusFeedInputAdapterKind = {
+  MANUAL: 'MANUAL',
+  JSON: 'JSON',
+  STIX: 'STIX',
+  TAXII: 'TAXII',
+  CUSTOM: 'CUSTOM',
+} as const;
+
+export interface VirusFeedInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  name: string;
+  adapterKind: VirusFeedInputAdapterKind;
+  /** @maxLength 2000 */
+  description?: string;
+}
+
+export type VirusFeedImportStatus = typeof VirusFeedImportStatus[keyof typeof VirusFeedImportStatus];
+
+
+export const VirusFeedImportStatus = {
+  RUNNING: 'RUNNING',
+  COMPLETED: 'COMPLETED',
+  PARTIAL: 'PARTIAL',
+  FAILED: 'FAILED',
+} as const;
+
+export interface VirusFeedImport {
+  id: number;
+  sourceId: number;
+  sourceVersion: string;
+  /** @nullable */
+  cursor: string | null;
+  status: VirusFeedImportStatus;
+  importedCount: number;
+  rejectedCount: number;
+  deduplicatedCount: number;
+  /** @nullable */
+  errorCode: string | null;
+  startedAt: string;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export interface VirusFeedSyncInput {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  sourceVersion: string;
+  /** @maxLength 500 */
+  cursor?: string;
+  /** @minimum 0 */
+  importedCount?: number;
+  /** @minimum 0 */
+  rejectedCount?: number;
+  /** @minimum 0 */
+  deduplicatedCount?: number;
+}
+
+export type VirusDatabaseAuditOutcome = typeof VirusDatabaseAuditOutcome[keyof typeof VirusDatabaseAuditOutcome];
+
+
+export const VirusDatabaseAuditOutcome = {
+  ALLOWED: 'ALLOWED',
+  DENIED: 'DENIED',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+
+export type VirusDatabaseAuditDetails = { [key: string]: unknown };
+
+export interface VirusDatabaseAudit {
+  id: number;
+  /** @nullable */
+  tenantId: number | null;
+  action: string;
+  entityType: string;
+  /** @nullable */
+  entityId: number | null;
+  principalRef: string;
+  outcome: VirusDatabaseAuditOutcome;
+  details: VirusDatabaseAuditDetails;
+  createdAt: string;
+}
+
+export interface VirusDatabaseStats {
+  catalogEntries: number;
+  activeIndicators: number;
+  quarantinedSamples: number;
+  exactMatches: number;
+  activeFeeds: number;
+  binaryStorageReady: boolean;
+  executionAllowed: boolean;
+}
+
 export type MetaCubeHealthStatus = typeof MetaCubeHealthStatus[keyof typeof MetaCubeHealthStatus];
 
 
@@ -849,5 +1251,74 @@ tenantId?: number;
 export type ListCorrelationsParams = {
 tenantId?: number;
 severity?: string;
+};
+
+export type ListVirusEntriesParams = {
+search?: string;
+severity?: ListVirusEntriesSeverity;
+status?: ListVirusEntriesStatus;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
+
+export type ListVirusEntriesSeverity = typeof ListVirusEntriesSeverity[keyof typeof ListVirusEntriesSeverity];
+
+
+export const ListVirusEntriesSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export type ListVirusEntriesStatus = typeof ListVirusEntriesStatus[keyof typeof ListVirusEntriesStatus];
+
+
+export const ListVirusEntriesStatus = {
+  ACTIVE: 'ACTIVE',
+  REVOKED: 'REVOKED',
+  SUPERSEDED: 'SUPERSEDED',
+} as const;
+
+export type ListVirusSamplesParams = {
+tenantId?: number;
+status?: ListVirusSamplesStatus;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
+
+export type ListVirusSamplesStatus = typeof ListVirusSamplesStatus[keyof typeof ListVirusSamplesStatus];
+
+
+export const ListVirusSamplesStatus = {
+  UPLOADING: 'UPLOADING',
+  QUARANTINED: 'QUARANTINED',
+  HASH_VERIFIED: 'HASH_VERIFIED',
+  REJECTED: 'REJECTED',
+  TOMBSTONED: 'TOMBSTONED',
+} as const;
+
+export type ListVirusMatchesParams = {
+tenantId?: number;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
+
+export type ListVirusDatabaseAuditParams = {
+tenantId?: number;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
 };
 

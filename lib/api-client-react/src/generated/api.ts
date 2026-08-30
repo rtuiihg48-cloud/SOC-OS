@@ -38,6 +38,10 @@ import type {
   ListRestorePointsParams,
   ListRulesParams,
   ListSelfHealingActionsParams,
+  ListVirusDatabaseAuditParams,
+  ListVirusEntriesParams,
+  ListVirusMatchesParams,
+  ListVirusSamplesParams,
   ManagedResource,
   MetaCubeCheckpoint,
   MetaCubeExecution,
@@ -67,6 +71,20 @@ import type {
   ToggleRuleBody,
   UpdateEventStatusBody,
   UpdateRuleBody,
+  VirusCatalogEntry,
+  VirusDatabaseAudit,
+  VirusDatabaseStats,
+  VirusEntryInput,
+  VirusFeedImport,
+  VirusFeedInput,
+  VirusFeedSource,
+  VirusFeedSyncInput,
+  VirusLookupInput,
+  VirusLookupResult,
+  VirusMatch,
+  VirusSample,
+  VirusSampleAccessInput,
+  VirusSampleInput,
   VoiceTranscription
 } from './api.schemas';
 
@@ -3422,3 +3440,991 @@ export const useResolveCorrelation = <TError = ErrorType<void>,
       return useMutation(getResolveCorrelationMutationOptions(options));
     }
 
+export const getGetVirusDatabaseStatsUrl = () => {
+
+
+
+
+  return `/api/virus-db/stats`
+}
+
+/**
+ * @summary Get virus catalog and quarantine vault statistics
+ */
+export const getVirusDatabaseStats = async ( options?: RequestInit): Promise<VirusDatabaseStats> => {
+
+  return customFetch<VirusDatabaseStats>(getGetVirusDatabaseStatsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVirusDatabaseStatsQueryKey = () => {
+    return [
+    `/api/virus-db/stats`
+    ] as const;
+    }
+
+
+export const getGetVirusDatabaseStatsQueryOptions = <TData = Awaited<ReturnType<typeof getVirusDatabaseStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVirusDatabaseStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVirusDatabaseStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVirusDatabaseStats>>> = ({ signal }) => getVirusDatabaseStats({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVirusDatabaseStats>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVirusDatabaseStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getVirusDatabaseStats>>>
+export type GetVirusDatabaseStatsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get virus catalog and quarantine vault statistics
+ */
+
+export function useGetVirusDatabaseStats<TData = Awaited<ReturnType<typeof getVirusDatabaseStats>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVirusDatabaseStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVirusDatabaseStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListVirusEntriesUrl = (params?: ListVirusEntriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/virus-db/entries?${stringifiedParams}` : `/api/virus-db/entries`
+}
+
+/**
+ * @summary List virus catalog entries
+ */
+export const listVirusEntries = async (params?: ListVirusEntriesParams, options?: RequestInit): Promise<VirusCatalogEntry[]> => {
+
+  return customFetch<VirusCatalogEntry[]>(getListVirusEntriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVirusEntriesQueryKey = (params?: ListVirusEntriesParams,) => {
+    return [
+    `/api/virus-db/entries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVirusEntriesQueryOptions = <TData = Awaited<ReturnType<typeof listVirusEntries>>, TError = ErrorType<unknown>>(params?: ListVirusEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVirusEntriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVirusEntries>>> = ({ signal }) => listVirusEntries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVirusEntries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVirusEntriesQueryResult = NonNullable<Awaited<ReturnType<typeof listVirusEntries>>>
+export type ListVirusEntriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List virus catalog entries
+ */
+
+export function useListVirusEntries<TData = Awaited<ReturnType<typeof listVirusEntries>>, TError = ErrorType<unknown>>(
+ params?: ListVirusEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVirusEntriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVirusEntryUrl = () => {
+
+
+
+
+  return `/api/virus-db/entries`
+}
+
+/**
+ * @summary Add a verified SHA-256 indicator to the catalog
+ */
+export const createVirusEntry = async (virusEntryInput: VirusEntryInput, options?: RequestInit): Promise<VirusCatalogEntry> => {
+
+  return customFetch<VirusCatalogEntry>(getCreateVirusEntryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusEntryInput,)
+  }
+);}
+
+
+
+
+export const getCreateVirusEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirusEntry>>, TError,{data: BodyType<VirusEntryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVirusEntry>>, TError,{data: BodyType<VirusEntryInput>}, TContext> => {
+
+const mutationKey = ['createVirusEntry'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVirusEntry>>, {data: BodyType<VirusEntryInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVirusEntry(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVirusEntryMutationResult = NonNullable<Awaited<ReturnType<typeof createVirusEntry>>>
+    export type CreateVirusEntryMutationBody = BodyType<VirusEntryInput>
+    export type CreateVirusEntryMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a verified SHA-256 indicator to the catalog
+ */
+export const useCreateVirusEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirusEntry>>, TError,{data: BodyType<VirusEntryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVirusEntry>>,
+        TError,
+        {data: BodyType<VirusEntryInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVirusEntryMutationOptions(options));
+    }
+
+export const getGetVirusEntryUrl = (id: number,) => {
+
+
+
+
+  return `/api/virus-db/entries/${id}`
+}
+
+/**
+ * @summary Get one virus catalog entry
+ */
+export const getVirusEntry = async (id: number, options?: RequestInit): Promise<VirusCatalogEntry> => {
+
+  return customFetch<VirusCatalogEntry>(getGetVirusEntryUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVirusEntryQueryKey = (id: number,) => {
+    return [
+    `/api/virus-db/entries/${id}`
+    ] as const;
+    }
+
+
+export const getGetVirusEntryQueryOptions = <TData = Awaited<ReturnType<typeof getVirusEntry>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVirusEntry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVirusEntryQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVirusEntry>>> = ({ signal }) => getVirusEntry(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVirusEntry>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVirusEntryQueryResult = NonNullable<Awaited<ReturnType<typeof getVirusEntry>>>
+export type GetVirusEntryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get one virus catalog entry
+ */
+
+export function useGetVirusEntry<TData = Awaited<ReturnType<typeof getVirusEntry>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVirusEntry>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVirusEntryQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLookupVirusIndicatorUrl = () => {
+
+
+
+
+  return `/api/virus-db/indicators/lookup`
+}
+
+/**
+ * @summary Look up an exact SHA-256 indicator
+ */
+export const lookupVirusIndicator = async (virusLookupInput: VirusLookupInput, options?: RequestInit): Promise<VirusLookupResult> => {
+
+  return customFetch<VirusLookupResult>(getLookupVirusIndicatorUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusLookupInput,)
+  }
+);}
+
+
+
+
+export const getLookupVirusIndicatorMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lookupVirusIndicator>>, TError,{data: BodyType<VirusLookupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof lookupVirusIndicator>>, TError,{data: BodyType<VirusLookupInput>}, TContext> => {
+
+const mutationKey = ['lookupVirusIndicator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof lookupVirusIndicator>>, {data: BodyType<VirusLookupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  lookupVirusIndicator(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LookupVirusIndicatorMutationResult = NonNullable<Awaited<ReturnType<typeof lookupVirusIndicator>>>
+    export type LookupVirusIndicatorMutationBody = BodyType<VirusLookupInput>
+    export type LookupVirusIndicatorMutationError = ErrorType<void>
+
+    /**
+ * @summary Look up an exact SHA-256 indicator
+ */
+export const useLookupVirusIndicator = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof lookupVirusIndicator>>, TError,{data: BodyType<VirusLookupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof lookupVirusIndicator>>,
+        TError,
+        {data: BodyType<VirusLookupInput>},
+        TContext
+      > => {
+      return useMutation(getLookupVirusIndicatorMutationOptions(options));
+    }
+
+export const getListVirusSamplesUrl = (params?: ListVirusSamplesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/virus-db/samples?${stringifiedParams}` : `/api/virus-db/samples`
+}
+
+/**
+ * @summary List private sample metadata without binary content
+ */
+export const listVirusSamples = async (params?: ListVirusSamplesParams, options?: RequestInit): Promise<VirusSample[]> => {
+
+  return customFetch<VirusSample[]>(getListVirusSamplesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVirusSamplesQueryKey = (params?: ListVirusSamplesParams,) => {
+    return [
+    `/api/virus-db/samples`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVirusSamplesQueryOptions = <TData = Awaited<ReturnType<typeof listVirusSamples>>, TError = ErrorType<unknown>>(params?: ListVirusSamplesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusSamples>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVirusSamplesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVirusSamples>>> = ({ signal }) => listVirusSamples(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVirusSamples>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVirusSamplesQueryResult = NonNullable<Awaited<ReturnType<typeof listVirusSamples>>>
+export type ListVirusSamplesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List private sample metadata without binary content
+ */
+
+export function useListVirusSamples<TData = Awaited<ReturnType<typeof listVirusSamples>>, TError = ErrorType<unknown>>(
+ params?: ListVirusSamplesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusSamples>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVirusSamplesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRegisterVirusSampleUrl = () => {
+
+
+
+
+  return `/api/virus-db/samples/intake`
+}
+
+/**
+ * @summary Register quarantined sample metadata
+ */
+export const registerVirusSample = async (virusSampleInput: VirusSampleInput, options?: RequestInit): Promise<VirusSample> => {
+
+  return customFetch<VirusSample>(getRegisterVirusSampleUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusSampleInput,)
+  }
+);}
+
+
+
+
+export const getRegisterVirusSampleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVirusSample>>, TError,{data: BodyType<VirusSampleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerVirusSample>>, TError,{data: BodyType<VirusSampleInput>}, TContext> => {
+
+const mutationKey = ['registerVirusSample'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerVirusSample>>, {data: BodyType<VirusSampleInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerVirusSample(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterVirusSampleMutationResult = NonNullable<Awaited<ReturnType<typeof registerVirusSample>>>
+    export type RegisterVirusSampleMutationBody = BodyType<VirusSampleInput>
+    export type RegisterVirusSampleMutationError = ErrorType<void>
+
+    /**
+ * @summary Register quarantined sample metadata
+ */
+export const useRegisterVirusSample = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerVirusSample>>, TError,{data: BodyType<VirusSampleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerVirusSample>>,
+        TError,
+        {data: BodyType<VirusSampleInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterVirusSampleMutationOptions(options));
+    }
+
+export const getRequestVirusSampleDownloadUrl = (id: number,) => {
+
+
+
+
+  return `/api/virus-db/samples/${id}/download-request`
+}
+
+/**
+ * @summary Request authorized private sample access
+ */
+export const requestVirusSampleDownload = async (id: number,
+    virusSampleAccessInput: VirusSampleAccessInput, options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getRequestVirusSampleDownloadUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusSampleAccessInput,)
+  }
+);}
+
+
+
+
+export const getRequestVirusSampleDownloadMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestVirusSampleDownload>>, TError,{id: number;data: BodyType<VirusSampleAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestVirusSampleDownload>>, TError,{id: number;data: BodyType<VirusSampleAccessInput>}, TContext> => {
+
+const mutationKey = ['requestVirusSampleDownload'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestVirusSampleDownload>>, {id: number;data: BodyType<VirusSampleAccessInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  requestVirusSampleDownload(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestVirusSampleDownloadMutationResult = NonNullable<Awaited<ReturnType<typeof requestVirusSampleDownload>>>
+    export type RequestVirusSampleDownloadMutationBody = BodyType<VirusSampleAccessInput>
+    export type RequestVirusSampleDownloadMutationError = ErrorType<void>
+
+    /**
+ * @summary Request authorized private sample access
+ */
+export const useRequestVirusSampleDownload = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestVirusSampleDownload>>, TError,{id: number;data: BodyType<VirusSampleAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestVirusSampleDownload>>,
+        TError,
+        {id: number;data: BodyType<VirusSampleAccessInput>},
+        TContext
+      > => {
+      return useMutation(getRequestVirusSampleDownloadMutationOptions(options));
+    }
+
+export const getListVirusFeedsUrl = () => {
+
+
+
+
+  return `/api/virus-db/feeds`
+}
+
+/**
+ * @summary List approved threat-intelligence feed sources
+ */
+export const listVirusFeeds = async ( options?: RequestInit): Promise<VirusFeedSource[]> => {
+
+  return customFetch<VirusFeedSource[]>(getListVirusFeedsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVirusFeedsQueryKey = () => {
+    return [
+    `/api/virus-db/feeds`
+    ] as const;
+    }
+
+
+export const getListVirusFeedsQueryOptions = <TData = Awaited<ReturnType<typeof listVirusFeeds>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusFeeds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVirusFeedsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVirusFeeds>>> = ({ signal }) => listVirusFeeds({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVirusFeeds>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVirusFeedsQueryResult = NonNullable<Awaited<ReturnType<typeof listVirusFeeds>>>
+export type ListVirusFeedsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List approved threat-intelligence feed sources
+ */
+
+export function useListVirusFeeds<TData = Awaited<ReturnType<typeof listVirusFeeds>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusFeeds>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVirusFeedsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateVirusFeedUrl = () => {
+
+
+
+
+  return `/api/virus-db/feeds`
+}
+
+/**
+ * @summary Register an approved feed source
+ */
+export const createVirusFeed = async (virusFeedInput: VirusFeedInput, options?: RequestInit): Promise<VirusFeedSource> => {
+
+  return customFetch<VirusFeedSource>(getCreateVirusFeedUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusFeedInput,)
+  }
+);}
+
+
+
+
+export const getCreateVirusFeedMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirusFeed>>, TError,{data: BodyType<VirusFeedInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVirusFeed>>, TError,{data: BodyType<VirusFeedInput>}, TContext> => {
+
+const mutationKey = ['createVirusFeed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVirusFeed>>, {data: BodyType<VirusFeedInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVirusFeed(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVirusFeedMutationResult = NonNullable<Awaited<ReturnType<typeof createVirusFeed>>>
+    export type CreateVirusFeedMutationBody = BodyType<VirusFeedInput>
+    export type CreateVirusFeedMutationError = ErrorType<void>
+
+    /**
+ * @summary Register an approved feed source
+ */
+export const useCreateVirusFeed = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVirusFeed>>, TError,{data: BodyType<VirusFeedInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVirusFeed>>,
+        TError,
+        {data: BodyType<VirusFeedInput>},
+        TContext
+      > => {
+      return useMutation(getCreateVirusFeedMutationOptions(options));
+    }
+
+export const getSyncVirusFeedUrl = (id: number,) => {
+
+
+
+
+  return `/api/virus-db/feeds/${id}/sync`
+}
+
+/**
+ * @summary Record an idempotent manual feed import
+ */
+export const syncVirusFeed = async (id: number,
+    virusFeedSyncInput: VirusFeedSyncInput, options?: RequestInit): Promise<VirusFeedImport> => {
+
+  return customFetch<VirusFeedImport>(getSyncVirusFeedUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      virusFeedSyncInput,)
+  }
+);}
+
+
+
+
+export const getSyncVirusFeedMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncVirusFeed>>, TError,{id: number;data: BodyType<VirusFeedSyncInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof syncVirusFeed>>, TError,{id: number;data: BodyType<VirusFeedSyncInput>}, TContext> => {
+
+const mutationKey = ['syncVirusFeed'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof syncVirusFeed>>, {id: number;data: BodyType<VirusFeedSyncInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  syncVirusFeed(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SyncVirusFeedMutationResult = NonNullable<Awaited<ReturnType<typeof syncVirusFeed>>>
+    export type SyncVirusFeedMutationBody = BodyType<VirusFeedSyncInput>
+    export type SyncVirusFeedMutationError = ErrorType<void>
+
+    /**
+ * @summary Record an idempotent manual feed import
+ */
+export const useSyncVirusFeed = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof syncVirusFeed>>, TError,{id: number;data: BodyType<VirusFeedSyncInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof syncVirusFeed>>,
+        TError,
+        {id: number;data: BodyType<VirusFeedSyncInput>},
+        TContext
+      > => {
+      return useMutation(getSyncVirusFeedMutationOptions(options));
+    }
+
+export const getListVirusMatchesUrl = (params?: ListVirusMatchesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/virus-db/matches?${stringifiedParams}` : `/api/virus-db/matches`
+}
+
+/**
+ * @summary List virus matches linked to SOC evidence
+ */
+export const listVirusMatches = async (params?: ListVirusMatchesParams, options?: RequestInit): Promise<VirusMatch[]> => {
+
+  return customFetch<VirusMatch[]>(getListVirusMatchesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVirusMatchesQueryKey = (params?: ListVirusMatchesParams,) => {
+    return [
+    `/api/virus-db/matches`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVirusMatchesQueryOptions = <TData = Awaited<ReturnType<typeof listVirusMatches>>, TError = ErrorType<unknown>>(params?: ListVirusMatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusMatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVirusMatchesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVirusMatches>>> = ({ signal }) => listVirusMatches(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVirusMatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVirusMatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listVirusMatches>>>
+export type ListVirusMatchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List virus matches linked to SOC evidence
+ */
+
+export function useListVirusMatches<TData = Awaited<ReturnType<typeof listVirusMatches>>, TError = ErrorType<unknown>>(
+ params?: ListVirusMatchesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusMatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVirusMatchesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListVirusDatabaseAuditUrl = (params?: ListVirusDatabaseAuditParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/virus-db/audit?${stringifiedParams}` : `/api/virus-db/audit`
+}
+
+/**
+ * @summary List append-only virus database audit events
+ */
+export const listVirusDatabaseAudit = async (params?: ListVirusDatabaseAuditParams, options?: RequestInit): Promise<VirusDatabaseAudit[]> => {
+
+  return customFetch<VirusDatabaseAudit[]>(getListVirusDatabaseAuditUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVirusDatabaseAuditQueryKey = (params?: ListVirusDatabaseAuditParams,) => {
+    return [
+    `/api/virus-db/audit`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListVirusDatabaseAuditQueryOptions = <TData = Awaited<ReturnType<typeof listVirusDatabaseAudit>>, TError = ErrorType<unknown>>(params?: ListVirusDatabaseAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusDatabaseAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVirusDatabaseAuditQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVirusDatabaseAudit>>> = ({ signal }) => listVirusDatabaseAudit(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVirusDatabaseAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVirusDatabaseAuditQueryResult = NonNullable<Awaited<ReturnType<typeof listVirusDatabaseAudit>>>
+export type ListVirusDatabaseAuditQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List append-only virus database audit events
+ */
+
+export function useListVirusDatabaseAudit<TData = Awaited<ReturnType<typeof listVirusDatabaseAudit>>, TError = ErrorType<unknown>>(
+ params?: ListVirusDatabaseAuditParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVirusDatabaseAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVirusDatabaseAuditQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

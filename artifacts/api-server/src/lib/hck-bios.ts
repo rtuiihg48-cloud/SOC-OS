@@ -51,6 +51,16 @@ const REQUIRED_TABLES = [
   "managed_resources",
   "self_healing_restore_points",
   "self_healing_actions",
+  "virus_families",
+  "virus_catalog_entries",
+  "virus_indicators",
+  "virus_feed_sources",
+  "virus_feed_imports",
+  "virus_samples",
+  "virus_sample_access",
+  "virus_matches",
+  "virus_scan_runs",
+  "virus_database_audit",
 ];
 
 const CAPABILITIES: HckBiosStatus["capabilities"] = [

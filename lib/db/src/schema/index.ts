@@ -271,6 +271,174 @@ export const agentObserverRunsTable = pgTable("agent_observer_runs", {
   check("agent_observer_runs_production_changed_check", sql`${table.productionChanged} = false`),
 ]);
 
+// ─── Virus Intelligence Database ─────────────────────────────────────────────
+export const virusFamiliesTable = pgTable("virus_families", {
+  id: serial("id").primaryKey(),
+  canonicalName: text("canonical_name").notNull(),
+  aliases: text("aliases").array().notNull().default(sql`ARRAY[]::text[]`),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [uniqueIndex("virus_families_canonical_name_uidx").on(sql`lower(${table.canonicalName})`)]);
+
+export const virusCatalogEntriesTable = pgTable("virus_catalog_entries", {
+  id: serial("id").primaryKey(),
+  familyId: integer("family_id").references(() => virusFamiliesTable.id, { onDelete: "restrict" }),
+  canonicalName: text("canonical_name").notNull(),
+  severity: text("severity").notNull(),
+  confidence: real("confidence").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  description: text("description"),
+  firstSeen: timestamp("first_seen", { withTimezone: true }),
+  lastSeen: timestamp("last_seen", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("virus_catalog_entries_family_idx").on(table.familyId),
+  index("virus_catalog_entries_severity_status_idx").on(table.severity, table.status),
+  check("virus_catalog_entries_severity_check", sql`${table.severity} IN ('LOW','MEDIUM','HIGH','CRITICAL')`),
+  check("virus_catalog_entries_confidence_check", sql`${table.confidence} BETWEEN 0 AND 1`),
+  check("virus_catalog_entries_status_check", sql`${table.status} IN ('ACTIVE','REVOKED','SUPERSEDED')`),
+]);
+
+export const virusFeedSourcesTable = pgTable("virus_feed_sources", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  adapterKind: text("adapter_kind").notNull().default("MANUAL"),
+  status: text("status").notNull().default("ACTIVE"),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("virus_feed_sources_name_uidx").on(sql`lower(${table.name})`),
+  check("virus_feed_sources_adapter_check", sql`${table.adapterKind} IN ('MANUAL','JSON','STIX','TAXII','CUSTOM')`),
+  check("virus_feed_sources_status_check", sql`${table.status} IN ('ACTIVE','PAUSED','DISABLED')`),
+]);
+
+export const virusIndicatorsTable = pgTable("virus_indicators", {
+  id: serial("id").primaryKey(),
+  catalogEntryId: integer("catalog_entry_id").notNull().references(() => virusCatalogEntriesTable.id, { onDelete: "restrict" }),
+  sourceId: integer("source_id").references(() => virusFeedSourcesTable.id, { onDelete: "restrict" }),
+  indicatorType: text("indicator_type").notNull(),
+  normalizedValue: text("normalized_value").notNull(),
+  ruleVersion: text("rule_version"),
+  confidence: real("confidence").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("virus_indicators_type_value_uidx").on(table.indicatorType, table.normalizedValue),
+  index("virus_indicators_catalog_idx").on(table.catalogEntryId),
+  check("virus_indicators_type_check", sql`${table.indicatorType} IN ('SHA256','BYTE_FINGERPRINT','SIGNATURE')`),
+  check("virus_indicators_confidence_check", sql`${table.confidence} BETWEEN 0 AND 1`),
+  check("virus_indicators_status_check", sql`${table.status} IN ('ACTIVE','REVOKED','SUPERSEDED')`),
+  check("virus_indicators_sha_check", sql`${table.indicatorType} <> 'SHA256' OR ${table.normalizedValue} ~ '^[0-9a-f]{64}$'`),
+]);
+
+export const virusFeedImportsTable = pgTable("virus_feed_imports", {
+  id: serial("id").primaryKey(),
+  sourceId: integer("source_id").notNull().references(() => virusFeedSourcesTable.id, { onDelete: "restrict" }),
+  sourceVersion: text("source_version").notNull(),
+  cursor: text("cursor"),
+  status: text("status").notNull(),
+  importedCount: integer("imported_count").notNull().default(0),
+  rejectedCount: integer("rejected_count").notNull().default(0),
+  deduplicatedCount: integer("deduplicated_count").notNull().default(0),
+  errorCode: text("error_code"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("virus_feed_imports_source_version_uidx").on(table.sourceId, table.sourceVersion),
+  check("virus_feed_imports_status_check", sql`${table.status} IN ('RUNNING','COMPLETED','PARTIAL','FAILED')`),
+]);
+
+export const virusSamplesTable = pgTable("virus_samples", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  catalogEntryId: integer("catalog_entry_id").references(() => virusCatalogEntriesTable.id, { onDelete: "restrict" }),
+  sha256: text("sha256").notNull(),
+  objectPath: text("object_path"),
+  sizeBytes: integer("size_bytes").notNull(),
+  declaredName: text("declared_name"),
+  declaredContentType: text("declared_content_type"),
+  sourceType: text("source_type").notNull(),
+  sourceReference: text("source_reference"),
+  status: text("status").notNull().default("QUARANTINED"),
+  retentionUntil: timestamp("retention_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("virus_samples_tenant_sha_uidx").on(sql`coalesce(${table.tenantId},0)`, table.sha256),
+  index("virus_samples_status_created_idx").on(table.status, table.createdAt),
+  check("virus_samples_sha_check", sql`${table.sha256} ~ '^[0-9a-f]{64}$'`),
+  check("virus_samples_size_check", sql`${table.sizeBytes} BETWEEN 0 AND 52428800`),
+  check("virus_samples_source_check", sql`${table.sourceType} IN ('MANUAL','NODE','VIRTUALBOX','FEED')`),
+  check("virus_samples_status_check", sql`${table.status} IN ('UPLOADING','QUARANTINED','HASH_VERIFIED','REJECTED','TOMBSTONED')`),
+  check("virus_samples_private_path_check", sql`${table.objectPath} IS NULL OR ${table.objectPath} LIKE '/objects/%'`),
+]);
+
+export const virusSampleAccessTable = pgTable("virus_sample_access", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  sampleId: integer("sample_id").notNull().references(() => virusSamplesTable.id, { onDelete: "restrict" }),
+  principalRef: text("principal_ref").notNull(),
+  capability: text("capability").notNull(),
+  purpose: text("purpose").notNull(),
+  decision: text("decision").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [index("virus_sample_access_sample_idx").on(table.sampleId), check("virus_sample_access_decision_check", sql`${table.decision} IN ('ALLOWED','DENIED')`)]);
+
+export const virusMatchesTable = pgTable("virus_matches", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  eventId: integer("event_id").references(() => securityEventsTable.id, { onDelete: "restrict" }),
+  sampleId: integer("sample_id").references(() => virusSamplesTable.id, { onDelete: "restrict" }),
+  indicatorId: integer("indicator_id").notNull().references(() => virusIndicatorsTable.id, { onDelete: "restrict" }),
+  matchType: text("match_type").notNull(),
+  matchedValue: text("matched_value").notNull(),
+  confidence: real("confidence").notNull(),
+  severity: text("severity").notNull(),
+  sourceId: integer("source_id").references(() => virusFeedSourcesTable.id, { onDelete: "restrict" }),
+  nodeId: text("node_id"),
+  hostId: text("host_id"),
+  vmId: text("vm_id"),
+  evidenceReference: text("evidence_reference").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("virus_matches_tenant_created_idx").on(table.tenantId, table.createdAt),
+  index("virus_matches_event_idx").on(table.eventId),
+  check("virus_matches_type_check", sql`${table.matchType} IN ('EXACT_HASH','BYTE_FINGERPRINT','SIGNATURE')`),
+  check("virus_matches_confidence_check", sql`${table.confidence} BETWEEN 0 AND 1`),
+  check("virus_matches_severity_check", sql`${table.severity} IN ('LOW','MEDIUM','HIGH','CRITICAL')`),
+]);
+
+export const virusScanRunsTable = pgTable("virus_scan_runs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  sampleId: integer("sample_id").references(() => virusSamplesTable.id, { onDelete: "restrict" }),
+  scannerVersion: text("scanner_version").notNull(),
+  inputHash: text("input_hash").notNull(),
+  status: text("status").notNull(),
+  findings: jsonb("findings").$type<Record<string, unknown>>().notNull(),
+  correlationId: text("correlation_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [index("virus_scan_runs_sample_idx").on(table.sampleId), check("virus_scan_runs_hash_check", sql`${table.inputHash} ~ '^[0-9a-f]{64}$'`)]);
+
+export const virusDatabaseAuditTable = pgTable("virus_database_audit", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  action: text("action").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: integer("entity_id"),
+  principalRef: text("principal_ref").notNull(),
+  outcome: text("outcome").notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("virus_database_audit_tenant_created_idx").on(table.tenantId, table.createdAt),
+  check("virus_database_audit_outcome_check", sql`${table.outcome} IN ('ALLOWED','DENIED','COMPLETED','FAILED')`),
+]);
+
 // ─── Derived types ────────────────────────────────────────────────────────────
 export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -327,3 +495,25 @@ export type DnaPredictionLayerObservation = typeof dnaPredictionLayerObservation
 export const insertAgentObserverRunSchema = createInsertSchema(agentObserverRunsTable).omit({ id: true, createdAt: true });
 export type InsertAgentObserverRun = z.infer<typeof insertAgentObserverRunSchema>;
 export type AgentObserverRun = typeof agentObserverRunsTable.$inferSelect;
+
+export const insertVirusFamilySchema = createInsertSchema(virusFamiliesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVirusCatalogEntrySchema = createInsertSchema(virusCatalogEntriesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVirusFeedSourceSchema = createInsertSchema(virusFeedSourcesTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertVirusIndicatorSchema = createInsertSchema(virusIndicatorsTable).omit({ id: true, createdAt: true });
+export const insertVirusFeedImportSchema = createInsertSchema(virusFeedImportsTable).omit({ id: true, startedAt: true, completedAt: true });
+export const insertVirusSampleSchema = createInsertSchema(virusSamplesTable).omit({ id: true, createdAt: true, verifiedAt: true });
+export const insertVirusSampleAccessSchema = createInsertSchema(virusSampleAccessTable).omit({ id: true, createdAt: true });
+export const insertVirusMatchSchema = createInsertSchema(virusMatchesTable).omit({ id: true, createdAt: true });
+export const insertVirusScanRunSchema = createInsertSchema(virusScanRunsTable).omit({ id: true, createdAt: true, completedAt: true });
+export const insertVirusDatabaseAuditSchema = createInsertSchema(virusDatabaseAuditTable).omit({ id: true, createdAt: true });
+
+export type VirusFamily = typeof virusFamiliesTable.$inferSelect;
+export type VirusCatalogEntry = typeof virusCatalogEntriesTable.$inferSelect;
+export type VirusFeedSource = typeof virusFeedSourcesTable.$inferSelect;
+export type VirusIndicator = typeof virusIndicatorsTable.$inferSelect;
+export type VirusFeedImport = typeof virusFeedImportsTable.$inferSelect;
+export type VirusSample = typeof virusSamplesTable.$inferSelect;
+export type VirusSampleAccess = typeof virusSampleAccessTable.$inferSelect;
+export type VirusMatch = typeof virusMatchesTable.$inferSelect;
+export type VirusScanRun = typeof virusScanRunsTable.$inferSelect;
+export type VirusDatabaseAudit = typeof virusDatabaseAuditTable.$inferSelect;

@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff } from "lucide-react";
 import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 
@@ -17,6 +17,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/simulate", label: "Simulation", icon: Cpu },
     { href: "/patches", label: "Patches", icon: GitCommit },
     { href: "/threat-graph", label: "Threat Graph", icon: ShieldAlert },
+    { href: "/virus-database", label: "Virus DB", icon: BugOff },
     { href: "/rules", label: "Rules Engine", icon: Zap },
     { href: "/correlations", label: "Correlations", icon: Link2 },
     { href: "/tenants", label: "Tenants", icon: Building2 },

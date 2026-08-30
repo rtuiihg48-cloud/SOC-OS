@@ -16,6 +16,7 @@ import Tenants from "@/pages/Tenants";
 import Runtime from "@/pages/Runtime";
 import Quarantine from "@/pages/Quarantine";
 import SelfHealing from "@/pages/SelfHealing";
+import VirusDatabase from "@/pages/VirusDatabase";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/runtime" component={Runtime} />
         <Route path="/quarantine" component={Quarantine} />
         <Route path="/self-healing" component={SelfHealing} />
+        <Route path="/virus-database" component={VirusDatabase} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
