@@ -9,6 +9,72 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Get the authenticated normalized principal
+ */
+export const GetCurrentPrincipalResponse = zod.object({
+  "principalId": zod.string(),
+  "principalType": zod.enum(['USER', 'SERVICE', 'GATEWAY']),
+  "tenantIds": zod.array(zod.number()),
+  "roles": zod.array(zod.string()),
+  "capabilities": zod.array(zod.string()),
+  "authMethod": zod.enum(['CLERK', 'SCOPED_CREDENTIAL']),
+  "credentialVersion": zod.number()
+})
+
+
+/**
+ * @summary List tenant-scoped immutable audit evidence
+ */
+export const listAuditRecordsQueryLimitDefault = 50;
+export const listAuditRecordsQueryLimitMax = 100;
+
+
+
+export const ListAuditRecordsQueryParams = zod.object({
+  "tenantId": zod.coerce.number().optional(),
+  "cursor": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listAuditRecordsQueryLimitMax).default(listAuditRecordsQueryLimitDefault)
+})
+
+export const ListAuditRecordsResponse = zod.object({
+  "records": zod.array(zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number(),
+  "sequence": zod.number(),
+  "occurredAt": zod.coerce.date(),
+  "principalId": zod.string(),
+  "principalType": zod.string(),
+  "action": zod.string(),
+  "targetType": zod.string(),
+  "targetId": zod.string(),
+  "decision": zod.string(),
+  "reasonCode": zod.string(),
+  "correlationId": zod.string(),
+  "prevHash": zod.string(),
+  "hash": zod.string()
+})),
+  "nextCursor": zod.string().nullable()
+})
+
+
+/**
+ * @summary Read-only verification of a tenant audit chain range
+ */
+export const VerifyAuditChainBody = zod.object({
+  "tenantId": zod.number().optional(),
+  "from": zod.coerce.date().optional(),
+  "to": zod.coerce.date().optional()
+})
+
+export const VerifyAuditChainResponse = zod.object({
+  "valid": zod.boolean(),
+  "checked": zod.number(),
+  "firstBrokenSequence": zod.number().nullable(),
+  "errorCode": zod.string().nullable()
+})
+
+
+/**
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({

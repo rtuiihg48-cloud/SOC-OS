@@ -23,17 +23,23 @@ import {
   UpdateEventStatusBody,
   ListEventsQueryParams,
 } from "@workspace/api-zod";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { appendAudit } from "../lib/audit";
 
 const router = Router();
 
 // ─── List Events ─────────────────────────────────────────────────────────────
-router.get("/events", async (req, res) => {
+router.get("/events", requireCapability("events:read", singleTenantScope), async (req, res) => {
   const parsed = ListEventsQueryParams.safeParse(req.query);
   const filters = parsed.success ? parsed.data : {};
 
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) { res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" }); return; }
+  if (filters.tenantId && Number(filters.tenantId) !== tenantId) { res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" }); return; }
   const events = await db
     .select()
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .orderBy(desc(securityEventsTable.timestamp))
     .limit(filters.limit ?? 200);
 
@@ -41,14 +47,14 @@ router.get("/events", async (req, res) => {
     .filter((e) => !filters.action || e.action === filters.action)
     .filter((e) => !filters.status || e.status === filters.status)
     .filter((e) => !filters.tactic || e.tactic === filters.tactic)
-    .filter((e) => !filters.tenantId || e.tenantId === Number(filters.tenantId));
+    .filter((e) => e.tenantId === tenantId);
 
   res.json(filtered.map(formatEvent));
 });
 
 // ─── V30/V50 Full SOC Pipeline ────────────────────────────────────────────────
 // Stages: Ingest → Rules Engine → Risk Engine → Correlation → Decision → Save → Broadcast
-router.post("/events", async (req, res) => {
+router.post("/events", requireCapability("events:ingest", singleTenantScope), async (req, res) => {
   const parsed = ProcessEventBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request body" });
@@ -62,7 +68,11 @@ router.post("/events", async (req, res) => {
     managedResourceKey,
     observedManagedState,
   } = parsed.data;
-  const tenantId = (req.body as Record<string, unknown>).tenantId as number | null ?? null;
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null || ("tenantId" in req.body && Number(req.body.tenantId) !== tenantId)) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
   if (
     observedManagedState &&
     managedStateSize(observedManagedState) > SELF_HEALING_POLICY.maxStateBytes
@@ -75,7 +85,6 @@ router.post("/events", async (req, res) => {
 
   // ── Stage 1: Ingest ──────────────────────────────────────────────────────
   pipelineStages.push("INGEST");
-  enqueue({ event, tenantId, cpuUsage: cpuUsage ?? undefined, memUsage: memUsage ?? undefined, enqueuedAt: Date.now(), source: "api" });
 
   // ── Stage 2: Base Risk Engine (MITRE + Regex + Velocity) ─────────────────
   pipelineStages.push("RISK_ENGINE");
@@ -112,37 +121,28 @@ router.post("/events", async (req, res) => {
   const recentTexts = [...recentEvents.map((e) => e.event), event];
   const correlationResult = correlate(recentTexts);
 
-  let correlationId: number | null = null;
-  if (correlationResult) {
-    const [savedCorr] = await db
-      .insert(correlationsTable)
-      .values({
+  // ── Stage 5: Decision Engine ─────────────────────────────────────────────
+  pipelineStages.push("DECISION_ENGINE");
+
+  // ── Stage 6: SOAR Auto-Fix ───────────────────────────────────────────────
+  pipelineStages.push("SOAR");
+  const fix = finalAction !== "ALLOW" ? autoFix(event) : null;
+
+  // ── Stage 7: Persist to DB ───────────────────────────────────────────────
+  pipelineStages.push("PERSIST");
+  const persisted = await db.transaction(async (tx) => {
+    let correlationId: number | null = null;
+    if (correlationResult) {
+      const [savedCorr] = await tx.insert(correlationsTable).values({
         tenantId,
         threatType: correlationResult.threatType,
         severity: correlationResult.severity,
         confidence: correlationResult.confidence,
         summary: correlationResult.summary,
         eventIds: JSON.stringify([]),
-      })
-      .returning();
-    correlationId = savedCorr.id;
-  }
-
-  // ── Stage 5: Decision Engine ─────────────────────────────────────────────
-  pipelineStages.push("DECISION_ENGINE");
-
-  // ── Stage 6: SOAR Auto-Fix ───────────────────────────────────────────────
-  pipelineStages.push("SOAR");
-  if (finalAction !== "ALLOW") {
-    const fix = autoFix(event);
-    if (fix) {
-      await db.insert(patchesTable).values({ tenantId, attack: event, fix, tactic: result.tactic });
+      }).returning();
+      correlationId = savedCorr.id;
     }
-  }
-
-  // ── Stage 7: Persist to DB ───────────────────────────────────────────────
-  pipelineStages.push("PERSIST");
-  const persisted = await db.transaction(async (tx) => {
     const [eventRow] = await tx
       .insert(securityEventsTable)
       .values({
@@ -165,9 +165,15 @@ router.post("/events", async (req, res) => {
         memUsage: memUsage ?? null,
       })
       .returning();
+    if (fix) await tx.insert(patchesTable).values({ tenantId, attack: event, fix, tactic: result.tactic });
 
     if (finalAction !== "ISOLATE") {
-      return { event: eventRow, quarantine: null };
+      await appendAudit(tx, {
+        tenantId, principal: req.principal!, action: "events:ingest", targetType: "security_event",
+        targetId: String(eventRow.id), decision: "COMMITTED", reasonCode: "EVENT_PERSISTED",
+        correlationId: req.principal!.correlationId, metadata: { action: finalAction, severity: result.severity, correlationId },
+      });
+      return { event: eventRow, quarantine: null, correlationId };
     }
 
     const capture = buildQuarantineCapture({
@@ -208,10 +214,17 @@ router.post("/events", async (req, res) => {
       .where(eq(securityEventsTable.id, eventRow.id))
       .returning();
 
-    return { event: quarantinedEvent ?? eventRow, quarantine };
+    const committedEvent = quarantinedEvent ?? eventRow;
+    await appendAudit(tx, {
+      tenantId, principal: req.principal!, action: "events:ingest", targetType: "security_event",
+      targetId: String(committedEvent.id), decision: "COMMITTED", reasonCode: "EVENT_PERSISTED",
+      correlationId: req.principal!.correlationId, metadata: { action: finalAction, severity: result.severity, correlationId, quarantineId: quarantine.id },
+    });
+    return { event: committedEvent, quarantine, correlationId };
   });
 
   const inserted = persisted.event;
+  const correlationId = persisted.correlationId;
 
   const formatted = formatEvent(inserted);
 
@@ -245,8 +258,13 @@ router.post("/events", async (req, res) => {
     scoreBoost: rulesResult.totalBoost,
   };
 
+  // Side effects occur only after the transaction containing both evidence and
+  // protected records has committed.
+  enqueue({ event, tenantId, cpuUsage: cpuUsage ?? undefined, memUsage: memUsage ?? undefined, enqueuedAt: Date.now(), source: "api" });
   broadcast(broadcastPayload, tenantId ?? undefined);
-  sseClients.forEach((send) => send(formatted));
+  sseClients.forEach((client) => {
+    if (client.tenantId === tenantId) client.send(formatted);
+  });
 
   res.json({
     event: formatted,
@@ -282,9 +300,15 @@ router.post("/events", async (req, res) => {
 // ─── SSE Stream ───────────────────────────────────────────────────────────────
 // MUST be registered before /events/:id — "stream" would be parsed as NaN id
 type SseSend = (data: unknown) => void;
-export const sseClients = new Set<SseSend>();
+type SseClient = { tenantId: number; send: SseSend };
+export const sseClients = new Set<SseClient>();
 
-router.get("/events/stream", (req, res) => {
+router.get("/events/stream", requireCapability("events:read", singleTenantScope), (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -295,55 +319,74 @@ router.get("/events/stream", (req, res) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  sseClients.add(send);
+  const client = { tenantId, send };
+  sseClients.add(client);
   res.write(": connected\n\n");
 
   req.on("close", () => {
-    sseClients.delete(send);
+    sseClients.delete(client);
   });
 });
 
 // ─── Get Single Event ─────────────────────────────────────────────────────────
-router.get("/events/:id", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+router.get("/events/:id", requireCapability("events:read", singleTenantScope), async (req, res) => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  const [event] = await db.select().from(securityEventsTable).where(eq(securityEventsTable.id, id));
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
+  const [event] = await db.select().from(securityEventsTable).where(and(eq(securityEventsTable.id, id), eq(securityEventsTable.tenantId, tenantId)));
   if (!event) { res.status(404).json({ error: "Not found" }); return; }
   res.json(formatEvent(event));
 });
 
 // ─── Update Alert Status ──────────────────────────────────────────────────────
-router.patch("/events/:id/status", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+router.patch("/events/:id/status", requireCapability("events:status:update", singleTenantScope), async (req, res) => {
+  const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const parsed = UpdateEventStatusBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid status" }); return; }
 
-  const [updated] = await db
-    .update(securityEventsTable)
-    .set({ status: parsed.data.status })
-    .where(eq(securityEventsTable.id, id))
-    .returning();
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) { res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" }); return; }
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx.update(securityEventsTable).set({ status: parsed.data.status }).where(and(eq(securityEventsTable.id, id), eq(securityEventsTable.tenantId, tenantId))).returning();
+    if (row) await appendAudit(tx, { tenantId, principal: req.principal!, action: "events:status:update", targetType: "security_event", targetId: String(id), decision: "COMMITTED", reasonCode: "STATUS_UPDATED", correlationId: req.principal!.correlationId, metadata: { status: parsed.data.status } });
+    return [row];
+  });
 
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
 
   // Broadcast status change via WebSocket
-  broadcast({ type: "status_update", eventId: id, status: parsed.data.status });
+  broadcast({ type: "status_update", eventId: id, status: parsed.data.status }, tenantId);
   res.json(formatEvent(updated));
 });
 
 // ─── Queue Stats ──────────────────────────────────────────────────────────────
-router.get("/queue-stats", (_req, res) => {
-  res.json(queueStats());
+router.get("/queue-stats", requireCapability("events:read", singleTenantScope), (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
+  res.json(queueStats(tenantId));
 });
 
 // ─── Self Red-Team ────────────────────────────────────────────────────────────
-router.post("/self-test", async (req, res) => {
+router.post("/self-test", requireCapability("testing:run", singleTenantScope), async (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
   const last = await db
     .select({ hash: securityEventsTable.hash })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .orderBy(desc(securityEventsTable.timestamp))
     .limit(1);
 
@@ -355,6 +398,7 @@ router.post("/self-test", async (req, res) => {
 
   for (const { result, fix } of redTeamResults) {
     await db.insert(securityEventsTable).values({
+      tenantId,
       event: result.event,
       score: result.score,
       action: result.action,
@@ -373,6 +417,7 @@ router.post("/self-test", async (req, res) => {
     if (fix) {
       const fixHash = computeHash(`SELF_FIX: ${fix}`, 0, "PATCHED", result.hash, Date.now());
       await db.insert(securityEventsTable).values({
+        tenantId,
         event: `SELF_FIX: ${fix}`,
         score: 0,
         action: "PATCHED",
@@ -387,7 +432,7 @@ router.post("/self-test", async (req, res) => {
         prevHash: result.hash,
       });
 
-      await db.insert(patchesTable).values({ attack: result.event, fix, tactic: result.tactic });
+      await db.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
       patchesApplied++;
     }
 
@@ -408,10 +453,16 @@ router.post("/self-test", async (req, res) => {
 });
 
 // ─── Full Simulation ──────────────────────────────────────────────────────────
-router.post("/simulate", async (req, res) => {
+router.post("/simulate", requireCapability("testing:run", singleTenantScope), async (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
   const last = await db
     .select({ hash: securityEventsTable.hash })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .orderBy(desc(securityEventsTable.timestamp))
     .limit(1);
 
@@ -421,6 +472,7 @@ router.post("/simulate", async (req, res) => {
   const [baseEvent] = await db
     .insert(securityEventsTable)
     .values({
+      tenantId,
       event: baseResult.event,
       score: baseResult.score,
       action: baseResult.action,
@@ -445,6 +497,7 @@ router.post("/simulate", async (req, res) => {
 
   for (const { result, fix } of redTeamResults) {
     await db.insert(securityEventsTable).values({
+      tenantId,
       event: result.event,
       score: result.score,
       action: result.action,
@@ -461,7 +514,7 @@ router.post("/simulate", async (req, res) => {
     });
 
     if (fix) {
-      await db.insert(patchesTable).values({ attack: result.event, fix, tactic: result.tactic });
+      await db.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
       selfHealingEvents.push({ attack: result.event, tactic: result.tactic, fix });
       patchesApplied++;
     }

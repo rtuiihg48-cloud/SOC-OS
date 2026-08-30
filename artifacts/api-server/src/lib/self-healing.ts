@@ -112,12 +112,12 @@ export async function registerVerifiedManagedResource(input: {
   });
 }
 
-export async function previewVerifiedRestorePoint(restorePointId: number) {
+export async function previewVerifiedRestorePoint(restorePointId: number, tenantId: number | null) {
   return db.transaction(async (tx) => {
     const [restorePoint] = await tx
       .select()
       .from(selfHealingRestorePointsTable)
-      .where(eq(selfHealingRestorePointsTable.id, restorePointId))
+      .where(and(eq(selfHealingRestorePointsTable.id, restorePointId), tenantId === null ? isNull(selfHealingRestorePointsTable.tenantId) : eq(selfHealingRestorePointsTable.tenantId, tenantId)))
       .limit(1);
     if (!restorePoint) return null;
 
@@ -165,6 +165,7 @@ export async function previewVerifiedRestorePoint(restorePointId: number) {
 
 export async function applyVerifiedRestorePoint(input: {
   restorePointId: number;
+  tenantId: number | null;
   eventId?: number | null;
   mode: "APPLY" | "AUTO";
   observedState?: JsonRecord;
@@ -173,7 +174,7 @@ export async function applyVerifiedRestorePoint(input: {
     const [restorePoint] = await tx
       .select()
       .from(selfHealingRestorePointsTable)
-      .where(eq(selfHealingRestorePointsTable.id, input.restorePointId))
+      .where(and(eq(selfHealingRestorePointsTable.id, input.restorePointId), input.tenantId === null ? isNull(selfHealingRestorePointsTable.tenantId) : eq(selfHealingRestorePointsTable.tenantId, input.tenantId)))
       .limit(1);
     if (!restorePoint) return null;
 
@@ -276,6 +277,7 @@ export async function automaticallyRestoreManagedResource(input: {
   if (restorePoint) {
     return applyVerifiedRestorePoint({
       restorePointId: restorePoint.id,
+      tenantId: input.tenantId,
       eventId: input.eventId,
       mode: "AUTO",
       observedState: input.observedState,

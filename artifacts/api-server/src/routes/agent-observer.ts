@@ -1,8 +1,10 @@
 import { Router, type IRouter } from "express";
-import { pool } from "@workspace/db";
+import { db, pool, agentObserverRunsTable } from "@workspace/db";
 import { analyzeEvent } from "../lib/soc-engine";
 import { getSystemMetrics } from "../lib/system-metrics";
 import { runObserverAgent, type ObserverInput, type ObserverTaskType } from "../lib/agent-observer";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { appendAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 const TASK_TYPES = new Set<ObserverTaskType>(["analyze_event", "analyze_system", "inspect_memory"]);
@@ -67,7 +69,7 @@ async function inspectMemory(tenantId?: number): Promise<Record<string, number>>
   };
 }
 
-router.post("/agent/observe", async (req, res): Promise<void> => {
+router.post("/agent/observe", requireCapability("agent:observe", singleTenantScope), async (req, res): Promise<void> => {
   const input = parseInput(req.body);
   if (!input) {
     res.status(400).json({
@@ -76,6 +78,15 @@ router.post("/agent/observe", async (req, res): Promise<void> => {
     });
     return;
   }
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null || (input.tenantId !== undefined && input.tenantId !== tenantId)) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
+  // Observer reads are always tenant-scoped, including requests that omitted a
+  // tenant id. This prevents an authorized tenant principal from observing
+  // aggregate cross-tenant memory.
+  input.tenantId = tenantId;
 
   const run = await runObserverAgent(input, {
     async analyzeEvent(event) {
@@ -85,23 +96,36 @@ router.post("/agent/observe", async (req, res): Promise<void> => {
     inspectMemory,
   });
 
-  await pool.query(`
-    INSERT INTO agent_observer_runs (
-      run_id, tenant_id, task_type, instruction, status, policy,
-      plan, results, reflection, production_changed
-    )
-    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9::jsonb, false)
-  `, [
-    run.runId,
-    input.tenantId ?? null,
-    input.taskType,
-    input.instruction,
-    run.status,
-    JSON.stringify(run.policy),
-    JSON.stringify(run.plan),
-    JSON.stringify(run.results),
-    JSON.stringify(run.reflection),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx.insert(agentObserverRunsTable).values({
+      runId: run.runId,
+      tenantId,
+      taskType: input.taskType,
+      instruction: input.instruction,
+      status: run.status,
+      policy: run.policy,
+      plan: run.plan,
+      results: run.results,
+      reflection: run.reflection,
+      productionChanged: false,
+    } as any);
+    await appendAudit(tx, {
+      tenantId,
+      principal: req.principal!,
+      action: "agent:observe",
+      targetType: "agent_observer_run",
+      targetId: run.runId,
+      decision: run.status === "completed" ? "COMMITTED" : run.status === "blocked" ? "REJECTED" : "FAILED",
+      reasonCode: run.status === "completed" ? "OBSERVER_RUN_RECORDED" : run.status === "blocked" ? "OBSERVER_POLICY_BLOCKED" : "OBSERVER_RUN_FAILED",
+      correlationId: req.principal!.correlationId,
+      metadata: {
+        taskType: input.taskType,
+        status: run.status,
+        failedSteps: run.results.filter((step) => step.status === "failed").length,
+        productionChanged: false,
+      },
+    });
+  });
 
   res.status(run.status === "blocked" ? 403 : 200).json(run);
 });

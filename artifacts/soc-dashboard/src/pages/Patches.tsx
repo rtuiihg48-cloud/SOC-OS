@@ -42,7 +42,7 @@ export default function Patches() {
             </CardDescription>
           </CardHeader>
         </Card>
-        
+
         <Card className="bg-card/50 backdrop-blur border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-mono text-muted-foreground uppercase flex items-center gap-2">

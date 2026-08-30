@@ -1,7 +1,7 @@
-import { 
-  useGetDashboard, 
-  useGetSystemMetrics, 
-  useGetMitreStats, 
+import {
+  useGetDashboard,
+  useGetSystemMetrics,
+  useGetMitreStats,
   useGetRiskTimeline,
   getGetDashboardQueryKey,
   getGetSystemMetricsQueryKey,
@@ -232,17 +232,17 @@ export default function Dashboard() {
           <CardContent>
             <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
               {liveEvents.map((ev) => (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, x: -20, backgroundColor: 'hsl(var(--primary)/0.2)' }}
                     animate={{ opacity: 1, x: 0, backgroundColor: 'transparent' }}
                     transition={{ duration: 0.5 }}
-                    key={`${ev.id}-${ev.timestamp}`} 
+                    key={`${ev.id}-${ev.timestamp}`}
                     className="flex items-center gap-3 p-2 rounded border border-border bg-secondary/30 font-mono text-xs"
                   >
                     <div className="w-16 shrink-0 text-muted-foreground">{new Date(ev.timestamp).toLocaleTimeString([], {hour12:false})}</div>
                     <div className="w-16 shrink-0 font-bold" style={{
-                      color: ev.action === 'ALLOW' ? 'hsl(var(--safe))' : 
-                             ev.action === 'WARN' ? 'hsl(var(--warn))' : 
+                      color: ev.action === 'ALLOW' ? 'hsl(var(--safe))' :
+                             ev.action === 'WARN' ? 'hsl(var(--warn))' :
                              ev.action === 'ISOLATE' ? 'hsl(var(--critical))' : 'hsl(var(--primary))'
                     }}>
                       {ev.action}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { 
-  useListTrafficFlows, 
-  useGetTrafficSummary, 
+import {
+  useListTrafficFlows,
+  useGetTrafficSummary,
   useGenerateSyntheticTraffic,
   getListTrafficFlowsQueryKey,
   getGetTrafficSummaryQueryKey,
@@ -77,11 +77,11 @@ export default function TrafficAnalysis() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Inspect normalized heartbeats and analyzed flow summaries</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={handleGenerateSynthetic} 
+          <Button
+            variant="outline"
+            onClick={handleGenerateSynthetic}
             disabled={generateSynthetic.isPending}
             className="gap-2 font-mono text-xs border-dashed border-primary/50 text-primary hover:bg-primary/10"
           >
@@ -123,7 +123,7 @@ export default function TrafficAnalysis() {
           <span className="text-[10px] text-muted-foreground font-mono uppercase">Flow Count</span>
           <span className="text-2xl font-mono text-foreground font-semibold mt-2">{summary?.flowCount ?? "-"}</span>
         </div>
-        
+
         <div className="bg-card border border-border p-3 rounded-md flex flex-col justify-between shadow-sm">
           <span className="text-[10px] text-muted-foreground font-mono uppercase">Heartbeat Count</span>
           <span className="text-2xl font-mono text-primary font-semibold mt-2">{summary?.heartbeatCount ?? "-"}</span>
@@ -164,7 +164,7 @@ export default function TrafficAnalysis() {
             <Filter className="w-4 h-4" />
             <span className="font-mono text-sm uppercase tracking-widest">Filters:</span>
           </div>
-          
+
           <Select value={observationTypeFilter} onValueChange={setObservationTypeFilter}>
             <SelectTrigger className="w-[160px] font-mono text-xs bg-background">
               <SelectValue placeholder="Type" />
@@ -202,14 +202,14 @@ export default function TrafficAnalysis() {
             </SelectContent>
           </Select>
 
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
-              setObservationTypeFilter("ALL"); 
-              setDirectionFilter("ALL"); 
+              setObservationTypeFilter("ALL");
+              setDirectionFilter("ALL");
               setSeverityFilter("ALL");
-            }} 
+            }}
             className="font-mono text-xs ml-auto text-muted-foreground"
           >
             RESET
@@ -253,7 +253,7 @@ export default function TrafficAnalysis() {
               </TableHeader>
               <TableBody>
                 {flows.map((obs: TrafficObservation) => (
-                    <motion.tr 
+                    <motion.tr
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       key={obs.id}
                       className={`border-b border-border hover:bg-secondary/30 font-mono text-xs transition-colors group ${
@@ -267,7 +267,7 @@ export default function TrafficAnalysis() {
                           <Badge variant="outline" className="mt-2 text-[9px] px-1 py-0 h-4 border-primary/50 text-primary">SYNTHETIC</Badge>
                         )}
                       </TableCell>
-                      
+
                       <TableCell className="align-top pt-3">
                         <Badge variant="outline" className={`font-mono text-[9px] ${
                           obs.observationType === 'HEARTBEAT' ? 'border-secondary-foreground/30 text-secondary-foreground' : 'border-primary/50 text-primary'
@@ -300,7 +300,7 @@ export default function TrafficAnalysis() {
                               <span className="text-foreground truncate" title={obs.destinationAsset || 'Unknown'}>{obs.destinationAsset || '*'}</span>
                               {obs.destinationPort && <span className="text-primary/70">:{obs.destinationPort}</span>}
                             </div>
-                            
+
                             {(obs.dnsQueryName || obs.tlsServerName || obs.httpHost) && (
                               <div className="flex gap-2 flex-wrap text-[9px]">
                                 {obs.dnsQueryName && <span className="bg-background border border-border px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[150px]" title={obs.dnsQueryName}>DNS: {obs.dnsQueryName}</span>}
@@ -308,7 +308,7 @@ export default function TrafficAnalysis() {
                                 {obs.httpHost && <span className="bg-background border border-border px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[150px]" title={obs.httpHost}>HOST: {obs.httpHost}</span>}
                               </div>
                             )}
-                            
+
                             <div className="text-[9px] text-muted-foreground flex gap-3">
                               <span>↑ {formatBytes(obs.bytesOut)}</span>
                               <span>↓ {formatBytes(obs.bytesIn)}</span>
@@ -320,7 +320,7 @@ export default function TrafficAnalysis() {
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] text-muted-foreground uppercase">Status:</span>
                               <span className={`font-semibold ${
-                                obs.heartbeatStatus === 'HEALTHY' ? 'text-safe' : 
+                                obs.heartbeatStatus === 'HEALTHY' ? 'text-safe' :
                                 obs.heartbeatStatus === 'DEGRADED' ? 'text-warn' : 'text-critical'
                               }`}>{obs.heartbeatStatus}</span>
                             </div>
@@ -362,11 +362,11 @@ export default function TrafficAnalysis() {
                       </TableCell>
 
                       <TableCell className="align-top pt-3 text-right">
-                        <span className="font-bold text-[10px]" style={{ 
-                          color: obs.recommendedAction === 'ALLOW' ? 'hsl(var(--safe))' : 
-                                 obs.recommendedAction === 'WARN' ? 'hsl(var(--warn))' : 
-                                 obs.recommendedAction === 'ISOLATE' ? 'hsl(var(--critical))' : 
-                                 'hsl(var(--primary))' 
+                        <span className="font-bold text-[10px]" style={{
+                          color: obs.recommendedAction === 'ALLOW' ? 'hsl(var(--safe))' :
+                                 obs.recommendedAction === 'WARN' ? 'hsl(var(--warn))' :
+                                 obs.recommendedAction === 'ISOLATE' ? 'hsl(var(--critical))' :
+                                 'hsl(var(--primary))'
                         }}>
                           {obs.recommendedAction}
                         </span>

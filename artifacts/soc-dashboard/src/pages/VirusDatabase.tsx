@@ -423,7 +423,7 @@ function LookupIndicatorDialog() {
 export default function VirusDatabase() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const { data: stats } = useGetVirusDatabaseStats({
     query: { refetchInterval: 10000, queryKey: getGetVirusDatabaseStatsQueryKey() }
   });
@@ -445,10 +445,10 @@ export default function VirusDatabase() {
           toast({ title: "Warning", description: "Download permitted by backend policy. Binary transfer starting...", variant: "destructive" });
         },
         onError: (err: any) => {
-          toast({ 
-            title: "Policy Denied", 
-            description: "DATA_PLANE_RESTRICTION: Active binary download is blocked by current environment constraints. " + err.message, 
-            variant: "destructive" 
+          toast({
+            title: "Policy Denied",
+            description: "DATA_PLANE_RESTRICTION: Active binary download is blocked by current environment constraints. " + err.message,
+            variant: "destructive"
           });
         }
       }
@@ -473,7 +473,7 @@ export default function VirusDatabase() {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">High-trust evidence catalog and exact-match intelligence</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <LookupIndicatorDialog />
           <Button variant="outline" size="icon" onClick={refreshAll} className="border-border bg-card">
@@ -659,9 +659,9 @@ export default function VirusDatabase() {
                         </div>
                       </td>
                       <td className="p-3 text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="h-7 text-[10px] font-mono border-warn/30 text-warn hover:bg-warn hover:text-warn-foreground"
                           onClick={() => handleDownload(sample.id)}
                           disabled={downloadMutation.isPending && downloadMutation.variables?.id === sample.id}

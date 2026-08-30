@@ -20,15 +20,21 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ApiError,
   ApplyRestorePointBody,
+  AuditRecordPage,
+  AuditVerificationInput,
+  AuditVerificationResult,
   Correlation,
   CreateRuleBody,
   CreateTenantBody,
+  CurrentPrincipal,
   DashboardSummary,
   EventInput,
   ExecuteVoiceCommandBody,
   HckBiosStatus,
   HealthStatus,
+  ListAuditRecordsParams,
   ListCorrelationsParams,
   ListEventsParams,
   ListManagedResourcesParams,
@@ -108,6 +114,238 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
+export const getGetCurrentPrincipalUrl = () => {
+
+
+
+
+  return `/api/auth/me`
+}
+
+/**
+ * @summary Get the authenticated normalized principal
+ */
+export const getCurrentPrincipal = async ( options?: RequestInit): Promise<CurrentPrincipal> => {
+
+  return customFetch<CurrentPrincipal>(getGetCurrentPrincipalUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCurrentPrincipalQueryKey = () => {
+    return [
+    `/api/auth/me`
+    ] as const;
+    }
+
+
+export const getGetCurrentPrincipalQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentPrincipal>>, TError = ErrorType<ApiError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentPrincipal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentPrincipalQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentPrincipal>>> = ({ signal }) => getCurrentPrincipal({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentPrincipal>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCurrentPrincipalQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentPrincipal>>>
+export type GetCurrentPrincipalQueryError = ErrorType<ApiError>
+
+
+/**
+ * @summary Get the authenticated normalized principal
+ */
+
+export function useGetCurrentPrincipal<TData = Awaited<ReturnType<typeof getCurrentPrincipal>>, TError = ErrorType<ApiError>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCurrentPrincipal>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCurrentPrincipalQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListAuditRecordsUrl = (params?: ListAuditRecordsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit/records?${stringifiedParams}` : `/api/audit/records`
+}
+
+/**
+ * @summary List tenant-scoped immutable audit evidence
+ */
+export const listAuditRecords = async (params?: ListAuditRecordsParams, options?: RequestInit): Promise<AuditRecordPage> => {
+
+  return customFetch<AuditRecordPage>(getListAuditRecordsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAuditRecordsQueryKey = (params?: ListAuditRecordsParams,) => {
+    return [
+    `/api/audit/records`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAuditRecordsQueryOptions = <TData = Awaited<ReturnType<typeof listAuditRecords>>, TError = ErrorType<unknown>>(params?: ListAuditRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAuditRecordsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAuditRecords>>> = ({ signal }) => listAuditRecords(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAuditRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAuditRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof listAuditRecords>>>
+export type ListAuditRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List tenant-scoped immutable audit evidence
+ */
+
+export function useListAuditRecords<TData = Awaited<ReturnType<typeof listAuditRecords>>, TError = ErrorType<unknown>>(
+ params?: ListAuditRecordsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAuditRecordsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifyAuditChainUrl = () => {
+
+
+
+
+  return `/api/audit/verify`
+}
+
+/**
+ * @summary Read-only verification of a tenant audit chain range
+ */
+export const verifyAuditChain = async (auditVerificationInput: AuditVerificationInput, options?: RequestInit): Promise<AuditVerificationResult> => {
+
+  return customFetch<AuditVerificationResult>(getVerifyAuditChainUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      auditVerificationInput,)
+  }
+);}
+
+
+
+
+export const getVerifyAuditChainMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAuditChain>>, TError,{data: BodyType<AuditVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyAuditChain>>, TError,{data: BodyType<AuditVerificationInput>}, TContext> => {
+
+const mutationKey = ['verifyAuditChain'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyAuditChain>>, {data: BodyType<AuditVerificationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyAuditChain(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyAuditChainMutationResult = NonNullable<Awaited<ReturnType<typeof verifyAuditChain>>>
+    export type VerifyAuditChainMutationBody = BodyType<AuditVerificationInput>
+    export type VerifyAuditChainMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Read-only verification of a tenant audit chain range
+ */
+export const useVerifyAuditChain = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAuditChain>>, TError,{data: BodyType<AuditVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyAuditChain>>,
+        TError,
+        {data: BodyType<AuditVerificationInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyAuditChainMutationOptions(options));
+    }
+
 export const getHealthCheckUrl = () => {
 
 
@@ -178,6 +416,13 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+
+
+
+
+
+
 export const getRunObserverAgentUrl = () => {
 
 
@@ -319,6 +564,7 @@ export function useGetBootStatus<TData = Awaited<ReturnType<typeof getBootStatus
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
 
 
 

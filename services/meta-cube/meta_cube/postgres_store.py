@@ -64,9 +64,9 @@ class PostgresStore:
 
     def _read(self, conn) -> dict[str, Any]:
         state: dict[str, Any] = {"executions": {}, "idempotency": {}, "checkpoints": {}, "dlq": {}}
-        for row in conn.execute("SELECT id, idempotency_key, data FROM meta_cube_executions"):
-            state["executions"][row[0]] = row[2]
-            state["idempotency"][row[1]] = row[0]
+        for row in conn.execute("SELECT id, tenant_id, idempotency_key, data FROM meta_cube_executions"):
+            state["executions"][row[0]] = row[3]
+            state["idempotency"][f"{row[1]}:{row[2]}"] = row[0]
         for row in conn.execute("SELECT id, execution_id, step_id, data FROM meta_cube_checkpoints"):
             state["checkpoints"].setdefault(row[1], {})[row[2]] = row[3]
         for row in conn.execute("SELECT id, data FROM meta_cube_dlq"):
@@ -91,12 +91,12 @@ class PostgresStore:
         for record in records:
             conn.execute(
                 """INSERT INTO meta_cube_executions
-                   (id,idempotency_key,name,status,payload,steps,completed_steps,attempts,max_retries,error,created_at,updated_at,finished_at,data)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    (id,tenant_id,idempotency_key,name,status,payload,steps,completed_steps,attempts,max_retries,error,created_at,updated_at,finished_at,data)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    ON CONFLICT (id) DO UPDATE SET status=EXCLUDED.status, completed_steps=EXCLUDED.completed_steps,
                    attempts=EXCLUDED.attempts,error=EXCLUDED.error,updated_at=EXCLUDED.updated_at,
                    finished_at=EXCLUDED.finished_at,data=EXCLUDED.data""",
-                (record["id"], record["idempotency_key"], record["name"], record["status"], Jsonb(record["payload"]),
+                 (record["id"], record.get("tenant_id", 0), record["idempotency_key"], record["name"], record["status"], Jsonb(record["payload"]),
                  Jsonb([item["id"] for item in record["steps"]]), Jsonb(list(record["results"])), Jsonb(record["attempts"]),
                  record["max_attempts"] - 1, record["error"], record["created_at"], record["updated_at"],
                  record.get("finished_at"), Jsonb(record)),
@@ -131,18 +131,18 @@ class PostgresStore:
     def _create_execution(self, conn, record: dict[str, Any]) -> dict[str, Any]:
         row = conn.execute(
                 """INSERT INTO meta_cube_executions
-                   (id,idempotency_key,name,status,payload,steps,completed_steps,attempts,max_retries,error,created_at,updated_at,finished_at,data)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                   ON CONFLICT (idempotency_key) DO NOTHING RETURNING data""",
-                (record["id"], record["idempotency_key"], record["name"], record["status"], Jsonb(record["payload"]),
+                    (id,tenant_id,idempotency_key,name,status,payload,steps,completed_steps,attempts,max_retries,error,created_at,updated_at,finished_at,data)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (tenant_id, idempotency_key) DO NOTHING RETURNING data""",
+                 (record["id"], record.get("tenant_id", 0), record["idempotency_key"], record["name"], record["status"], Jsonb(record["payload"]),
                  Jsonb([item["id"] for item in record["steps"]]), Jsonb([]), Jsonb({}), record["max_attempts"] - 1,
                  record["error"], record["created_at"], record["updated_at"], record.get("finished_at"), Jsonb(record)),
         ).fetchone()
         if row:
             conn.commit()
             return row[0]
-        winner = conn.execute("SELECT data FROM meta_cube_executions WHERE idempotency_key=%s",
-                              (record["idempotency_key"],)).fetchone()
+        winner = conn.execute("SELECT data FROM meta_cube_executions WHERE tenant_id=%s AND idempotency_key=%s",
+                               (record.get("tenant_id", 0), record["idempotency_key"])).fetchone()
         conn.commit()
         return winner[0]
 

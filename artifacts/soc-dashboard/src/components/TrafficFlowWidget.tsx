@@ -109,7 +109,7 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
     () => (flows ?? []).filter((flow) => flow.observationType === "FLOW"),
     [flows],
   );
-  
+
   const isSyntheticPreview = !isInitialLoading && flowRows.length === 0;
 
   const throughput = useMemo<ThroughputPoint[]>(() => {
@@ -137,7 +137,7 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
       buckets.set(bucket, current);
     }
 
-    const maxBucket = buckets.size > 0 
+    const maxBucket = buckets.size > 0
       ? Math.max(...Array.from(buckets.keys()))
       : Math.floor(Date.now() / 60000) * 60000;
 
@@ -176,13 +176,13 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
     const maxRate = Math.max(...allRates, 0);
     const usesMbps = maxRate >= 1000;
     const scale = usesMbps ? 1000 : 1;
-    
+
     const scaled = throughput.map((point) => ({
       ...point,
       inbound: point.inbound / scale,
       outbound: point.outbound / scale,
     }));
-    
+
     const latest = scaled.at(-1) ?? { inbound: 0, outbound: 0 };
     const previous = scaled.slice(0, -1);
     const previousAverage = previous.length

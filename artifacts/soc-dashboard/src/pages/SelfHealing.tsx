@@ -32,9 +32,9 @@ function truncateHash(hash: string | null | undefined) {
 function formatDate(dateStr: string | null | undefined) {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
-  return d.toLocaleString(undefined, { 
-    month: 'short', day: 'numeric', 
-    hour: '2-digit', minute: '2-digit', second: '2-digit' 
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
@@ -215,20 +215,20 @@ export default function SelfHealing() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full justify-start border-b rounded-none h-12 bg-transparent p-0 space-x-6">
-          <TabsTrigger 
-            value="resources" 
+          <TabsTrigger
+            value="resources"
             className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-2 font-mono uppercase tracking-widest text-xs"
           >
             Logical Resources
           </TabsTrigger>
-          <TabsTrigger 
-            value="restore-points" 
+          <TabsTrigger
+            value="restore-points"
             className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-2 font-mono uppercase tracking-widest text-xs"
           >
             Restore Points
           </TabsTrigger>
-          <TabsTrigger 
-            value="audit" 
+          <TabsTrigger
+            value="audit"
             className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-full px-2 font-mono uppercase tracking-widest text-xs"
           >
             Recovery Audit
@@ -256,9 +256,9 @@ export default function SelfHealing() {
                 <form onSubmit={handleRegister} className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label className="font-mono text-xs uppercase text-muted-foreground">Resource Key</Label>
-                    <Input 
-                      className="font-mono bg-background/50 border-border" 
-                      placeholder="e.g. system.config.network" 
+                    <Input
+                      className="font-mono bg-background/50 border-border"
+                      placeholder="e.g. system.config.network"
                       value={regKey}
                       onChange={(e) => setRegKey(e.target.value)}
                       required
@@ -266,9 +266,9 @@ export default function SelfHealing() {
                   </div>
                   <div className="space-y-2">
                     <Label className="font-mono text-xs uppercase text-muted-foreground">Location</Label>
-                    <Input 
-                      className="font-mono bg-background/50 border-border" 
-                      placeholder="managed://..." 
+                    <Input
+                      className="font-mono bg-background/50 border-border"
+                      placeholder="managed://..."
                       value={regLocation}
                       onChange={(e) => setRegLocation(e.target.value)}
                       required
@@ -276,8 +276,8 @@ export default function SelfHealing() {
                   </div>
                   <div className="space-y-2">
                     <Label className="font-mono text-xs uppercase text-muted-foreground">Initial State (JSON)</Label>
-                    <Textarea 
-                      className="font-mono text-sm bg-background/50 border-border min-h-[120px]" 
+                    <Textarea
+                      className="font-mono text-sm bg-background/50 border-border min-h-[120px]"
                       value={regState}
                       onChange={(e) => setRegState(e.target.value)}
                       required
@@ -295,7 +295,7 @@ export default function SelfHealing() {
               </DialogContent>
             </Dialog>
           </div>
-          
+
           <Card className="border-border bg-card/50 overflow-hidden">
             <Table>
               <TableHeader className="bg-secondary/50">
@@ -344,7 +344,7 @@ export default function SelfHealing() {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium tracking-wide">Immutable Restore Points</h3>
           </div>
-          
+
           <Card className="border-border bg-card/50 overflow-hidden">
             <Table>
               <TableHeader className="bg-secondary/50">
@@ -384,9 +384,9 @@ export default function SelfHealing() {
                       <TableCell><StatusBadge status={point.status} /></TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{formatDate(point.createdAt)}</TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="font-mono text-xs hover:bg-primary/20 hover:text-primary transition-colors"
                           onClick={() => handlePreview(point.id)}
                           disabled={previewMutation.isPending && previewingId === point.id}
@@ -407,7 +407,7 @@ export default function SelfHealing() {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium tracking-wide">Self-Healing Execution Log</h3>
           </div>
-          
+
           <Card className="border-border bg-card/50 overflow-hidden">
             <Table>
               <TableHeader className="bg-secondary/50">
@@ -558,8 +558,8 @@ export default function SelfHealing() {
             <Button variant="ghost" onClick={() => setPreviewOpen(false)} className="font-mono text-xs">
               CANCEL
             </Button>
-            <Button 
-              onClick={handleApply} 
+            <Button
+              onClick={handleApply}
               disabled={applyMutation.isPending || !previewMutation.data?.canRestore}
               className="font-mono text-xs bg-primary text-primary-foreground hover:bg-primary/90"
             >

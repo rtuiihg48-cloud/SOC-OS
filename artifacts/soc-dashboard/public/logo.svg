@@ -1,0 +1,32 @@
+<svg xmlns="http://www.2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="cyber-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00D2FF" />
+      <stop offset="100%" stop-color="#0066FF" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer Hexagon -->
+  <polygon points="256,32 464,152 464,360 256,480 48,360 48,152" stroke="url(#cyber-gradient)" stroke-width="24" stroke-linejoin="round" fill="rgba(0, 210, 255, 0.05)" filter="url(#glow)" />
+
+  <!-- Inner Hexagon -->
+  <polygon points="256,112 368,176 368,336 256,400 144,336 144,176" stroke="url(#cyber-gradient)" stroke-width="16" stroke-linejoin="round" fill="rgba(0, 102, 255, 0.1)" />
+
+  <!-- Core Element -->
+  <circle cx="256" cy="256" r="48" fill="url(#cyber-gradient)" filter="url(#glow)" />
+
+  <!-- Connecting Lines -->
+  <line x1="256" y1="32" x2="256" y2="112" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+  <line x1="256" y1="400" x2="256" y2="480" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+  <line x1="464" y1="152" x2="368" y2="176" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+  <line x1="464" y1="360" x2="368" y2="336" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+  <line x1="48" y1="152" x2="144" y2="176" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+  <line x1="48" y1="360" x2="144" y2="336" stroke="url(#cyber-gradient)" stroke-width="8" stroke-linecap="round" />
+</svg>

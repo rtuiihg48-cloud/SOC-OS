@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import express from "express";
 import {
   detectAudioFormat,
@@ -187,6 +188,7 @@ function recommendedActionFor(criteria: Criterion[], hasMatch: boolean): "ALLOW"
 
 router.post(
   "/voice/transcribe",
+  requireCapability("voice:use", singleTenantScope),
   express.raw({
     type: ["audio/*", "application/octet-stream"],
     limit: MAX_AUDIO_BYTES,
@@ -228,7 +230,7 @@ router.post(
   },
 );
 
-router.post("/voice/commands/preview", async (req, res) => {
+router.post("/voice/commands/preview", requireCapability("voice:use", singleTenantScope), async (req, res) => {
   const parsed = PreviewVoiceCommandBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid voice command transcript" });
@@ -242,7 +244,7 @@ router.post("/voice/commands/preview", async (req, res) => {
   res.json(plan);
 });
 
-router.post("/voice/commands/execute", async (req, res) => {
+router.post("/voice/commands/execute", requireCapability("testing:run", singleTenantScope), async (req, res) => {
   const parsed = ExecuteVoiceCommandBody.safeParse(req.body);
   if (!parsed.success || parsed.data.confirmed !== true) {
     res.status(400).json({ error: "A valid, explicitly confirmed command is required" });

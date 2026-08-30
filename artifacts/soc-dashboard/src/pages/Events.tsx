@@ -23,7 +23,7 @@ export default function Events() {
   const { data: events, isLoading } = useListEvents(queryParams, {
     query: { queryKey: getListEventsQueryKey(queryParams) }
   });
-  
+
   const updateStatus = useUpdateEventStatus();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -51,7 +51,7 @@ export default function Events() {
 
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-8rem)]">
-      
+
       {/* Triage Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 shrink-0">
         <Card className="bg-critical/5 border-critical/20">
@@ -93,7 +93,7 @@ export default function Events() {
             <Filter className="w-4 h-4" />
             <span className="font-mono text-sm uppercase tracking-widest">Filters:</span>
           </div>
-          
+
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px] font-mono text-xs">
               <SelectValue placeholder="Status" />
@@ -163,7 +163,7 @@ export default function Events() {
               </TableHeader>
               <TableBody>
                 {events.map((ev) => (
-                    <motion.tr 
+                    <motion.tr
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       key={ev.id}
                       className="border-b border-border hover:bg-secondary/20 font-mono text-xs transition-colors group"
@@ -172,7 +172,7 @@ export default function Events() {
                         {new Date(ev.timestamp).toLocaleTimeString([], {hour12:false})}
                         <div className="text-[10px] opacity-50 mt-1">ID: {ev.hash.substring(0,8)}</div>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Badge variant="outline" className={`font-mono text-[10px] ${
                           ev.status === 'NEW' ? 'border-critical text-critical' :

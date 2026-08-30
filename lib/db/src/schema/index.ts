@@ -13,6 +13,61 @@ export const tenantsTable = pgTable("tenants", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Security control-plane identities and immutable audit evidence ──────────
+export const controlPlaneUsersTable = pgTable("control_plane_users", {
+  id: serial("id").primaryKey(),
+  clerkUserId: text("clerk_user_id").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [uniqueIndex("control_plane_users_clerk_uidx").on(table.clerkUserId), check("control_plane_users_status_check", sql`${table.status} IN ('ACTIVE','DISABLED')`)]);
+
+export const tenantMembershipsTable = pgTable("tenant_memberships", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => controlPlaneUsersTable.id, { onDelete: "restrict" }),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  role: text("role").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [uniqueIndex("tenant_memberships_user_tenant_uidx").on(table.userId, table.tenantId), index("tenant_memberships_tenant_status_idx").on(table.tenantId, table.status), check("tenant_memberships_role_check", sql`${table.role} IN ('SOC_ADMIN','ANALYST','VIEWER')`), check("tenant_memberships_status_check", sql`${table.status} IN ('ACTIVE','DISABLED')`)]);
+
+export const serviceCredentialsTable = pgTable("service_credentials", {
+  id: serial("id").primaryKey(),
+  credentialId: text("credential_id").notNull(),
+  credentialPrefix: text("credential_prefix").notNull(),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  principalType: text("principal_type").notNull(),
+  principalName: text("principal_name").notNull(),
+  secretHash: text("secret_hash").notNull(),
+  allowedCapabilities: jsonb("allowed_capabilities").$type<string[]>().notNull(),
+  gatewayScope: text("gateway_scope"),
+  credentialVersion: integer("credential_version").notNull().default(1),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (table) => [uniqueIndex("service_credentials_id_uidx").on(table.credentialId), uniqueIndex("service_credentials_prefix_uidx").on(table.credentialPrefix), index("service_credentials_auth_lookup_idx").on(table.credentialPrefix, table.tenantId), check("service_credentials_principal_type_check", sql`${table.principalType} IN ('SERVICE','GATEWAY')`)]);
+
+export const auditChainHeadsTable = pgTable("audit_chain_heads", {
+  partitionKey: text("partition_key").primaryKey(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  sequence: integer("sequence").notNull().default(0),
+  currentHash: text("current_hash").notNull().default("GENESIS"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [uniqueIndex("audit_chain_heads_tenant_uidx").on(table.tenantId)]);
+
+export const auditRecordsTable = pgTable("audit_records", {
+  id: serial("id").primaryKey(), partitionKey: text("partition_key").notNull(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  sequence: integer("sequence").notNull(), occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  insertedAt: timestamp("inserted_at", { withTimezone: true }).defaultNow().notNull(),
+  principalId: text("principal_id").notNull(), principalType: text("principal_type").notNull(),
+  action: text("action").notNull(), targetType: text("target_type").notNull(), targetId: text("target_id").notNull(),
+  decision: text("decision").notNull(), reasonCode: text("reason_code").notNull(), correlationId: text("correlation_id").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull(), prevHash: text("prev_hash").notNull(), hash: text("hash").notNull(), externalAnchorId: text("external_anchor_id"),
+}, (table) => [uniqueIndex("audit_records_partition_sequence_uidx").on(table.partitionKey, table.sequence), uniqueIndex("audit_records_partition_hash_uidx").on(table.partitionKey, table.hash), index("audit_records_tenant_occurred_idx").on(table.tenantId, table.occurredAt), index("audit_records_correlation_idx").on(table.correlationId), index("audit_records_action_decision_idx").on(table.action, table.decision), index("audit_records_principal_idx").on(table.principalId), index("audit_records_target_idx").on(table.targetType, table.targetId), check("audit_records_metadata_size_check", sql`octet_length(${table.metadata}::text) <= 4096`), check("audit_records_decision_check", sql`${table.decision} IN ('ALLOWED','DENIED','COMMITTED','FAILED','REJECTED','ACCEPTED','QUEUED')`)]);
+
 // ─── Rules ────────────────────────────────────────────────────────────────────
 // Configurable SIEM rules — operators define patterns, boosts, and forced actions.
 // This is the "no-code rule engine" that makes SOC-OS a product, not just a script.

@@ -20,6 +20,7 @@ const queue: QueuedEvent[] = [];
 const MAX_QUEUE_SIZE = 1000;
 let processor: QueueProcessor | null = null;
 let isProcessing = false;
+let processingTenantId: number | null | undefined;
 
 // ─── Enqueue an event ─────────────────────────────────────────────────────────
 export function enqueue(item: QueuedEvent): boolean {
@@ -38,12 +39,15 @@ export function setProcessor(fn: QueueProcessor): void {
 }
 
 // ─── Queue stats ──────────────────────────────────────────────────────────────
-export function queueStats() {
+export function queueStats(tenantId?: number) {
+  const pending = tenantId === undefined
+    ? queue.length
+    : queue.reduce((count, item) => count + (item.tenantId === tenantId ? 1 : 0), 0);
   return {
-    pending: queue.length,
+    pending,
     maxSize: MAX_QUEUE_SIZE,
     hasProcessor: processor !== null,
-    isProcessing,
+    isProcessing: tenantId === undefined ? isProcessing : isProcessing && processingTenantId === tenantId,
   };
 }
 
@@ -56,12 +60,14 @@ function scheduleProcess(): void {
     isProcessing = true;
 
     const item = queue.shift()!;
+    processingTenantId = item.tenantId;
     try {
       await processor(item);
     } catch (err) {
       logger.error({ err, event: item.event }, "Queue processor error");
     } finally {
       isProcessing = false;
+      processingTenantId = undefined;
       if (queue.length > 0) scheduleProcess();
     }
   });

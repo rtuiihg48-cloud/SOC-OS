@@ -94,7 +94,10 @@ server.listen(port, async () => {
       return { missing: getRequiredHckTables().filter((table) => !present.has(table)) };
     },
     async checkMetaCube() {
-      return await callMetaCube("healthz", { correlationId: "hck-bios-boot" }) as Record<string, unknown>;
+      return await callMetaCube("healthz", {
+        correlationId: "hck-bios-boot",
+        context: { tenantId: 1, principalType: "SERVICE", principalId: "api-server-bios", capability: "execution:health", correlationId: "hck-bios-boot" },
+      }) as Record<string, unknown>;
     },
     getQueueStatus: () => queueStats(),
   });

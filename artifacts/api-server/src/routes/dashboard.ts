@@ -1,15 +1,18 @@
 import { Router } from "express";
 import { db, securityEventsTable, patchesTable, correlationsTable } from "@workspace/db";
-import { desc, sql, count } from "drizzle-orm";
+import { and, desc, eq, sql, count } from "drizzle-orm";
 import { getSystemMetrics } from "../lib/system-metrics";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 
 const router = Router();
 
 // ─── Patches ──────────────────────────────────────────────────────────────────
-router.get("/patches", async (req, res) => {
+router.get("/patches", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const patches = await db
     .select()
     .from(patchesTable)
+    .where(eq(patchesTable.tenantId, tenantId))
     .orderBy(desc(patchesTable.appliedAt));
   res.json(patches.map((p) => ({ ...p, appliedAt: p.appliedAt.toISOString() })));
 });
@@ -17,34 +20,40 @@ router.get("/patches", async (req, res) => {
 // ─── Dashboard Summary ────────────────────────────────────────────────────────
 // Aggregated metrics computed in a single pass — this is what turns raw events
 // into actionable SOC intelligence for the operator's first glance.
-router.get("/dashboard", async (req, res) => {
-  const [totalEventsRow] = await db.select({ count: count() }).from(securityEventsTable);
-  const [totalPatchesRow] = await db.select({ count: count() }).from(patchesTable);
-  const [totalCorrelationsRow] = await db.select({ count: count() }).from(correlationsTable);
+router.get("/dashboard", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
+  const [totalEventsRow] = await db.select({ count: count() }).from(securityEventsTable).where(eq(securityEventsTable.tenantId, tenantId));
+  const [totalPatchesRow] = await db.select({ count: count() }).from(patchesTable).where(eq(patchesTable.tenantId, tenantId));
+  const [totalCorrelationsRow] = await db.select({ count: count() }).from(correlationsTable).where(eq(correlationsTable.tenantId, tenantId));
 
   const actionRows = await db
     .select({ action: securityEventsTable.action, count: count() })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .groupBy(securityEventsTable.action);
 
   const statusRows = await db
     .select({ status: securityEventsTable.status, count: count() })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .groupBy(securityEventsTable.status);
 
   const tacticRows = await db
     .select({ tactic: securityEventsTable.tactic, count: count() })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .groupBy(securityEventsTable.tactic)
     .orderBy(desc(count()));
 
   const [avgRow] = await db
     .select({ avg: sql<number>`ROUND(AVG(score)::numeric, 1)` })
-    .from(securityEventsTable);
+    .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId));
 
   const recentEvents = await db
     .select()
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .orderBy(desc(securityEventsTable.timestamp))
     .limit(10);
 
@@ -95,10 +104,12 @@ router.get("/dashboard", async (req, res) => {
 });
 
 // ─── Threat Graph ─────────────────────────────────────────────────────────────
-router.get("/threat-graph", async (req, res) => {
+router.get("/threat-graph", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const events = await db
     .select()
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .orderBy(securityEventsTable.timestamp)
     .limit(60);
 
@@ -123,7 +134,7 @@ router.get("/threat-graph", async (req, res) => {
 // ─── Real System Metrics ──────────────────────────────────────────────────────
 // Reads actual /proc/stat and /proc/meminfo from the host — not simulated.
 // This gives the SOC operator ground truth about host health during an incident.
-router.get("/system-metrics", async (req, res) => {
+router.get("/system-metrics", requireCapability("agent:observe", singleTenantScope), async (req, res) => {
   const metrics = await getSystemMetrics();
   res.json(metrics);
 });
@@ -131,7 +142,8 @@ router.get("/system-metrics", async (req, res) => {
 // ─── MITRE ATT&CK Stats ───────────────────────────────────────────────────────
 // Groups events by ATT&CK tactic with avg risk score.
 // Enables the operator to see which kill-chain phases are most active.
-router.get("/mitre-stats", async (req, res) => {
+router.get("/mitre-stats", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const rows = await db
     .select({
       tactic: securityEventsTable.tactic,
@@ -139,6 +151,7 @@ router.get("/mitre-stats", async (req, res) => {
       avgScore: sql<number>`ROUND(AVG(score)::numeric, 1)`,
     })
     .from(securityEventsTable)
+    .where(eq(securityEventsTable.tenantId, tenantId))
     .groupBy(securityEventsTable.tactic)
     .orderBy(desc(count()));
 
@@ -156,14 +169,15 @@ router.get("/mitre-stats", async (req, res) => {
 // ─── Risk Timeline ────────────────────────────────────────────────────────────
 // Returns hourly avg risk score for the last 24 hours.
 // Powers the time-series chart showing when the system is under peak attack.
-router.get("/risk-timeline", async (req, res) => {
+router.get("/risk-timeline", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const result = await db.execute(sql`
     SELECT
       date_trunc('hour', timestamp) AS hour,
       ROUND(AVG(score)::numeric, 1) AS avg_score,
       COUNT(*)::int AS count
     FROM security_events
-    WHERE timestamp >= NOW() - INTERVAL '24 hours'
+    WHERE tenant_id = ${tenantId} AND timestamp >= NOW() - INTERVAL '24 hours'
     GROUP BY hour
     ORDER BY hour ASC
   `);

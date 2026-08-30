@@ -7,6 +7,7 @@ import {
 } from "@workspace/api-zod";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { analyzeTraffic } from "../lib/traffic-engine";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 
 const router = Router();
 const ALLOWED_PROTOCOLS = new Set([
@@ -54,6 +55,7 @@ function validateTelemetry(
 
 async function insertObservation(
   input: ReturnType<typeof IngestTrafficTelemetryBody.parse>,
+  tenantId: number,
   isSynthetic = false,
 ) {
   const protocol = input.protocol.toUpperCase();
@@ -72,7 +74,8 @@ async function insertObservation(
   const [row] = await db
     .insert(trafficObservationsTable)
     .values({
-      tenantId: input.tenantId ?? null,
+      // Telemetry's declared tenant is untrusted; credential/session scope is authoritative.
+      tenantId,
       gatewayId: input.gatewayId,
       observationId: input.observationId,
       observationType: input.observationType,
@@ -99,7 +102,7 @@ async function insertObservation(
   return row;
 }
 
-router.post("/traffic/telemetry", async (req, res) => {
+router.post("/traffic/telemetry", requireCapability("events:ingest", singleTenantScope), async (req, res) => {
   const parsed = IngestTrafficTelemetryBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid gateway telemetry", issues: parsed.error.issues });
@@ -111,7 +114,7 @@ router.post("/traffic/telemetry", async (req, res) => {
     return;
   }
   try {
-    const row = await insertObservation(parsed.data);
+    const row = await insertObservation(parsed.data, req.principal!.tenantIds[0]!);
     res.status(201).json(formatObservation(row));
   } catch (error) {
     if (hasDatabaseCode(error, "23505")) {
@@ -122,17 +125,19 @@ router.post("/traffic/telemetry", async (req, res) => {
   }
 });
 
-router.get("/traffic/flows", async (req, res) => {
+router.get("/traffic/flows", requireCapability("traffic:read", singleTenantScope), async (req, res) => {
   const parsed = ListTrafficFlowsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid traffic filters" });
     return;
   }
   const query = parsed.data;
+  const tenantId = req.principal!.tenantIds[0]!;
   const rows = await db
     .select()
     .from(trafficObservationsTable)
     .where(and(
+      eq(trafficObservationsTable.tenantId, tenantId),
       query.protocol ? eq(trafficObservationsTable.protocol, query.protocol.toUpperCase()) : undefined,
       query.action ? eq(trafficObservationsTable.recommendedAction, query.action) : undefined,
       query.severity ? eq(trafficObservationsTable.severity, query.severity) : undefined,
@@ -145,7 +150,8 @@ router.get("/traffic/flows", async (req, res) => {
   res.json(rows.map(formatObservation));
 });
 
-router.get("/traffic/summary", async (_req, res) => {
+router.get("/traffic/summary", requireCapability("traffic:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const [totals] = await db
     .select({
       totalObservations: count(),
@@ -157,20 +163,22 @@ router.get("/traffic/summary", async (_req, res) => {
       bytesOut: sql<number>`coalesce(sum(${trafficObservationsTable.bytesOut}), 0)`,
       bytesIn: sql<number>`coalesce(sum(${trafficObservationsTable.bytesIn}), 0)`,
     })
-    .from(trafficObservationsTable);
+    .from(trafficObservationsTable)
+    .where(eq(trafficObservationsTable.tenantId, tenantId));
 
   const protocolRows = await db
     .select({ protocol: trafficObservationsTable.protocol, value: count() })
     .from(trafficObservationsTable)
-    .where(eq(trafficObservationsTable.observationType, "FLOW"))
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "FLOW")))
     .groupBy(trafficObservationsTable.protocol);
   const signalRows = await db
     .select({ signals: trafficObservationsTable.signals })
-    .from(trafficObservationsTable);
+    .from(trafficObservationsTable)
+    .where(eq(trafficObservationsTable.tenantId, tenantId));
   const heartbeatRows = await db
     .select()
     .from(trafficObservationsTable)
-    .where(eq(trafficObservationsTable.observationType, "HEARTBEAT"))
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "HEARTBEAT")))
     .orderBy(desc(trafficObservationsTable.observedAt));
 
   const signalBreakdown: Record<string, number> = {};
@@ -208,7 +216,7 @@ router.get("/traffic/summary", async (_req, res) => {
   });
 });
 
-router.post("/traffic/synthetic", async (_req, res) => {
+router.post("/traffic/synthetic", requireCapability("events:ingest", singleTenantScope), async (req, res) => {
   const runId = crypto.randomUUID();
   const observedAt = new Date();
   const inputs = [
@@ -277,7 +285,7 @@ router.post("/traffic/synthetic", async (_req, res) => {
   ];
   const rows = [];
   for (const input of inputs) {
-    rows.push(await insertObservation(IngestTrafficTelemetryBody.parse(input), true));
+    rows.push(await insertObservation(IngestTrafficTelemetryBody.parse(input), req.principal!.tenantIds[0]!, true));
   }
   res.status(201).json(rows.map(formatObservation));
 });

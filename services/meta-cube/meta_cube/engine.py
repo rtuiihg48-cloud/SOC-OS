@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import hashlib
+import json
 from pathlib import Path
 import threading
 from typing import Any
@@ -12,6 +14,18 @@ from .store import FileStore, Store
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+class IdempotencyConflict(ValueError):
+    """A key has already been accepted with a different operation payload."""
+
+
+def _fingerprint(event: EventRequest) -> str:
+    return hashlib.sha256(json.dumps({
+        "name": event.name, "payload": event.payload,
+        "steps": [step.model_dump(mode="json") for step in event.steps],
+        "max_attempts": event.max_attempts, "tenant_id": event.tenant_id,
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 class ExecutionEngine:
@@ -27,27 +41,34 @@ class ExecutionEngine:
 
     def accept(self, event: EventRequest) -> ExecutionRecord:
         with self._execution_lock:
-            with self.store.lock(f"accept:{event.idempotency_key or event.event_id or ''}"):
+            with self.store.lock(f"accept:{event.tenant_id}:{event.idempotency_key or event.event_id or ''}"):
                 return self._accept_locked(event)
 
     def _accept_locked(self, event: EventRequest) -> ExecutionRecord:
             data = self.store.read()
             key = event.idempotency_key or event.event_id or str(uuid4())
-            existing = data["idempotency"].get(key)
+            scoped_key = f"{event.tenant_id}:{key}"
+            existing = data["idempotency"].get(scoped_key)
             if existing:
-                return ExecutionRecord.model_validate(data["executions"][existing])
+                winner = ExecutionRecord.model_validate(data["executions"][existing])
+                if winner.request_fingerprint and winner.request_fingerprint != _fingerprint(event):
+                    raise IdempotencyConflict("idempotency key was already used with a different request")
+                return winner
             execution_id = str(uuid4())
             now = _now()
             record = ExecutionRecord(
-                id=execution_id, event_id=event.event_id or execution_id, idempotency_key=key,
+                id=execution_id, event_id=event.event_id or execution_id, tenant_id=event.tenant_id, idempotency_key=key,
                 name=event.name, status=ExecutionStatus.CREATED, payload=event.payload, steps=event.steps,
-                max_attempts=event.max_attempts, created_at=now, updated_at=now,
+                max_attempts=event.max_attempts, created_at=now, updated_at=now, request_fingerprint=_fingerprint(event),
             )
             serialized = record.model_dump(mode="json")
             if hasattr(self.store, "create_execution"):
-                return ExecutionRecord.model_validate(self.store.create_execution(serialized))  # type: ignore[attr-defined]
+                winner = ExecutionRecord.model_validate(self.store.create_execution(serialized))  # type: ignore[attr-defined]
+                if winner.id != record.id and winner.request_fingerprint and winner.request_fingerprint != record.request_fingerprint:
+                    raise IdempotencyConflict("idempotency key was already used with a different request")
+                return winner
             data["executions"][execution_id] = serialized
-            data["idempotency"][key] = execution_id
+            data["idempotency"][scoped_key] = execution_id
             self.store.update(data)
             return record
 
@@ -108,6 +129,24 @@ class ExecutionEngine:
                 if self.get(execution_id) is None:
                     raise KeyError(execution_id)
                 return self._run(execution_id, recovered=True)
+
+    def operation(self, execution_id: str, action: str, idempotency_key: str) -> ExecutionRecord | None:
+        """Return the record for an already accepted mutating operation."""
+        record = self.get(execution_id)
+        if record and record.operation_idempotency.get(f"{action}:{idempotency_key}") == execution_id:
+            return record
+        return None
+
+    def remember_operation(self, execution_id: str, action: str, idempotency_key: str) -> None:
+        with self._execution_lock:
+            with self.store.lock(f"execution:{execution_id}"):
+                record = self.get(execution_id)
+                if record is None:
+                    raise KeyError(execution_id)
+                record.operation_idempotency[f"{action}:{idempotency_key}"] = execution_id
+                data = self.store.read()
+                data["executions"][execution_id] = record.model_dump(mode="json")
+                self.store.update(data)
 
     def _run(self, execution_id: str, reset_failed: bool = False, recovered: bool = False) -> ExecutionRecord:
         data = self.store.read()

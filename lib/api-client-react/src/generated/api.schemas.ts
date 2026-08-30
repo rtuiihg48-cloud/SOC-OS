@@ -5,6 +5,77 @@
  * SOC OS - SaaS Security Platform API (V30/V50)
  * OpenAPI spec version: 0.3.0
  */
+export interface ApiError {
+  error: string;
+  code: string;
+  decisionId?: string;
+}
+
+export type CurrentPrincipalPrincipalType = typeof CurrentPrincipalPrincipalType[keyof typeof CurrentPrincipalPrincipalType];
+
+
+export const CurrentPrincipalPrincipalType = {
+  USER: 'USER',
+  SERVICE: 'SERVICE',
+  GATEWAY: 'GATEWAY',
+} as const;
+
+export type CurrentPrincipalAuthMethod = typeof CurrentPrincipalAuthMethod[keyof typeof CurrentPrincipalAuthMethod];
+
+
+export const CurrentPrincipalAuthMethod = {
+  CLERK: 'CLERK',
+  SCOPED_CREDENTIAL: 'SCOPED_CREDENTIAL',
+} as const;
+
+export interface CurrentPrincipal {
+  principalId: string;
+  principalType: CurrentPrincipalPrincipalType;
+  tenantIds: number[];
+  roles: string[];
+  capabilities: string[];
+  authMethod: CurrentPrincipalAuthMethod;
+  credentialVersion: number;
+}
+
+export interface AuditRecord {
+  id: number;
+  tenantId: number;
+  sequence: number;
+  occurredAt: string;
+  principalId: string;
+  principalType: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  decision: string;
+  reasonCode: string;
+  correlationId: string;
+  prevHash: string;
+  hash: string;
+}
+
+export interface AuditRecordPage {
+  records: AuditRecord[];
+  /** @nullable */
+  nextCursor: string | null;
+}
+
+export interface AuditVerificationInput {
+  tenantId?: number;
+  from?: string;
+  to?: string;
+}
+
+export interface AuditVerificationResult {
+  valid: boolean;
+  checked: number;
+  /** @nullable */
+  firstBrokenSequence: number | null;
+  /** @nullable */
+  errorCode: string | null;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -1491,6 +1562,16 @@ export interface MetaCubeCheckpoint {
   state: MetaCubeCheckpointState;
   createdAt: string;
 }
+
+export type ListAuditRecordsParams = {
+tenantId?: number;
+cursor?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
 
 export type ListEventsParams = {
 action?: string;

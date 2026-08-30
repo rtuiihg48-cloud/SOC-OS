@@ -31,6 +31,7 @@ class EventRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
     steps: list[StepSpec] = Field(default_factory=lambda: [StepSpec(id="main")])
     max_attempts: int = Field(default=3, ge=1, le=100)
+    tenant_id: int = 0
 
     @model_validator(mode="after")
     def validate_dag(self) -> "EventRequest":
@@ -59,6 +60,7 @@ class Checkpoint(BaseModel):
 class ExecutionRecord(BaseModel):
     id: str
     event_id: str
+    tenant_id: int = 0
     name: str = "default"
     idempotency_key: str
     status: ExecutionStatus
@@ -72,6 +74,8 @@ class ExecutionRecord(BaseModel):
     updated_at: str
     recovered_at: str | None = None
     finished_at: str | None = None
+    request_fingerprint: str | None = None
+    operation_idempotency: dict[str, str] = Field(default_factory=dict)
 
 
 class DeadLetterRecord(BaseModel):

@@ -21,7 +21,7 @@ export default function Simulation() {
   const [isSelfTestRunning, setIsSelfTestRunning] = useState(false);
   const [steps, setSteps] = useState<SimStep[]>([]);
   const [selfTestResult, setSelfTestResult] = useState<any>(null);
-  
+
   const runSimulation = useRunSimulation();
   const runSelfTest = useRunSelfTest();
   const queryClient = useQueryClient();
@@ -31,7 +31,7 @@ export default function Simulation() {
     setIsRunning(true);
     setSelfTestResult(null);
     setSteps([{ id: 'init', title: 'INITIALIZING SIMULATION', description: 'Starting autonomous self-healing cycle...', type: 'info' }]);
-    
+
     runSimulation.mutate(undefined, {
       onSuccess: (result) => {
         let stepDelay = 1000;
@@ -56,7 +56,7 @@ export default function Simulation() {
               tactic: healingEvent.tactic || undefined
             }]);
           }, stepDelay);
-          
+
           stepDelay += 1500;
           setTimeout(() => {
             setSteps(prev => [...prev, {
@@ -77,12 +77,12 @@ export default function Simulation() {
             type: 'success'
           }]);
           setIsRunning(false);
-          
+
           queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
           queryClient.invalidateQueries({ queryKey: getListPatchesQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetThreatGraphQueryKey() });
-          
+
           toast({ title: "SIMULATION SUCCESS", description: "Self-healing cycle completed successfully." });
         }, stepDelay);
       },

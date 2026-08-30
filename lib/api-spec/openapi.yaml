@@ -37,6 +37,41 @@ tags:
   - name: traffic
     description: Normalized Node Gateway traffic telemetry and deterministic analysis
 paths:
+  /auth/me:
+    get:
+      operationId: getCurrentPrincipal
+      tags: [auth]
+      summary: Get the authenticated normalized principal
+      responses:
+        "200":
+          description: Current principal
+          content: { application/json: { schema: { $ref: "#/components/schemas/CurrentPrincipal" } } }
+        "401": { description: Authentication required, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /audit/records:
+    get:
+      operationId: listAuditRecords
+      tags: [audit]
+      summary: List tenant-scoped immutable audit evidence
+      parameters:
+        - { name: tenantId, in: query, schema: { type: integer } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: Stable audit record page
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuditRecordPage" } } }
+  /audit/verify:
+    post:
+      operationId: verifyAuditChain
+      tags: [audit]
+      summary: Read-only verification of a tenant audit chain range
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AuditVerificationInput" } } }
+      responses:
+        "200":
+          description: Chain verification result
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuditVerificationResult" } } }
   /healthz:
     get:
       operationId: healthCheck
@@ -1415,6 +1450,50 @@ paths:
 
 components:
   schemas:
+    ApiError:
+      type: object
+      required: [error, code]
+      properties: { error: { type: string }, code: { type: string }, decisionId: { type: string } }
+    CurrentPrincipal:
+      type: object
+      required: [principalId, principalType, tenantIds, roles, capabilities, authMethod, credentialVersion]
+      properties:
+        principalId: { type: string }
+        principalType: { type: string, enum: [USER, SERVICE, GATEWAY] }
+        tenantIds: { type: array, items: { type: integer } }
+        roles: { type: array, items: { type: string } }
+        capabilities: { type: array, items: { type: string } }
+        authMethod: { type: string, enum: [CLERK, SCOPED_CREDENTIAL] }
+        credentialVersion: { type: integer }
+    AuditRecord:
+      type: object
+      required: [id, tenantId, sequence, occurredAt, principalId, principalType, action, targetType, targetId, decision, reasonCode, correlationId, prevHash, hash]
+      properties:
+        id: { type: integer }
+        tenantId: { type: integer }
+        sequence: { type: integer }
+        occurredAt: { type: string, format: date-time }
+        principalId: { type: string }
+        principalType: { type: string }
+        action: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        decision: { type: string }
+        reasonCode: { type: string }
+        correlationId: { type: string }
+        prevHash: { type: string }
+        hash: { type: string }
+    AuditRecordPage:
+      type: object
+      required: [records, nextCursor]
+      properties: { records: { type: array, items: { $ref: "#/components/schemas/AuditRecord" } }, nextCursor: { type: ["string", "null"] } }
+    AuditVerificationInput:
+      type: object
+      properties: { tenantId: { type: integer }, from: { type: string, format: date-time }, to: { type: string, format: date-time } }
+    AuditVerificationResult:
+      type: object
+      required: [valid, checked, firstBrokenSequence, errorCode]
+      properties: { valid: { type: boolean }, checked: { type: integer }, firstBrokenSequence: { type: ["integer", "null"] }, errorCode: { type: ["string", "null"] } }
     HealthStatus:
       type: object
       properties:

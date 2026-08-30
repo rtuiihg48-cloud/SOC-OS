@@ -6,8 +6,8 @@ import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Play, RotateCcw, AlertTriangle, CheckCircle2, Server, Database, Cpu, Activity, Clock, Box, ShieldAlert } from "lucide-react";
 
-import { 
-  useGetMetaCubeHealth, 
+import {
+  useGetMetaCubeHealth,
   useListMetaCubeExecutions,
   useCreateMetaCubeExecution,
   useRetryMetaCubeExecution,
@@ -51,7 +51,7 @@ const newExecutionSchema = z.object({
 export default function Runtime() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("executions");
@@ -89,23 +89,30 @@ export default function Runtime() {
     }
   });
 
+  const [retryKey, setRetryKey] = useState(crypto.randomUUID());
+  const [recoverKey, setRecoverKey] = useState(crypto.randomUUID());
+
   const retryExecution = useRetryMetaCubeExecution({
+    request: { headers: { "Idempotency-Key": retryKey } },
     mutation: {
       onSuccess: () => {
         toast({ title: "Execution retrying", description: "The execution retry has been triggered." });
         queryClient.invalidateQueries({ queryKey: getListMetaCubeExecutionsQueryKey({ limit: 50 }) });
         queryClient.invalidateQueries({ queryKey: getListMetaCubeDlqQueryKey({ limit: 50 }) });
-      }
+      },
+      onSettled: () => setRetryKey(crypto.randomUUID())
     }
   });
 
   const recoverExecution = useRecoverMetaCubeExecution({
+    request: { headers: { "Idempotency-Key": recoverKey } },
     mutation: {
       onSuccess: () => {
         toast({ title: "Execution recovered", description: "The dead letter execution has been marked as recovered." });
         queryClient.invalidateQueries({ queryKey: getListMetaCubeExecutionsQueryKey({ limit: 50 }) });
         queryClient.invalidateQueries({ queryKey: getListMetaCubeDlqQueryKey({ limit: 50 }) });
-      }
+      },
+      onSettled: () => setRecoverKey(crypto.randomUUID())
     }
   });
 
@@ -153,7 +160,7 @@ export default function Runtime() {
             </Badge>
           </CardContent>
         </Card>
-        
+
         <Card className="bg-card">
           <CardHeader className="py-3 px-4">
             <CardTitle className="text-xs uppercase font-mono text-muted-foreground flex items-center gap-2">
@@ -296,8 +303,8 @@ export default function Runtime() {
                     <div key={i} className="p-4"><Skeleton className="h-12 w-full" /></div>
                   ))}
                   {executions?.map(exec => (
-                    <button 
-                      key={exec.id} 
+                    <button
+                      key={exec.id}
                       onClick={() => setSelectedExecutionId(exec.id)}
                       className={`text-left p-3 hover:bg-secondary/50 transition-all flex flex-col gap-2 relative overflow-hidden group ${selectedExecutionId === exec.id ? 'bg-secondary border-l-2 border-l-primary' : 'border-l-2 border-l-transparent'}`}
                       data-testid={`btn-select-exec-${exec.id}`}
@@ -326,8 +333,8 @@ export default function Runtime() {
                     <div key={i} className="p-4"><Skeleton className="h-12 w-full" /></div>
                   ))}
                   {dlq?.map(exec => (
-                    <button 
-                      key={exec.id} 
+                    <button
+                      key={exec.id}
                       onClick={() => setSelectedExecutionId(exec.id)}
                       className={`text-left p-3 hover:bg-secondary/50 transition-all flex flex-col gap-2 relative overflow-hidden group ${selectedExecutionId === exec.id ? 'bg-secondary border-l-2 border-l-destructive' : 'border-l-2 border-l-transparent'}`}
                       data-testid={`btn-select-dlq-${exec.id}`}
@@ -371,9 +378,9 @@ export default function Runtime() {
                 <div className="flex gap-2">
                   {["failed", "dead_letter"].includes(selectedExecution.status) && (
                     <>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => retryExecution.mutate({ id: selectedExecution.id })}
                         disabled={retryExecution.isPending}
                         className="font-mono text-xs border-primary/30 hover:bg-primary/10"
@@ -381,9 +388,9 @@ export default function Runtime() {
                       >
                         <RotateCcw className="w-3 h-3 mr-2" /> RETRY
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => recoverExecution.mutate({ id: selectedExecution.id })}
                         disabled={recoverExecution.isPending}
                         className="font-mono text-xs border-safe/30 hover:bg-safe/10 text-safe"
@@ -407,10 +414,10 @@ export default function Runtime() {
                         const isCompleted = selectedExecution.completedSteps.includes(step);
                         const isNext = !isCompleted && (idx === 0 || selectedExecution.completedSteps.includes(selectedExecution.steps[idx - 1]));
                         const isFailed = isNext && ["failed", "dead_letter"].includes(selectedExecution.status);
-                        
+
                         return (
-                          <Badge 
-                            key={step} 
+                          <Badge
+                            key={step}
                             variant={isCompleted ? "default" : isFailed ? "destructive" : "outline"}
                             className={`font-mono text-xs px-3 py-1 ${isCompleted ? 'bg-primary/20 text-primary hover:bg-primary/30 border-primary/50' : isFailed ? 'animate-pulse' : 'text-muted-foreground'}`}
                           >
@@ -474,7 +481,7 @@ export default function Runtime() {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Meta stats */}
                   <div className="grid grid-cols-4 gap-4 pt-4 border-t border-border">
                     <div className="font-mono">

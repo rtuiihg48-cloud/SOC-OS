@@ -14,10 +14,15 @@ import selfHealingRouter from "./self-healing";
 import virusDatabaseRouter from "./virus-database";
 import trafficRouter from "./traffic";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
+import authRouter from "./auth";
+import auditRouter from "./audit";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
+router.use(auditRouter);
 router.use(eventsRouter);
 router.use(dashboardRouter);
 router.use(tenantsRouter);
@@ -31,7 +36,7 @@ router.use(quarantineRouter);
 router.use(selfHealingRouter);
 router.use(virusDatabaseRouter);
 router.use(trafficRouter);
-router.post("/scan/lockfile", async (req, res) => {
+router.post("/scan/lockfile", requireCapability("testing:run", singleTenantScope), async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {
     return res.status(400).json({ error: "Відсутні параметри сканування" });

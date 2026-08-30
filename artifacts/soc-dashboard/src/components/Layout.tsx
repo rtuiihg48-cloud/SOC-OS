@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network } from "lucide-react";
-import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network, LogOut } from "lucide-react";
+import { useGetCurrentPrincipal, getGetCurrentPrincipalQueryKey, useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
+import { useClerk } from "@clerk/react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -12,6 +13,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: dashboard } = useGetDashboard({
     query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() }
   });
+  const { data: principal } = useGetCurrentPrincipal({
+    query: { queryKey: getGetCurrentPrincipalQueryKey() }
+  });
+  const { signOut } = useClerk();
+
+  const canReadAudit = principal?.capabilities?.includes("audit:read");
 
   useEffect(() => {
     const compactQuery = window.matchMedia("(max-width: 1024px)");
@@ -27,7 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
     {
       label: "Operations",
       items: [
-        { href: "/", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/alerts", label: "Alerts", icon: Bell },
         { href: "/events", label: "Event Log", icon: Database },
         { href: "/simulate", label: "Simulation", icon: Cpu },
@@ -55,13 +62,14 @@ export function Layout({ children }: { children: ReactNode }) {
       items: [
         { href: "/runtime", label: "Runtime", icon: TerminalSquare },
         { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
+        ...(canReadAudit ? [{ href: "/audit-trail", label: "Audit Trail", icon: Activity }] : []),
         { href: "/tenants", label: "Tenants", icon: Building2 },
       ],
     },
   ];
   const navItems = navSections.flatMap((section) => section.items);
 
-  const statusColor = 
+  const statusColor =
     dashboard?.systemStatus === 'SECURE' ? 'text-safe bg-safe/10 border-safe/20' :
     dashboard?.systemStatus === 'MONITORING' ? 'text-primary bg-primary/10 border-primary/20' :
     dashboard?.systemStatus === 'ALERT' ? 'text-warn bg-warn/10 border-warn/20' :
@@ -70,7 +78,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans selection:bg-primary/30">
-      
+
       {/* Sidebar */}
       <aside
         className={`flex-shrink-0 border-r border-border bg-card flex flex-col z-10 transition-[width] duration-300 ease-out ${
@@ -78,7 +86,7 @@ export function Layout({ children }: { children: ReactNode }) {
         }`}
       >
         <div className={`h-16 flex items-center border-b border-border ${isSidebarCollapsed ? "justify-between px-2" : "justify-between px-5"}`}>
-          <Link href="/" className={`flex items-center min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${isSidebarCollapsed ? "justify-center" : ""}`} title="SOC_OS home">
+          <Link href="/dashboard" className={`flex items-center min-w-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 ${isSidebarCollapsed ? "justify-center" : ""}`} title="SOC_OS home">
             <Shield className="w-6 h-6 flex-shrink-0 text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.6)]" />
             {!isSidebarCollapsed && (
               <span className="ml-3 font-bold text-lg tracking-wider text-primary font-mono">SOC_OS</span>
@@ -94,7 +102,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
         </div>
-        
+
         <div className={`border-b border-border ${isSidebarCollapsed ? "p-3" : "p-4"}`}>
           {!isSidebarCollapsed && (
             <div className="mb-2 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">
@@ -149,15 +157,23 @@ export function Layout({ children }: { children: ReactNode }) {
             ))}
           </div>
         </nav>
-        
-        <div className={`border-t border-border font-mono text-xs text-muted-foreground ${isSidebarCollapsed ? "p-3 text-center" : "p-4"}`}>
+
+        <div className={`border-t border-border font-mono text-xs text-muted-foreground ${isSidebarCollapsed ? "p-3 flex flex-col items-center gap-2" : "p-4 flex flex-col gap-3"}`}>
           {isSidebarCollapsed ? (
-            <span className="text-[9px] leading-4 text-muted-foreground/70">V50</span>
+            <>
+              <span className="text-[9px] leading-4 text-muted-foreground/70">V50</span>
+              <button onClick={() => signOut()} className="w-full flex justify-center text-muted-foreground hover:text-primary transition-colors py-2"><LogOut className="w-4 h-4" /></button>
+            </>
           ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span>v0.3.0-beta</span>
-              <span className="text-primary/70">V50 PIPELINE</span>
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span>v0.3.0-beta</span>
+                <span className="text-primary/70">V50 PIPELINE</span>
+              </div>
+              <button onClick={() => signOut()} className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors text-xs w-full py-1">
+                <LogOut className="w-3.5 h-3.5" /> Sign Out
+              </button>
+            </>
           )}
         </div>
       </aside>
@@ -166,7 +182,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Subtle grid background */}
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        
+
         <header className="h-16 flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-sm flex items-center px-8 z-30 justify-between">
           <h1 className="text-xl font-semibold tracking-wide capitalize">
             {navItems.find(n => n.href === location)?.label || "Dashboard"}

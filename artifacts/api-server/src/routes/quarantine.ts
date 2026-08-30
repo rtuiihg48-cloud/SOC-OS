@@ -1,10 +1,12 @@
 import { Router } from "express";
-import { desc, eq } from "drizzle-orm";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { and, desc, eq } from "drizzle-orm";
 import { db, sandboxQuarantinesTable } from "@workspace/db";
 
 const router = Router();
 
-router.get("/quarantine", async (req, res) => {
+router.get("/quarantine", requireCapability("quarantine:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsedLimit = Number(req.query.limit);
   const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
   const requestedStatus = typeof req.query.status === "string" ? req.query.status.toUpperCase() : undefined;
@@ -12,14 +14,18 @@ router.get("/quarantine", async (req, res) => {
   const captures = await db
     .select()
     .from(sandboxQuarantinesTable)
-    .where(requestedStatus ? eq(sandboxQuarantinesTable.status, requestedStatus) : undefined)
+    .where(and(
+      eq(sandboxQuarantinesTable.tenantId, tenantId),
+      requestedStatus ? eq(sandboxQuarantinesTable.status, requestedStatus) : undefined,
+    ))
     .orderBy(desc(sandboxQuarantinesTable.createdAt))
     .limit(limit);
 
   res.json(captures.map(formatCapture));
 });
 
-router.get("/quarantine/:id", async (req, res) => {
+router.get("/quarantine/:id", requireCapability("quarantine:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     res.status(400).json({ error: "Invalid quarantine id" });
@@ -29,7 +35,7 @@ router.get("/quarantine/:id", async (req, res) => {
   const [capture] = await db
     .select()
     .from(sandboxQuarantinesTable)
-    .where(eq(sandboxQuarantinesTable.id, id))
+    .where(and(eq(sandboxQuarantinesTable.id, id), eq(sandboxQuarantinesTable.tenantId, tenantId)))
     .limit(1);
 
   if (!capture) {

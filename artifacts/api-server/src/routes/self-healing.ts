@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import {
   db,
   managedResourcesTable,
+  securityEventsTable,
   selfHealingActionsTable,
   selfHealingRestorePointsTable,
 } from "@workspace/db";
@@ -23,7 +25,8 @@ import {
 
 const router = Router();
 
-router.get("/self-healing/resources", async (req, res) => {
+router.get("/self-healing/resources", requireCapability("self_healing:preview", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListManagedResourcesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid resource query" });
@@ -33,14 +36,15 @@ router.get("/self-healing/resources", async (req, res) => {
   const rows = await db
     .select()
     .from(managedResourcesTable)
-    .where(parsed.data.tenantId ? eq(managedResourcesTable.tenantId, parsed.data.tenantId) : undefined)
+    .where(eq(managedResourcesTable.tenantId, tenantId))
     .orderBy(desc(managedResourcesTable.updatedAt))
     .limit(parsed.data.limit ?? 100);
 
   res.json(rows.map(formatManagedResource));
 });
 
-router.post("/self-healing/resources", async (req, res) => {
+router.post("/self-healing/resources", requireCapability("self_healing:apply", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = RegisterManagedResourceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid managed resource" });
@@ -52,7 +56,8 @@ router.post("/self-healing/resources", async (req, res) => {
   }
 
   const result = await registerVerifiedManagedResource({
-    tenantId: parsed.data.tenantId ?? null,
+    // A body tenant selector is never authoritative.
+    tenantId,
     resourceKey: parsed.data.resourceKey,
     location: parsed.data.location,
     state: parsed.data.state,
@@ -64,7 +69,8 @@ router.post("/self-healing/resources", async (req, res) => {
   });
 });
 
-router.get("/self-healing/restore-points", async (req, res) => {
+router.get("/self-healing/restore-points", requireCapability("self_healing:preview", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListRestorePointsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid restore-point query" });
@@ -73,7 +79,7 @@ router.get("/self-healing/restore-points", async (req, res) => {
 
   const filters = [];
   if (parsed.data.resourceKey) filters.push(eq(selfHealingRestorePointsTable.resourceKey, parsed.data.resourceKey));
-  if (parsed.data.tenantId) filters.push(eq(selfHealingRestorePointsTable.tenantId, parsed.data.tenantId));
+  filters.push(eq(selfHealingRestorePointsTable.tenantId, tenantId));
 
   const rows = await db
     .select()
@@ -85,7 +91,8 @@ router.get("/self-healing/restore-points", async (req, res) => {
   res.json(rows.map(formatRestorePoint));
 });
 
-router.get("/self-healing/actions", async (req, res) => {
+router.get("/self-healing/actions", requireCapability("self_healing:preview", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListSelfHealingActionsQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid self-healing action query" });
@@ -94,7 +101,7 @@ router.get("/self-healing/actions", async (req, res) => {
 
   const filters = [];
   if (parsed.data.resourceKey) filters.push(eq(selfHealingActionsTable.resourceKey, parsed.data.resourceKey));
-  if (parsed.data.tenantId) filters.push(eq(selfHealingActionsTable.tenantId, parsed.data.tenantId));
+  filters.push(eq(selfHealingActionsTable.tenantId, tenantId));
 
   const rows = await db
     .select()
@@ -106,14 +113,22 @@ router.get("/self-healing/actions", async (req, res) => {
   res.json(rows.map(formatAction));
 });
 
-router.post("/self-healing/restore-points/:id/preview", async (req, res) => {
+router.post("/self-healing/restore-points/:id/preview", requireCapability("self_healing:preview", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     res.status(400).json({ error: "Invalid restore point id" });
     return;
   }
 
-  const result = await previewVerifiedRestorePoint(id);
+  // Addressed records are loaded in the authorized tenant before side effects.
+  const [restorePoint] = await db.select().from(selfHealingRestorePointsTable)
+    .where(and(eq(selfHealingRestorePointsTable.id, id), eq(selfHealingRestorePointsTable.tenantId, tenantId))).limit(1);
+  if (!restorePoint) {
+    res.status(404).json({ error: "Restore point or managed resource not found" });
+    return;
+  }
+  const result = await previewVerifiedRestorePoint(id, tenantId);
   if (!result) {
     res.status(404).json({ error: "Restore point or managed resource not found" });
     return;
@@ -125,16 +140,32 @@ router.post("/self-healing/restore-points/:id/preview", async (req, res) => {
   res.json(result);
 });
 
-router.post("/self-healing/restore-points/:id/apply", async (req, res) => {
+router.post("/self-healing/restore-points/:id/apply", requireCapability("self_healing:apply", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const id = Number(req.params.id);
   const parsed = ApplyRestorePointBody.safeParse(req.body ?? {});
   if (!Number.isInteger(id) || id < 1 || !parsed.success) {
     res.status(400).json({ error: "Invalid restore request" });
     return;
   }
+  const [restorePoint] = await db.select().from(selfHealingRestorePointsTable)
+    .where(and(eq(selfHealingRestorePointsTable.id, id), eq(selfHealingRestorePointsTable.tenantId, tenantId))).limit(1);
+  if (!restorePoint) {
+    res.status(404).json({ error: "Restore point or managed resource not found" });
+    return;
+  }
+  if (parsed.data.eventId) {
+    const [event] = await db.select({ id: securityEventsTable.id }).from(securityEventsTable)
+      .where(and(eq(securityEventsTable.id, parsed.data.eventId), eq(securityEventsTable.tenantId, tenantId))).limit(1);
+    if (!event) {
+      res.status(404).json({ error: "Security event not found" });
+      return;
+    }
+  }
 
   const result = await applyVerifiedRestorePoint({
     restorePointId: id,
+    tenantId,
     eventId: parsed.data.eventId ?? null,
     mode: "APPLY",
   });

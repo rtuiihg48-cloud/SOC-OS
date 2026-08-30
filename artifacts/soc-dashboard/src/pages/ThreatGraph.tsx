@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 
 function generateNodePositions(nodes: any[]) {
   return nodes.map((node, i) => {
-    const x = ((i * 137) % 100); 
+    const x = ((i * 137) % 100);
     const y = ((i * 149 + node.score) % 100);
     // Size based on score (clamped)
     const z = Math.max(100, Math.min(500, node.score * 4));
@@ -60,8 +60,8 @@ export default function ThreatGraph() {
           )}
           <div className="flex justify-between items-center mt-2 pt-2 border-t border-border gap-4">
             <span className="text-muted-foreground">Action: <span style={{
-              color: data.action === 'ALLOW' ? 'hsl(var(--safe))' : 
-                     data.action === 'WARN' ? 'hsl(var(--warn))' : 
+              color: data.action === 'ALLOW' ? 'hsl(var(--safe))' :
+                     data.action === 'WARN' ? 'hsl(var(--warn))' :
                      data.action === 'ISOLATE' ? 'hsl(var(--critical))' : 'hsl(var(--primary))'
             }}>{data.action}</span></span>
             <span className="text-muted-foreground">Status: <span className="text-foreground">{data.status}</span></span>
@@ -96,7 +96,7 @@ export default function ThreatGraph() {
 
       <Card className="bg-[#050B14] border-primary/20 flex-1 relative overflow-hidden flex items-center justify-center min-h-[500px]">
         <div className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#00ffff_1px,transparent_1px),linear-gradient(to_bottom,#00ffff_1px,transparent_1px)] bg-[size:40px_40px]"></div>
-        
+
         <CardContent className="w-full h-full p-6 relative z-10">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -104,12 +104,12 @@ export default function ThreatGraph() {
               <YAxis type="number" dataKey="y" name="Y" domain={[0, 100]} hide />
               <ZAxis type="number" dataKey="z" range={[50, 400]} name="Size" />
               <RechartsTooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3', stroke: 'hsl(var(--muted-foreground))' }} />
-              
+
               {edges.map((edge: any, i) => (
-                <ReferenceLine 
-                  key={`edge-${i}`} 
-                  segment={[{ x: edge.start.x, y: edge.start.y }, { x: edge.end.x, y: edge.end.y }]} 
-                  stroke="hsl(var(--primary))" 
+                <ReferenceLine
+                  key={`edge-${i}`}
+                  segment={[{ x: edge.start.x, y: edge.start.y }, { x: edge.end.x, y: edge.end.y }]}
+                  stroke="hsl(var(--primary))"
                   strokeOpacity={0.3}
                   strokeWidth={1}
                 />

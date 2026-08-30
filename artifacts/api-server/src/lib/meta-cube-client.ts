@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 const DEFAULT_META_CUBE_URL = "http://127.0.0.1:8008";
 const DEFAULT_TIMEOUT_MS = 5_000;
@@ -13,6 +13,14 @@ export class MetaCubeClientError extends Error {
     this.name = "MetaCubeClientError";
   }
 }
+export type MetaCubeBridgeContext = {
+  tenantId: number;
+  principalType: string;
+  principalId: string;
+  capability: string;
+  correlationId: string;
+  idempotencyKey?: string;
+};
 
 function serviceUrl(path: string): URL {
   const baseUrl = process.env.META_CUBE_URL ?? DEFAULT_META_CUBE_URL;
@@ -26,7 +34,8 @@ export async function callMetaCube(
     body?: unknown;
     query?: Record<string, string | number | undefined>;
     correlationId?: string;
-  } = {},
+    context: MetaCubeBridgeContext;
+  },
 ): Promise<unknown> {
   const url = serviceUrl(path);
   for (const [key, value] of Object.entries(options.query ?? {})) {
@@ -34,7 +43,20 @@ export async function callMetaCube(
   }
 
   const timeoutMs = Number(process.env.META_CUBE_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  const correlationId = options.correlationId ?? randomUUID();
+  // Preserve a caller-supplied bridge correlation ID. Route callers normally
+  // provide both values, but library users may supply it in the typed context.
+  const correlationId = options.correlationId ?? options.context.correlationId ?? randomUUID();
+  const secret = process.env.META_CUBE_INTERNAL_SECRET;
+  if (!secret) {
+    throw new MetaCubeClientError(
+      "META-CUBE internal authentication is not configured",
+      503,
+      { error: "META-CUBE internal authentication is not configured", correlationId },
+    );
+  }
+  const context = { ...options.context, correlationId };
+  const encodedContext = Buffer.from(JSON.stringify(context)).toString("base64url");
+  const signature = createHmac("sha256", secret).update(encodedContext).digest("hex");
 
   let response: Response;
   try {
@@ -44,6 +66,8 @@ export async function callMetaCube(
         accept: "application/json",
         "content-type": "application/json",
         "x-correlation-id": correlationId,
+        "x-meta-cube-context": encodedContext,
+        "x-meta-cube-signature": signature,
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: AbortSignal.timeout(timeoutMs),

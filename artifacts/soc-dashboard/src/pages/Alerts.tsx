@@ -10,13 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 export default function Alerts() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   // Use a custom query for Alerts specifically (ISOLATE/WARN, NEW/ACKNOWLEDGED)
   const { data: isolateNew, isLoading: load1 } = useListEvents(
     { action: "ISOLATE", status: "NEW", limit: 20 },
     { query: { queryKey: getListEventsQueryKey({ action: "ISOLATE", status: "NEW", limit: 20 }), refetchInterval: 10000 } }
   );
-  
+
   const { data: warnNew, isLoading: load2 } = useListEvents(
     { action: "WARN", status: "NEW", limit: 20 },
     { query: { queryKey: getListEventsQueryKey({ action: "WARN", status: "NEW", limit: 20 }), refetchInterval: 10000 } }
@@ -26,7 +26,7 @@ export default function Alerts() {
     { action: "ISOLATE", status: "ACKNOWLEDGED", limit: 20 },
     { query: { queryKey: getListEventsQueryKey({ action: "ISOLATE", status: "ACKNOWLEDGED", limit: 20 }), refetchInterval: 10000 } }
   );
-  
+
   const { data: warnAck, isLoading: load4 } = useListEvents(
     { action: "WARN", status: "ACKNOWLEDGED", limit: 20 },
     { query: { queryKey: getListEventsQueryKey({ action: "WARN", status: "ACKNOWLEDGED", limit: 20 }), refetchInterval: 10000 } }
@@ -48,7 +48,7 @@ export default function Alerts() {
   }
 
   const allAlerts = [
-    ...(isolateNew || []), 
+    ...(isolateNew || []),
     ...(warnNew || []),
     ...(isolateAck || []),
     ...(warnAck || []),
@@ -101,7 +101,7 @@ export default function Alerts() {
               >
                 <Card className={`border ${alert.action === 'ISOLATE' ? 'bg-critical/5 border-critical/30' : 'bg-warn/5 border-warn/30'} overflow-hidden relative group`}>
                   <div className={`absolute top-0 left-0 w-1 h-full ${alert.action === 'ISOLATE' ? 'bg-critical' : 'bg-warn'}`}></div>
-                  
+
                   <CardHeader className="pb-3 flex flex-row items-start justify-between">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export default function Alerts() {
                       <div className="text-xs opacity-70">ID: {alert.hash.substring(0,8)}</div>
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent className="py-0 pb-4">
                     {alert.technique && (
                       <div className="text-sm font-mono text-muted-foreground mb-3 flex items-center gap-2">

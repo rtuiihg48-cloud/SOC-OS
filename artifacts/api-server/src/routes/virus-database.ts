@@ -10,6 +10,7 @@ import {
   virusMatchesTable,
   virusSampleAccessTable,
   virusSamplesTable,
+  securityEventsTable,
 } from "@workspace/db";
 import {
   CreateVirusEntryBody,
@@ -24,6 +25,7 @@ import {
   SyncVirusFeedBody,
 } from "@workspace/api-zod";
 import { and, count, desc, eq, ilike, inArray } from "drizzle-orm";
+import { requireCapability, singleTenantScope } from "../middlewares/principal";
 
 const router = Router();
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -138,7 +140,7 @@ async function hydrateEntries(ids?: number[]) {
   }));
 }
 
-router.get("/virus-db/stats", async (_req, res) => {
+router.get("/virus-db/stats", requireCapability("virus:read", singleTenantScope), async (_req, res) => {
   const [[entries], [indicators], [samples], [matches], [feeds]] = await Promise.all([
     db.select({ value: count() }).from(virusCatalogEntriesTable),
     db.select({ value: count() }).from(virusIndicatorsTable).where(eq(virusIndicatorsTable.status, "ACTIVE")),
@@ -157,7 +159,7 @@ router.get("/virus-db/stats", async (_req, res) => {
   });
 });
 
-router.get("/virus-db/entries", async (req, res) => {
+router.get("/virus-db/entries", requireCapability("virus:read", singleTenantScope), async (req, res) => {
   const parsed = ListVirusEntriesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid virus catalog query" });
@@ -177,7 +179,7 @@ router.get("/virus-db/entries", async (req, res) => {
   res.json(await hydrateEntries(entries.map(({ id }) => id)));
 });
 
-router.get("/virus-db/entries/:id", async (req, res) => {
+router.get("/virus-db/entries/:id", requireCapability("virus:read", singleTenantScope), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     res.status(400).json({ error: "Invalid virus entry id" });
@@ -191,7 +193,7 @@ router.get("/virus-db/entries/:id", async (req, res) => {
   res.json(entry);
 });
 
-router.post("/virus-db/entries", async (req, res) => {
+router.post("/virus-db/entries", requireCapability("virus:write", singleTenantScope), async (req, res) => {
   const parsed = CreateVirusEntryBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid virus catalog entry" });
@@ -282,7 +284,8 @@ router.post("/virus-db/entries", async (req, res) => {
   }
 });
 
-router.post("/virus-db/indicators/lookup", async (req, res) => {
+router.post("/virus-db/indicators/lookup", requireCapability("virus:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = LookupVirusIndicatorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid SHA-256 lookup" });
@@ -301,7 +304,7 @@ router.post("/virus-db/indicators/lookup", async (req, res) => {
 
   if (!indicator) {
     await audit(db, {
-      tenantId: parsed.data.tenantId ?? null,
+      tenantId,
       action: "EXACT_HASH_LOOKUP",
       entityType: "virus_indicator",
       principalRef: principal(req),
@@ -322,10 +325,16 @@ router.post("/virus-db/indicators/lookup", async (req, res) => {
   const [entry] = await hydrateEntries([indicator.catalogEntryId]);
   let match: ReturnType<typeof formatMatch> | null = null;
   if (parsed.data.eventId) {
+    const [event] = await db.select({ id: securityEventsTable.id }).from(securityEventsTable)
+      .where(and(eq(securityEventsTable.id, parsed.data.eventId), eq(securityEventsTable.tenantId, tenantId))).limit(1);
+    if (!event) {
+      res.status(404).json({ error: "Security event not found" });
+      return;
+    }
     const [row] = await db
       .insert(virusMatchesTable)
       .values({
-        tenantId: parsed.data.tenantId ?? null,
+        tenantId,
         eventId: parsed.data.eventId,
         indicatorId: indicator.id,
         matchType: "EXACT_HASH",
@@ -342,7 +351,7 @@ router.post("/virus-db/indicators/lookup", async (req, res) => {
     match = formatMatch(row);
   }
   await audit(db, {
-    tenantId: parsed.data.tenantId ?? null,
+    tenantId,
     action: "EXACT_HASH_LOOKUP",
     entityType: "virus_indicator",
     entityId: indicator.id,
@@ -360,14 +369,15 @@ router.post("/virus-db/indicators/lookup", async (req, res) => {
   });
 });
 
-router.get("/virus-db/samples", async (req, res) => {
+router.get("/virus-db/samples", requireCapability("virus:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListVirusSamplesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid sample query" });
     return;
   }
   const filters = [];
-  if (parsed.data.tenantId) filters.push(eq(virusSamplesTable.tenantId, parsed.data.tenantId));
+  filters.push(eq(virusSamplesTable.tenantId, tenantId));
   if (parsed.data.status) filters.push(eq(virusSamplesTable.status, parsed.data.status));
   const rows = await db
     .select()
@@ -378,7 +388,8 @@ router.get("/virus-db/samples", async (req, res) => {
   res.json(rows.map(formatSample));
 });
 
-router.post("/virus-db/samples/intake", async (req, res) => {
+router.post("/virus-db/samples/intake", requireCapability("virus:write", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = RegisterVirusSampleBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid or oversized sample metadata" });
@@ -390,7 +401,7 @@ router.post("/virus-db/samples/intake", async (req, res) => {
       const [row] = await tx
         .insert(virusSamplesTable)
         .values({
-          tenantId: parsed.data.tenantId ?? null,
+          tenantId,
           catalogEntryId: parsed.data.catalogEntryId ?? null,
           sha256,
           objectPath: null,
@@ -423,14 +434,15 @@ router.post("/virus-db/samples/intake", async (req, res) => {
   }
 });
 
-router.post("/virus-db/samples/:id/download-request", async (req, res) => {
+router.post("/virus-db/samples/:id/download-request", requireCapability("virus:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const sampleId = Number(req.params.id);
   const parsed = RequestVirusSampleDownloadBody.safeParse(req.body);
   if (!Number.isInteger(sampleId) || sampleId < 1 || !parsed.success) {
     res.status(400).json({ error: "Invalid sample access request" });
     return;
   }
-  const [sample] = await db.select().from(virusSamplesTable).where(eq(virusSamplesTable.id, sampleId)).limit(1);
+  const [sample] = await db.select().from(virusSamplesTable).where(and(eq(virusSamplesTable.id, sampleId), eq(virusSamplesTable.tenantId, tenantId))).limit(1);
   if (!sample) {
     res.status(404).json({ error: "Sample not found" });
     return;
@@ -457,12 +469,12 @@ router.post("/virus-db/samples/:id/download-request", async (req, res) => {
   res.status(403).json({ error: "Private sample download is disabled until authorization is configured" });
 });
 
-router.get("/virus-db/feeds", async (_req, res) => {
+router.get("/virus-db/feeds", requireCapability("virus:read", singleTenantScope), async (_req, res) => {
   const rows = await db.select().from(virusFeedSourcesTable).orderBy(desc(virusFeedSourcesTable.updatedAt));
   res.json(rows.map(formatFeed));
 });
 
-router.post("/virus-db/feeds", async (req, res) => {
+router.post("/virus-db/feeds", requireCapability("virus:write", singleTenantScope), async (req, res) => {
   const parsed = CreateVirusFeedBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid feed source" });
@@ -495,7 +507,7 @@ router.post("/virus-db/feeds", async (req, res) => {
   }
 });
 
-router.post("/virus-db/feeds/:id/sync", async (req, res) => {
+router.post("/virus-db/feeds/:id/sync", requireCapability("virus:write", singleTenantScope), async (req, res) => {
   const sourceId = Number(req.params.id);
   const parsed = SyncVirusFeedBody.safeParse(req.body);
   if (!Number.isInteger(sourceId) || sourceId < 1 || !parsed.success) {
@@ -539,27 +551,29 @@ router.post("/virus-db/feeds/:id/sync", async (req, res) => {
   }
 });
 
-router.get("/virus-db/matches", async (req, res) => {
+router.get("/virus-db/matches", requireCapability("virus:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListVirusMatchesQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid virus match query" });
     return;
   }
   const rows = await db.select().from(virusMatchesTable)
-    .where(parsed.data.tenantId ? eq(virusMatchesTable.tenantId, parsed.data.tenantId) : undefined)
+    .where(eq(virusMatchesTable.tenantId, tenantId))
     .orderBy(desc(virusMatchesTable.createdAt))
     .limit(parsed.data.limit ?? 100);
   res.json(rows.map(formatMatch));
 });
 
-router.get("/virus-db/audit", async (req, res) => {
+router.get("/virus-db/audit", requireCapability("virus:read", singleTenantScope), async (req, res) => {
+  const tenantId = req.principal!.tenantIds[0]!;
   const parsed = ListVirusDatabaseAuditQueryParams.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid virus audit query" });
     return;
   }
   const rows = await db.select().from(virusDatabaseAuditTable)
-    .where(parsed.data.tenantId ? eq(virusDatabaseAuditTable.tenantId, parsed.data.tenantId) : undefined)
+    .where(eq(virusDatabaseAuditTable.tenantId, tenantId))
     .orderBy(desc(virusDatabaseAuditTable.createdAt))
     .limit(parsed.data.limit ?? 100);
   res.json(rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })));
