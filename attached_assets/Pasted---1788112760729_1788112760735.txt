@@ -1,0 +1,107 @@
+Ось код для розшифрування даних, який відповідає попередньому прикладу з багатоканальним шифруванням:
+
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import unpad
+from Crypto.Protocol.KDF import scrypt
+from Crypto.Hash import HMAC, SHA256
+from Crypto.PublicKey import RSA
+from Crypto.Signature import pkcs1_15
+from Crypto.Signature import DSS
+
+# Функція для генерації ключа та IV з пароля та солі
+def generate_key_iv(password, salt):
+    key = scrypt(password.encode('utf-8'), salt, dklen=32, N=2**14, r=8, p=1)
+    iv = get_random_bytes(16)  # IV для GCM або CBC
+    return key, iv
+
+# Функція для розшифрування даних з AES GCM
+def aes_decrypt_gcm(data, key, iv, tag):
+    cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+    decrypted_data = cipher.decrypt_and_verify(data, tag)
+    return unpad(decrypted_data, AES.block_size).decode('utf-8')
+
+# Функція для перевірки HMAC
+def verify_hmac(data, hmac, key):
+    try:
+        hmac_check = HMAC.new(key, data.encode('utf-8'), SHA256)
+        hmac_check.verify(hmac)
+        print("Цілісність даних підтверджена.")
+        return True
+    except ValueError:
+        print("Цілісність даних порушена.")
+        return False
+
+# Функція для перевірки підпису RSA
+def verify_signature_rsa(data, signature, public_key):
+    key = RSA.import_key(public_key)
+    verifier = pkcs1_15.new(key)
+    h = SHA256.new(data.encode('utf-8'))
+    try:
+        verifier.verify(h, signature)
+        print("Підпис підтверджено.")
+        return True
+    except (ValueError, TypeError):
+        print("Підпис не підтверджено!")
+        return False
+
+# Функція для декодування з багатоканального шифрування
+def multi_channel_decrypt(encrypted_data, metadata, password, hmacs, signatures):
+    data_chunks = []
+    num_channels = metadata['channel_count']
+    salts = metadata['salts']
+    ivs = metadata['ivs']
+    
+    # Розбиваємо зашифровані дані на канали
+    chunk_size = len(encrypted_data) // num_channels
+    data_chunks = [encrypted_data[i:i + chunk_size] for i in range(0, len(encrypted_data), chunk_size)]
+    
+    decrypted_data = []
+    
+    # Декодуємо кожен канал окремо
+    for i in range(num_channels):
+        salt = bytes.fromhex(salts[i])
+        iv = bytes.fromhex(ivs[i])
+        key, _ = generate_key_iv(password, salt)
+        
+        # Розшифровуємо канал
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        decrypted_channel = aes_decrypt_gcm(data_chunks[i], key, iv, tag=hmacs[i])
+        
+        # Перевірка цілісності
+        if verify_hmac(decrypted_channel, hmacs[i], key):
+            # Перевірка підпису RSA
+            public_key = RSA.import_key(signatures[i])
+            if verify_signature_rsa(decrypted_channel, signatures[i], public_key):
+                decrypted_data.append(decrypted_channel)
+            else:
+                print(f"Канал {i + 1} не пройшов перевірку підпису RSA!")
+                return None
+        else:
+            print(f"Канал {i + 1} не пройшов перевірку HMAC!")
+            return None
+
+    return ''.join(decrypted_data)
+
+# Приклад декодування
+def main():
+    # Задано зашифровані дані, метадані та інші параметри (відповідно до попереднього коду)
+    encrypted_data = b"..."  # Ваші зашифровані дані
+    metadata = {
+        'channel_count': 16,
+        'salts': ['...'],
+        'ivs': ['...']
+    }
+    hmacs = [...]  # HMAC для кожного каналу
+    signatures = [...]  # Підписи для кожного каналу
+    
+    # Розшифровуємо дані
+    password = "my_strong_password"
+    decrypted_data = multi_channel_decrypt(encrypted_data, metadata, password, hmacs, signatures)
+    
+    if decrypted_data:
+        print("\nРозшифроване значення:", decrypted_data)
+
+# Запуск
+if __name__ == "__main__":
+    main()
