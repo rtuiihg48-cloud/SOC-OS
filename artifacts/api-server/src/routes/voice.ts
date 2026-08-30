@@ -3,6 +3,7 @@ import express from "express";
 import {
   detectAudioFormat,
   ensureCompatibleFormat,
+  isSupportedAudioMimeType,
   speechToText,
 } from "@workspace/integrations-openai-ai-server/audio";
 import {
@@ -197,8 +198,11 @@ router.post(
     }
 
     const detectedFormat = detectAudioFormat(req.body);
-    if (detectedFormat === "unknown") {
-      res.status(415).json({ error: "Unsupported or invalid audio format" });
+    const declaredContentType = req.header("content-type") ?? undefined;
+    if (detectedFormat === "unknown" && !isSupportedAudioMimeType(declaredContentType)) {
+      res.status(415).json({
+        error: "Unsupported audio format. Use WAV, MP3, WebM, MP4, OGG, or AAC audio.",
+      });
       return;
     }
 
@@ -213,6 +217,12 @@ router.post(
       });
     } catch (error) {
       req.log?.error({ err: error }, "Voice transcription failed");
+      if (detectedFormat === "unknown") {
+        res.status(415).json({
+          error: "The audio file is damaged or its container cannot be decoded.",
+        });
+        return;
+      }
       res.status(502).json({ error: "Voice transcription is unavailable" });
     }
   },

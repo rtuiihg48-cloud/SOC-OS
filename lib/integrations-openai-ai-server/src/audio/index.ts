@@ -1,6 +1,7 @@
 export {
   openai,
   detectAudioFormat,
+  isSupportedAudioMimeType,
   convertToWav,
   ensureCompatibleFormat,
   type AudioFormat,

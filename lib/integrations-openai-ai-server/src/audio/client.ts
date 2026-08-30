@@ -25,6 +25,32 @@ export const openai = new OpenAI({
 
 export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
 
+const SUPPORTED_AUDIO_MIME_TYPES = new Set([
+  "audio/aac",
+  "audio/flac",
+  "audio/mp3",
+  "audio/m4a",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/ogg",
+  "audio/opus",
+  "audio/wav",
+  "audio/webm",
+  "audio/x-flac",
+  "audio/x-m4a",
+  "audio/x-wav",
+]);
+
+/**
+ * MIME types that ffmpeg can safely inspect/convert for transcription.
+ * The MIME value is only a fallback hint; the bytes are still validated by
+ * ffmpeg before they are sent to the transcription provider.
+ */
+export function isSupportedAudioMimeType(contentType: string | undefined): boolean {
+  if (!contentType) return false;
+  return SUPPORTED_AUDIO_MIME_TYPES.has(contentType.split(";")[0].trim().toLowerCase());
+}
+
 /**
  * Detect audio format from buffer magic bytes.
  * Supports: WAV, MP3, WebM (Chrome/Firefox), MP4/M4A/MOV (Safari/iOS), OGG
@@ -42,7 +68,7 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
   }
   // MP3: ID3 tag or frame sync
   if (
-    (buffer[0] === 0xff && (buffer[1] === 0xfb || buffer[1] === 0xfa || buffer[1] === 0xf3)) ||
+    (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0 && (buffer[1] & 0x06) !== 0) ||
     (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33)
   ) {
     return "mp3";
