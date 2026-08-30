@@ -12,9 +12,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
 type VoiceCommand =
   | { label: string; kind: "navigate"; path: string }
   | { label: string; kind: "request"; path: "/simulate" | "/self-test" };
+
+class VoiceTranscriptionError extends Error {
+  constructor(
+    readonly kind: "audio-format" | "transcription",
+    message: string,
+  ) {
+    super(message);
+    this.name = "VoiceTranscriptionError";
+  }
+}
 
 const VOICE_COMMANDS: Array<{ pattern: RegExp; command: VoiceCommand }> = [
   { pattern: /self[\s-]?test|selftest|само?тест|перевір(ка|ити) системи/i, command: { label: "Run self-test", kind: "request", path: "/self-test" } },
@@ -44,6 +56,10 @@ function isSafeVirusCommand(transcript: string): boolean {
 }
 
 async function transcribeAudio(blob: Blob): Promise<string> {
+  if (blob.size > MAX_AUDIO_BYTES) {
+    throw new VoiceTranscriptionError("audio-format", "The audio file exceeds the 25 MB upload limit.");
+  }
+
   const response = await fetch("/api/voice/transcribe", {
     method: "POST",
     headers: { "Content-Type": blob.type || "audio/webm" },
@@ -52,7 +68,11 @@ async function transcribeAudio(blob: Blob): Promise<string> {
 
   const data = (await response.json().catch(() => ({}))) as { transcript?: string; error?: string };
   if (!response.ok) {
-    throw new Error(data.error ?? "Voice transcription failed");
+    const message = data.error ?? "Voice transcription failed";
+    throw new VoiceTranscriptionError(
+      response.status === 400 || response.status === 415 ? "audio-format" : "transcription",
+      message,
+    );
   }
   return data.transcript?.trim() ?? "";
 }
@@ -73,6 +93,7 @@ export function VoiceCommandPanel() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [audioError, setAudioError] = useState("");
 
   const resetResult = () => {
     setTranscript("");
@@ -82,6 +103,7 @@ export function VoiceCommandPanel() {
     setResult(null);
     setMessage("");
     setError("");
+    setAudioError("");
   };
 
   const interpretTranscript = async (text: string) => {
@@ -91,6 +113,7 @@ export function VoiceCommandPanel() {
     setPlan(null);
     setResult(null);
     setMessage("");
+    setAudioError("");
     if (!normalized) {
       setMessage("No speech was detected.");
       return;
@@ -121,11 +144,16 @@ export function VoiceCommandPanel() {
     setIsTranscribing(true);
     setError("");
     setMessage("");
+    setAudioError("");
     try {
       const text = await transcribeAudio(audio);
       await interpretTranscript(text);
     } catch (transcriptionError) {
-      setError(transcriptionError instanceof Error ? transcriptionError.message : "Voice transcription failed");
+      if (transcriptionError instanceof VoiceTranscriptionError && transcriptionError.kind === "audio-format") {
+        setAudioError(transcriptionError.message);
+      } else {
+        setError(transcriptionError instanceof Error ? transcriptionError.message : "Voice transcription failed");
+      }
     } finally {
       setIsTranscribing(false);
     }
@@ -134,6 +162,7 @@ export function VoiceCommandPanel() {
   const toggleRecording = async () => {
     setError("");
     setMessage("");
+    setAudioError("");
     if (recordingState === "recording") {
       await processAudio(await stopRecording());
       return;
@@ -235,7 +264,7 @@ export function VoiceCommandPanel() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="audio/*"
+                accept="audio/*,.wav,.mp3,.webm,.m4a,.mp4,.ogg,.opus,.aac,.flac"
                 className="hidden"
                 onChange={(event) => void handleFile(event.target.files?.[0])}
                 data-testid="input-voice-file"
@@ -359,6 +388,13 @@ export function VoiceCommandPanel() {
               </div>
             )}
 
+            {audioError && (
+              <div className="space-y-1 rounded-md border border-warn/30 bg-warn/5 p-3 text-xs" role="alert" data-testid="voice-audio-format-error">
+                <p className="font-mono font-bold uppercase tracking-widest text-warn">Audio format problem</p>
+                <p className="text-muted-foreground">{audioError}</p>
+                <p className="text-muted-foreground/80">Try a complete WAV, MP3, WebM, MP4/M4A, OGG, AAC, or FLAC recording.</p>
+              </div>
+            )}
             {error && <p className="text-xs text-critical" role="alert">{error}</p>}
             {message && <p className="text-xs text-safe" role="status">{message}</p>}
 

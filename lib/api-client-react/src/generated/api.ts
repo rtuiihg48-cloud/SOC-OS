@@ -1969,7 +1969,7 @@ export const transcribeVoice = async (transcribeVoiceBody: Blob, options?: Reque
 
 
 
-export const getTranscribeVoiceMutationOptions = <TError = ErrorType<void>,
+export const getTranscribeVoiceMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext> => {
 
@@ -1998,12 +1998,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type TranscribeVoiceMutationResult = NonNullable<Awaited<ReturnType<typeof transcribeVoice>>>
     export type TranscribeVoiceMutationBody = BodyType<Blob>
-    export type TranscribeVoiceMutationError = ErrorType<void>
+    export type TranscribeVoiceMutationError = ErrorType<ApiError>
 
     /**
  * @summary Transcribe an audio command without storing the audio
  */
-export const useTranscribeVoice = <TError = ErrorType<void>,
+export const useTranscribeVoice = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVoice>>, TError,{data: BodyType<Blob>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof transcribeVoice>>,

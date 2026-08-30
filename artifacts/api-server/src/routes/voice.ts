@@ -4,6 +4,7 @@ import express from "express";
 import {
   detectAudioFormat,
   ensureCompatibleFormat,
+  AudioFormatError,
   isSupportedAudioMimeType,
   speechToText,
 } from "@workspace/integrations-openai-ai-server/audio";
@@ -191,20 +192,24 @@ router.post(
   "/voice/transcribe",
   requireCapability("voice:use", singleTenantScope),
   express.raw({
-    type: ["audio/*", "application/octet-stream"],
+    type: ["audio/*", "application/octet-stream", "application/ogg", "application/mp4", "video/mp4", "video/webm"],
     limit: MAX_AUDIO_BYTES,
   }),
   async (req, res) => {
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      res.status(400).json({ error: "Audio payload is required" });
+      res.status(400).json({ code: "AUDIO_PAYLOAD_REQUIRED", error: "Audio payload is required" });
       return;
     }
 
     const detectedFormat = detectAudioFormat(req.body);
     const declaredContentType = req.header("content-type") ?? undefined;
-    if (detectedFormat === "unknown" && !isSupportedAudioMimeType(declaredContentType)) {
+    if (detectedFormat === "unknown") {
+      const declaredAsAudio = isSupportedAudioMimeType(declaredContentType);
       res.status(415).json({
-        error: "Unsupported audio format. Use WAV, MP3, WebM, MP4, OGG, or AAC audio.",
+        code: declaredAsAudio ? "AUDIO_FORMAT_INVALID" : "AUDIO_FORMAT_UNSUPPORTED",
+        error: declaredAsAudio
+          ? "The audio file is damaged or its container cannot be decoded."
+          : "Unsupported audio format. Upload WAV, MP3, WebM, MP4/M4A, OGG, AAC, or FLAC audio.",
       });
       return;
     }
@@ -220,13 +225,14 @@ router.post(
       });
     } catch (error) {
       req.log?.error({ err: error }, "Voice transcription failed");
-      if (detectedFormat === "unknown") {
+      if (error instanceof AudioFormatError) {
         res.status(415).json({
+          code: "AUDIO_FORMAT_INVALID",
           error: "The audio file is damaged or its container cannot be decoded.",
         });
         return;
       }
-      res.status(502).json({ error: "Voice transcription is unavailable" });
+      res.status(502).json({ code: "TRANSCRIPTION_UNAVAILABLE", error: "Voice transcription is unavailable" });
     }
   },
 );

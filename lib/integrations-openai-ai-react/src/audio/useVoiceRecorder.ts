@@ -9,6 +9,9 @@ export type RecordingState = "idle" | "recording" | "stopped";
 const PREFERRED_MIME_TYPES = [
   "audio/webm;codecs=opus",
   "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+  "audio/mp4;codecs=mp4a.40.2",
   "audio/mp4",
   "audio/aac",
 ];
@@ -31,12 +34,11 @@ export function useVoiceRecorder() {
   const startRecording = useCallback(async (): Promise<void> => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mimeType = getSupportedMimeType();
-    mimeTypeRef.current = mimeType;
-
     const recorder = mimeType
       ? new MediaRecorder(stream, { mimeType })
       : new MediaRecorder(stream);
 
+    mimeTypeRef.current = recorder.mimeType || mimeType;
     mediaRecorderRef.current = recorder;
     chunksRef.current = [];
 
@@ -57,7 +59,7 @@ export function useVoiceRecorder() {
       }
 
       recorder.onstop = () => {
-        const blobType = mimeTypeRef.current ?? recorder.mimeType ?? "audio/webm";
+        const blobType = recorder.mimeType || mimeTypeRef.current || "application/octet-stream";
         const blob = new Blob(chunksRef.current, { type: blobType });
         recorder.stream.getTracks().forEach((t) => t.stop());
         setState("stopped");

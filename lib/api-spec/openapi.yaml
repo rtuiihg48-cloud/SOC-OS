@@ -591,6 +591,34 @@ paths:
             schema:
               type: string
               format: binary
+          audio/aac:
+            schema:
+              type: string
+              format: binary
+          audio/flac:
+            schema:
+              type: string
+              format: binary
+          audio/m4a:
+            schema:
+              type: string
+              format: binary
+          application/ogg:
+            schema:
+              type: string
+              format: binary
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+          video/mp4:
+            schema:
+              type: string
+              format: binary
+          video/webm:
+            schema:
+              type: string
+              format: binary
       responses:
         "200":
           description: Transcribed voice input
@@ -600,10 +628,22 @@ paths:
                 $ref: "#/components/schemas/VoiceTranscription"
         "400":
           description: Audio payload is missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "415":
-          description: Unsupported audio format
+          description: Unsupported, damaged, or undecodable audio format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
         "502":
           description: Transcription provider unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 
   /voice/commands/preview:
     post:

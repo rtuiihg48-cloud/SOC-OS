@@ -5,6 +5,14 @@ import { writeFile, unlink, readFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { tmpdir } from "os";
 import { join } from "path";
+import {
+  assertCompleteAudioContainer,
+  AudioFormatError,
+  type ContainerAudioFormat,
+  wavDurationSeconds,
+} from "./validation";
+
+export { AudioFormatError } from "./validation";
 
 if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
   throw new Error(
@@ -23,10 +31,11 @@ export const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-export type AudioFormat = "wav" | "mp3" | "webm" | "mp4" | "ogg" | "unknown";
+export type AudioFormat = ContainerAudioFormat | "unknown";
 
 const SUPPORTED_AUDIO_MIME_TYPES = new Set([
   "audio/aac",
+  "audio/aacp",
   "audio/flac",
   "audio/mp3",
   "audio/m4a",
@@ -39,7 +48,14 @@ const SUPPORTED_AUDIO_MIME_TYPES = new Set([
   "audio/x-flac",
   "audio/x-m4a",
   "audio/x-wav",
+  "application/mp4",
+  "application/ogg",
+  "application/octet-stream",
+  "video/mp4",
+  "video/webm",
 ]);
+
+const FFMPEG_TIMEOUT_MS = 30_000;
 
 /**
  * MIME types that ffmpeg can safely inspect/convert for transcription.
@@ -53,50 +69,110 @@ export function isSupportedAudioMimeType(contentType: string | undefined): boole
 
 /**
  * Detect audio format from buffer magic bytes.
- * Supports: WAV, MP3, WebM (Chrome/Firefox), MP4/M4A/MOV (Safari/iOS), OGG
+ * Supports: WAV, MP3, AAC, FLAC, WebM (Chrome/Firefox), MP4/M4A/MOV
+ * (Safari/iOS), and OGG. Detection is only a routing hint; ffmpeg still
+ * validates that the container contains a complete decodable audio stream.
  */
 export function detectAudioFormat(buffer: Buffer): AudioFormat {
-  if (buffer.length < 12) return "unknown";
-
   // WAV: RIFF....WAVE
-  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WAVE"
+  ) {
     return "wav";
   }
   // WebM: EBML header
-  if (buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) {
     return "webm";
   }
   // MP3: ID3 tag or frame sync
   if (
-    (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0 && (buffer[1] & 0x06) !== 0) ||
-    (buffer[0] === 0x49 && buffer[1] === 0x44 && buffer[2] === 0x33)
+    (buffer.length >= 3 && buffer.subarray(0, 3).toString("ascii") === "ID3") ||
+    (buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0 && (buffer[1] & 0x06) !== 0)
   ) {
     return "mp3";
   }
+  // AAC: ADTS frame sync with the layer bits reserved for AAC.
+  if (buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xf6) === 0xf0) {
+    return "aac";
+  }
   // MP4/M4A/MOV: ....ftyp (Safari/iOS records in these containers)
-  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+  if (buffer.length >= 8 && buffer.subarray(4, 8).toString("ascii") === "ftyp") {
     return "mp4";
   }
   // OGG: OggS
-  if (buffer[0] === 0x4f && buffer[1] === 0x67 && buffer[2] === 0x67 && buffer[3] === 0x53) {
+  if (buffer.length >= 4 && buffer.subarray(0, 4).toString("ascii") === "OggS") {
     return "ogg";
   }
+  // FLAC: native stream marker.
+  if (buffer.length >= 4 && buffer.subarray(0, 4).toString("ascii") === "fLaC") {
+    return "flac";
+  }
   return "unknown";
+}
+
+function runFfmpeg(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    let settled = false;
+    const timer = setTimeout(() => {
+      ffmpeg.kill("SIGKILL");
+      if (!settled) {
+        settled = true;
+        reject(new Error("ffmpeg timed out while validating audio"));
+      }
+    }, FFMPEG_TIMEOUT_MS);
+
+    const settle = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback();
+    };
+
+    ffmpeg.stderr.on("data", (chunk: Buffer | string) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-500);
+    });
+    ffmpeg.on("error", (error) => settle(() => reject(error)));
+    ffmpeg.on("close", (code, signal) => {
+      if (code === 0) {
+        settle(resolve);
+        return;
+      }
+      settle(() => reject(new Error(`ffmpeg could not decode audio (${signal ?? `exit ${code}`})${stderr ? `: ${stderr}` : ""}`)));
+    });
+  });
+}
+
+async function withTemporaryAudioFile<T>(
+  audioBuffer: Buffer,
+  callback: (inputPath: string) => Promise<T>,
+): Promise<T> {
+  const inputPath = join(tmpdir(), `input-${randomUUID()}`);
+  try {
+    await writeFile(inputPath, audioBuffer);
+    return await callback(inputPath);
+  } finally {
+    await unlink(inputPath).catch(() => {});
+  }
 }
 
 /**
  * Convert any audio/video format to WAV using ffmpeg.
  */
 export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
-  const inputPath = join(tmpdir(), `input-${randomUUID()}`);
   const outputPath = join(tmpdir(), `output-${randomUUID()}.wav`);
 
   try {
-    await writeFile(inputPath, audioBuffer);
-
-    await new Promise<void>((resolve, reject) => {
-      const ffmpeg = spawn("ffmpeg", [
+    return await withTemporaryAudioFile(audioBuffer, async (inputPath) => {
+      await runFfmpeg([
+        "-v", "error",
+        "-xerror",
+        "-err_detect", "explode",
         "-i", inputPath,
+        "-map", "0:a:0",
         "-vn",
         "-f", "wav",
         "-ar", "16000",
@@ -105,20 +181,23 @@ export async function convertToWav(audioBuffer: Buffer): Promise<Buffer> {
         "-y",
         outputPath,
       ]);
-
-      ffmpeg.stderr.on("data", () => {});
-      ffmpeg.on("close", (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`ffmpeg exited with code ${code}`));
-      });
-      ffmpeg.on("error", reject);
+      return readFile(outputPath);
     });
-
-    return await readFile(outputPath);
   } finally {
-    await unlink(inputPath).catch(() => {});
     await unlink(outputPath).catch(() => {});
   }
+}
+
+async function validateAudioBuffer(audioBuffer: Buffer): Promise<void> {
+  await withTemporaryAudioFile(audioBuffer, (inputPath) => runFfmpeg([
+    "-v", "error",
+    "-xerror",
+    "-err_detect", "explode",
+    "-i", inputPath,
+    "-map", "0:a:0",
+    "-f", "null",
+    "-",
+  ]));
 }
 
 /**
@@ -128,10 +207,28 @@ export async function ensureCompatibleFormat(
   audioBuffer: Buffer
 ): Promise<{ buffer: Buffer; format: "wav" | "mp3" }> {
   const detected = detectAudioFormat(audioBuffer);
-  if (detected === "wav") return { buffer: audioBuffer, format: "wav" };
-  if (detected === "mp3") return { buffer: audioBuffer, format: "mp3" };
-  const wavBuffer = await convertToWav(audioBuffer);
-  return { buffer: wavBuffer, format: "wav" };
+  try {
+    if (detected === "unknown") throw new AudioFormatError("Unsupported audio container.");
+    const validation = assertCompleteAudioContainer(audioBuffer, detected);
+    if (detected === "wav") {
+      await validateAudioBuffer(audioBuffer);
+      return { buffer: audioBuffer, format: "wav" };
+    }
+    if (detected === "mp3") {
+      await validateAudioBuffer(audioBuffer);
+      return { buffer: audioBuffer, format: "mp3" };
+    }
+    const wavBuffer = await convertToWav(audioBuffer);
+    if (validation.durationSeconds) {
+      const convertedDuration = wavDurationSeconds(wavBuffer);
+      const tolerance = Math.max(0.08, validation.durationSeconds * 0.02);
+      if (convertedDuration + tolerance < validation.durationSeconds) throw new AudioFormatError();
+    }
+    return { buffer: wavBuffer, format: "wav" };
+  } catch (error) {
+    if (error instanceof AudioFormatError) throw error;
+    throw new AudioFormatError();
+  }
 }
 
 /** Voice Chat: audio-in, audio-out using gpt-audio. */
