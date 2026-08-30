@@ -15,4 +15,6 @@ agent prompt would create an unsafe execution plane.
 execution time. Virus tests read metadata and indicators only. Synthetic
 defense uses harmless text scenarios and does not write them into the live
 event stream. Keep binary, shell, network, host, VM, and META-CUBE execution
-disabled, and append an audit record for every completed command.
+disabled, and append an audit record for every completed command. Keep
+navigation phrases separate from mutation/test intents, and test paired
+multilingual phrases so “open virus database” cannot become “test virus.”

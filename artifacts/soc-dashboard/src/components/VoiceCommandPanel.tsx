@@ -20,6 +20,7 @@ const VOICE_COMMANDS: Array<{ pattern: RegExp; command: VoiceCommand }> = [
   { pattern: /self[\s-]?test|selftest|само?тест|перевір(ка|ити) системи/i, command: { label: "Run self-test", kind: "request", path: "/self-test" } },
   { pattern: /simulation|симуляц|сценар(ій|ію)|запусти атаку/i, command: { label: "Run simulation", kind: "request", path: "/simulate" } },
   { pattern: /dashboard|дашборд|головн(а|ий)/i, command: { label: "Open dashboard", kind: "navigate", path: "/" } },
+  { pattern: /audit[\s-]?(trail|log)|аудит|журнал аудиту|історія аудиту/i, command: { label: "Open audit trail", kind: "navigate", path: "/audit-trail" } },
   { pattern: /event|поді(ї|я)|журнал/i, command: { label: "Open event log", kind: "navigate", path: "/events" } },
   { pattern: /alert|сповіщен|тривог/i, command: { label: "Open alerts", kind: "navigate", path: "/alerts" } },
   { pattern: /patch|патч|виправлен/i, command: { label: "Open patches", kind: "navigate", path: "/patches" } },
@@ -27,10 +28,19 @@ const VOICE_COMMANDS: Array<{ pattern: RegExp; command: VoiceCommand }> = [
   { pattern: /rule|правил/i, command: { label: "Open rules engine", kind: "navigate", path: "/rules" } },
   { pattern: /correlation|кореляц/i, command: { label: "Open correlations", kind: "navigate", path: "/correlations" } },
   { pattern: /runtime|виконан|мета.?куб/i, command: { label: "Open runtime", kind: "navigate", path: "/runtime" } },
+  { pattern: /traffic|network traffic|трафік|мережевий аналіз|аналіз трафіку/i, command: { label: "Open traffic analysis", kind: "navigate", path: "/traffic-analysis" } },
+  { pattern: /quarantine|ізоляц|карантин/i, command: { label: "Open quarantine", kind: "navigate", path: "/quarantine" } },
+  { pattern: /self[\s-]?healing|відновлен(ня|ня системи)|самовідновлен/i, command: { label: "Open self-healing", kind: "navigate", path: "/self-healing" } },
+  { pattern: /virus[\s-]?(database|db)|malware[\s-]?(database|db)|база вірусів|вірусна база|база malware/i, command: { label: "Open virus database", kind: "navigate", path: "/virus-database" } },
+  { pattern: /tenant|тенант|організаці|орендар/i, command: { label: "Open tenants", kind: "navigate", path: "/tenants" } },
 ];
 
 function resolveCommand(transcript: string): VoiceCommand | null {
   return VOICE_COMMANDS.find(({ pattern }) => pattern.test(transcript))?.command ?? null;
+}
+
+function isSafeVirusCommand(transcript: string): boolean {
+  return /(?:test|протест|перевір|тест|симул|іміту|зіміту|defend|відб|захист).*(?:virus|вірус|malware)|(?:virus|вірус|malware).*(?:test|протест|перевір|тест|симул|іміту|зіміту|defend|відб|захист)/iu.test(transcript);
 }
 
 async function transcribeAudio(blob: Blob): Promise<string> {
@@ -80,12 +90,13 @@ export function VoiceCommandPanel() {
     setCommand(null);
     setPlan(null);
     setResult(null);
+    setMessage("");
     if (!normalized) {
       setMessage("No speech was detected.");
       return;
     }
 
-    if (/(?:вірус|malware)/iu.test(normalized)) {
+    if (isSafeVirusCommand(normalized)) {
       try {
         const nextPlan = await previewVoiceCommand.mutateAsync({ data: { transcript: normalized } });
         setPlan(nextPlan);
@@ -204,6 +215,9 @@ export function VoiceCommandPanel() {
                 <CardDescription className="mt-2 text-xs">
                   Transcribe a command, review it, then confirm execution.
                 </CardDescription>
+                <p className="mt-2 text-[10px] leading-4 text-muted-foreground/80">
+                  Try: “open audit trail”, “show traffic”, “open quarantine”, “open virus database”, or “run simulation”.
+                </p>
               </div>
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)} aria-label="Close voice control">
                 <X className="h-4 w-4" />
