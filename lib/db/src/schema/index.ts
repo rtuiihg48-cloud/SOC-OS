@@ -152,6 +152,22 @@ export const dnaAttackLinksTable = pgTable("dna_attack_links", {
   check("dna_attack_links_distinct_predictions_check", sql`${table.fromPredictionId} <> ${table.toPredictionId}`),
 ]);
 
+export const dnaPredictionLayerObservationsTable = pgTable("dna_prediction_layer_observations", {
+  id: serial("id").primaryKey(),
+  predictionId: integer("prediction_id").notNull().references(() => dnaPredictionsTable.id, { onDelete: "restrict" }),
+  layerName: text("layer_name").notNull(),
+  output: jsonb("output").$type<Record<string, unknown>>().notNull(),
+  confidence: real("confidence").notNull(),
+  modelVersion: text("model_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("dna_prediction_layer_observations_prediction_layer_uidx").on(table.predictionId, table.layerName),
+  index("dna_prediction_layer_observations_prediction_idx").on(table.predictionId),
+  index("dna_prediction_layer_observations_layer_created_at_idx").on(table.layerName, table.createdAt),
+  check("dna_prediction_layer_observations_layer_name_check", sql`${table.layerName} IN ('markov', 'quantum')`),
+  check("dna_prediction_layer_observations_confidence_check", sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`),
+]);
+
 // ─── Derived types ────────────────────────────────────────────────────────────
 export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -184,3 +200,7 @@ export type DnaOutcome = typeof dnaOutcomesTable.$inferSelect;
 export const insertDnaAttackLinkSchema = createInsertSchema(dnaAttackLinksTable).omit({ id: true, createdAt: true });
 export type InsertDnaAttackLink = z.infer<typeof insertDnaAttackLinkSchema>;
 export type DnaAttackLink = typeof dnaAttackLinksTable.$inferSelect;
+
+export const insertDnaPredictionLayerObservationSchema = createInsertSchema(dnaPredictionLayerObservationsTable).omit({ id: true, createdAt: true });
+export type InsertDnaPredictionLayerObservation = z.infer<typeof insertDnaPredictionLayerObservationSchema>;
+export type DnaPredictionLayerObservation = typeof dnaPredictionLayerObservationsTable.$inferSelect;

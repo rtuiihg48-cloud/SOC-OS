@@ -4,6 +4,8 @@ import { analyzeEvent, autoFix, decideAction, severityFromScore } from "./soc-en
 import { queueStats } from "./queue";
 import { logger } from "./logger";
 import { buildAttackLinkCandidates, type PriorAttackPrediction } from "./attack-memory-graph";
+import { analyzeMarkovLayer, type MarkovAnalysis } from "./markov-layer";
+import { analyzeQuantumLayer } from "./quantum-layer";
 
 const MODEL_VERSION = "cpu-history-v1";
 const LOCK_NAME = "soc-os:cpu-simulator";
@@ -37,6 +39,7 @@ export interface CpuSimulationResult {
   residualRisk: number;
   vulnerabilityPattern: string | null;
   linkCount: number;
+  layerObservationCount: number;
 }
 
 const SCENARIOS: ScenarioTemplate[] = [
@@ -144,6 +147,16 @@ async function loadHistory(client: PoolClient): Promise<Map<string, HistoryFeatu
       },
     ]),
   );
+}
+
+async function loadAttackSequence(client: PoolClient): Promise<string[]> {
+  const result = await client.query<{ attack_family: string }>(`
+    SELECT attack_family
+    FROM dna_predictions
+    WHERE created_at >= NOW() - INTERVAL '90 days'
+    ORDER BY created_at ASC, id ASC
+  `);
+  return result.rows.map((row) => row.attack_family);
 }
 
 async function reconcilePendingOutcomes(client: PoolClient): Promise<number> {
@@ -291,7 +304,7 @@ async function linkPrediction(
   return selected.length;
 }
 
-function selectScenario(history: Map<string, HistoryFeature>): ScenarioTemplate {
+function selectScenario(history: Map<string, HistoryFeature>, markovRecommendation: string | null): ScenarioTemplate {
   const totalSamples = [...history.values()].reduce((sum, feature) => sum + feature.sampleCount, 0);
   const rotationIndex = totalSamples % SCENARIOS.length;
 
@@ -303,12 +316,20 @@ function selectScenario(history: Map<string, HistoryFeature>): ScenarioTemplate 
       const vulnerabilityWeight = (1 - (feature?.defenseSuccessRate ?? 0.5)) * 3;
       const residualWeight = (feature?.averageResidualRisk ?? 0) / 10;
       const rotationWeight = index === rotationIndex ? 0.75 : 0;
-      return { scenario, priority: explorationWeight + vulnerabilityWeight + residualWeight + rotationWeight };
+      const markovWeight = scenario.family === markovRecommendation ? 1.2 : 0;
+      return {
+        scenario,
+        priority: explorationWeight + vulnerabilityWeight + residualWeight + rotationWeight + markovWeight,
+      };
     })
     .sort((left, right) => right.priority - left.priority)[0]!.scenario;
 }
 
-function predictScenario(scenario: ScenarioTemplate, feature: HistoryFeature | undefined) {
+function predictScenario(
+  scenario: ScenarioTemplate,
+  feature: HistoryFeature | undefined,
+  markovAnalysis: MarkovAnalysis | undefined,
+) {
   const sampleCount = feature?.sampleCount ?? 0;
   const historicalPressure = Math.round((feature?.averageResidualRisk ?? 0) * 0.25);
   const cpuUsage = clamp(scenario.baseCpu + (sampleCount % 9), 0, 95);
@@ -319,7 +340,11 @@ function predictScenario(scenario: ScenarioTemplate, feature: HistoryFeature | u
   const proposedDefense = autoFix(scenario.event);
   const historyConfidence = Math.log10(sampleCount + 1) * 0.16;
   const stability = feature ? 1 - Math.min(0.25, Math.abs(feature.averageConfidence - 0.7)) : 0.75;
-  const confidence = clamp(0.45 + historyConfidence + stability * 0.2, 0.45, 0.94);
+  const confidence = clamp(
+    0.45 + historyConfidence + stability * 0.2 + (markovAnalysis?.confidence ?? 0) * 0.05,
+    0.45,
+    0.94,
+  );
   const expectedCoverage = proposedDefense
     ? 0.58 + (feature?.defenseSuccessRate ?? 0.55) * 0.25 + (predictedAction === "ISOLATE" ? 0.12 : 0)
     : 0.18;
@@ -347,6 +372,8 @@ function predictScenario(scenario: ScenarioTemplate, feature: HistoryFeature | u
       averageConfidence: feature?.averageConfidence ?? 0,
       defenseSuccessRate: feature?.defenseSuccessRate ?? 0,
       averageResidualRisk: feature?.averageResidualRisk ?? 0,
+      markovTransitionProbability: markovAnalysis?.transitionProbability ?? 0,
+      markovConfidence: markovAnalysis?.confidence ?? 0,
     },
   };
 }
@@ -401,6 +428,31 @@ async function rollback(client: PoolClient): Promise<void> {
   await client.query("ROLLBACK").catch(() => undefined);
 }
 
+async function persistLayerObservation(
+  client: PoolClient,
+  predictionId: number,
+  layerName: "markov" | "quantum",
+  output: Record<string, unknown>,
+  confidence: number,
+  modelVersion: string,
+): Promise<boolean> {
+  await begin(client);
+  try {
+    await client.query(`
+      INSERT INTO dna_prediction_layer_observations (
+        prediction_id, layer_name, output, confidence, model_version
+      )
+      VALUES ($1, $2, $3::jsonb, $4, $5)
+      ON CONFLICT (prediction_id, layer_name) DO NOTHING
+    `, [predictionId, layerName, JSON.stringify(output), confidence, modelVersion]);
+    await commit(client);
+    return true;
+  } catch (error) {
+    await rollback(client);
+    throw error;
+  }
+}
+
 export async function runCpuSimulationCycle(options: { force?: boolean } = {}): Promise<CpuSimulationResult | null> {
   if (!options.force) {
     const queue = queueStats();
@@ -425,9 +477,33 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     }
 
     const history = await loadHistory(client);
-    const scenario = selectScenario(history);
+    const attackSequence = await loadAttackSequence(client);
+    let markovRecommendation: string | null = null;
+    try {
+      markovRecommendation = attackSequence.length === 0
+        ? null
+        : analyzeMarkovLayer(
+          attackSequence,
+          attackSequence.at(-1)!,
+          SCENARIOS.map((candidate) => candidate.family),
+        ).predictedNextFamily;
+    } catch (error) {
+      logger.warn({ error }, "Markov layer recommendation failed; using history selector");
+    }
+
+    const scenario = selectScenario(history, markovRecommendation);
     const feature = history.get(scenario.family);
-    const prediction = predictScenario(scenario, feature);
+    let markovAnalysis: MarkovAnalysis | undefined;
+    try {
+      markovAnalysis = analyzeMarkovLayer(
+        attackSequence,
+        scenario.family,
+        SCENARIOS.map((candidate) => candidate.family),
+      );
+    } catch (error) {
+      logger.warn({ error, attackFamily: scenario.family }, "Markov layer analysis failed");
+    }
+    const prediction = predictScenario(scenario, feature, markovAnalysis);
     const cycleId = crypto.randomUUID();
 
     await begin(client);
@@ -475,6 +551,46 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
 
     const predictionId = Number(insertedPrediction.rows[0]!.id);
     const outcome = simulateDefense(scenario, prediction);
+    let layerObservationCount = 0;
+
+    if (markovAnalysis) {
+      try {
+        if (await persistLayerObservation(
+          client,
+          predictionId,
+          "markov",
+          markovAnalysis as unknown as Record<string, unknown>,
+          markovAnalysis.confidence,
+          markovAnalysis.modelVersion,
+        )) {
+          layerObservationCount += 1;
+        }
+      } catch (error) {
+        logger.warn({ error, predictionId }, "Failed to persist Markov layer observation");
+      }
+    }
+
+    try {
+      const quantumAnalysis = analyzeQuantumLayer({
+        attackFamily: scenario.family,
+        riskScore: prediction.riskScore,
+        confidence: prediction.confidence,
+        defenseSucceeded: outcome.defenseSucceeded,
+        residualRisk: outcome.residualRisk,
+      });
+      if (await persistLayerObservation(
+        client,
+        predictionId,
+        "quantum",
+        quantumAnalysis as unknown as Record<string, unknown>,
+        quantumAnalysis.confidence,
+        quantumAnalysis.modelVersion,
+      )) {
+        layerObservationCount += 1;
+      }
+    } catch (error) {
+      logger.warn({ error, predictionId }, "Failed to persist quantum layer observation");
+    }
 
     await begin(client);
     transactionOpen = true;
@@ -522,6 +638,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       residualRisk: outcome.residualRisk,
       vulnerabilityPattern: outcome.vulnerabilityPattern,
       linkCount,
+      layerObservationCount,
     };
   } catch (error) {
     if (transactionOpen) await rollback(client);
@@ -567,6 +684,7 @@ export class CpuSimulatorScheduler {
             verificationStatus: result.verificationStatus,
             residualRisk: result.residualRisk,
             linkCount: result.linkCount,
+            layerObservationCount: result.layerObservationCount,
           }, "CPU red-team/blue-team simulation stored in DNA memory");
         }
       } catch (error) {
