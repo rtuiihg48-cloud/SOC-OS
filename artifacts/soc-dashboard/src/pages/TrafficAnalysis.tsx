@@ -9,17 +9,18 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
+import { TrafficFlowWidget } from "@/components/TrafficFlowWidget";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { Network, RefreshCw, Activity, ShieldCheck, AlertTriangle, Zap, Server, Filter, Database, ArrowRight } from "lucide-react";
+import { Network, RefreshCw, Activity, AlertTriangle, Zap, Server, Filter, Database, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-const formatBytes = (bytes: number) => {
-  if (bytes === 0) return '0 B';
+const formatBytes = (bytes?: number) => {
+  if (bytes === undefined || bytes === null || bytes === 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -37,11 +38,11 @@ export default function TrafficAnalysis() {
   if (severityFilter !== "ALL") queryParams.severity = severityFilter;
 
   const { data: summary, isError: isSummaryError } = useGetTrafficSummary({
-    query: { refetchInterval: 10000, queryKey: getGetTrafficSummaryQueryKey() }
+    query: { queryKey: getGetTrafficSummaryQueryKey() }
   });
 
   const { data: flows, isLoading, isError: isFlowsError } = useListTrafficFlows(queryParams, {
-    query: { queryKey: getListTrafficFlowsQueryKey(queryParams), refetchInterval: 10000 }
+    query: { queryKey: getListTrafficFlowsQueryKey(queryParams) }
   });
 
   const generateSynthetic = useGenerateSyntheticTraffic();
@@ -70,9 +71,9 @@ export default function TrafficAnalysis() {
     <div className="flex flex-col h-full w-full max-w-[1600px] mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold tracking-widest text-primary font-mono flex items-center gap-3">
+          <h1 className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-base font-bold tracking-widest text-primary sm:gap-3 sm:text-2xl">
             <Network className="w-6 h-6" />
-            TRAFFIC_ANALYSIS <span className="text-muted-foreground font-normal text-lg">/ NODE GATEWAYS</span>
+            TRAFFIC_ANALYSIS <span className="text-sm font-normal text-muted-foreground sm:text-lg">/ NODE GATEWAYS</span>
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Inspect normalized heartbeats and analyzed flow summaries</p>
         </div>
@@ -92,6 +93,8 @@ export default function TrafficAnalysis() {
           </Button>
         </div>
       </div>
+
+      <TrafficFlowWidget flows={flows} summary={summary} isLoading={isLoading} />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 shrink-0">
