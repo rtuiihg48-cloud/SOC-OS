@@ -15,5 +15,7 @@ fully client-controlled.
 **How to apply:** Keep the accepted container set explicit, validate structural
 lengths/end markers or frame boundaries before invoking ffmpeg, then retain
 strict decode, timeout, and temporary-file cleanup as a second validation
-layer. Test trailing truncation for every accepted format and test a decodable
-but unallowlisted container with an allowlisted MIME hint.
+layer. Container-family magic is insufficient: for EBML, require the WebM
+DocType so Matroska cannot cross the boundary. Test trailing truncation for
+every accepted format and test a decodable but unallowlisted container with an
+allowlisted MIME hint.

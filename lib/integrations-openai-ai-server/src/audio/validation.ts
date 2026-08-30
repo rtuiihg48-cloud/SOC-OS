@@ -314,6 +314,7 @@ const EBML_HEADER_ID = 0x1a45dfa3n;
 const EBML_SEGMENT_ID = 0x18538067n;
 const EBML_CLUSTER_ID = 0x1f43b675n;
 const EBML_TRACKS_ID = 0x1654ae6bn;
+const EBML_DOC_TYPE_ID = 0x4282n;
 const SEGMENT_LEVEL_IDS = new Set([
   0x114d9b74n,
   0x1549a966n,
@@ -338,7 +339,28 @@ function consumeUnknownCluster(buffer: Buffer, start: number, segmentEnd: number
   return cursor;
 }
 
+export function hasWebmDocType(buffer: Buffer): boolean {
+  try {
+    const header = readEbmlElement(buffer, 0, buffer.length);
+    if (header.id !== EBML_HEADER_ID || header.dataEnd === null) return false;
+    let cursor = header.dataStart;
+    let docType: string | null = null;
+    while (cursor < header.dataEnd) {
+      const child = readEbmlElement(buffer, cursor, header.dataEnd);
+      if (child.dataEnd === null) return false;
+      if (child.id === EBML_DOC_TYPE_ID) {
+        docType = buffer.subarray(child.dataStart, child.dataEnd).toString("ascii").toLowerCase();
+      }
+      cursor = child.dataEnd;
+    }
+    return cursor === header.dataEnd && docType === "webm";
+  } catch {
+    return false;
+  }
+}
+
 function validateWebm(buffer: Buffer): AudioContainerValidation {
+  if (!hasWebmDocType(buffer)) return invalidAudio();
   const header = readEbmlElement(buffer, 0, buffer.length);
   if (header.id !== EBML_HEADER_ID || header.dataEnd === null) return invalidAudio();
   const segment = readEbmlElement(buffer, header.dataEnd, buffer.length);

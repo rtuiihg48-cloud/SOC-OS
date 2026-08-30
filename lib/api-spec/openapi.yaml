@@ -607,6 +607,10 @@ paths:
             schema:
               type: string
               format: binary
+          application/mp4:
+            schema:
+              type: string
+              format: binary
           application/octet-stream:
             schema:
               type: string

@@ -60,6 +60,17 @@ describe("voice audio format handling", () => {
       unsupportedPath,
     ]);
     buffers.set("unsupported", await readFile(unsupportedPath));
+    const matroskaPath = join(fixtureDir, "unsupported.mkv");
+    await execFileAsync("ffmpeg", [
+      "-v", "error",
+      "-f", "lavfi",
+      "-i", "sine=frequency=440:duration=0.2",
+      "-c:a", "libopus",
+      "-f", "matroska",
+      "-y",
+      matroskaPath,
+    ]);
+    buffers.set("matroska", await readFile(matroskaPath));
   }, 30_000);
 
   afterAll(async () => {
@@ -112,6 +123,14 @@ describe("voice audio format handling", () => {
     expect(detectAudioFormat(unsupported)).toBe("unknown");
     expect(isSupportedAudioMimeType("application/octet-stream")).toBe(true);
     await expect(ensureCompatibleFormat(unsupported)).rejects.toBeInstanceOf(AudioFormatError);
+  });
+
+  it("rejects Matroska EBML even when the MIME hint advertises WebM", async () => {
+    const matroska = buffers.get("matroska")!;
+    expect(matroska.subarray(0, 4)).toEqual(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+    expect(isSupportedAudioMimeType("video/webm;codecs=opus")).toBe(true);
+    expect(detectAudioFormat(matroska)).toBe("unknown");
+    await expect(ensureCompatibleFormat(matroska)).rejects.toBeInstanceOf(AudioFormatError);
   });
 
   it.each(FIXTURES)("rejects a trailing-truncated $name recording", async (fixture) => {

@@ -8,6 +8,7 @@ import { join } from "path";
 import {
   assertCompleteAudioContainer,
   AudioFormatError,
+  hasWebmDocType,
   type ContainerAudioFormat,
   wavDurationSeconds,
 } from "./validation";
@@ -83,7 +84,11 @@ export function detectAudioFormat(buffer: Buffer): AudioFormat {
     return "wav";
   }
   // WebM: EBML header
-  if (buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) {
+  if (
+    buffer.length >= 4 &&
+    buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) &&
+    hasWebmDocType(buffer)
+  ) {
     return "webm";
   }
   // MP3: ID3 tag or frame sync
