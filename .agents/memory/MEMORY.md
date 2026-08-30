@@ -7,3 +7,4 @@
 - [Quarantine boundary](quarantine-boundary.md) — detected ISOLATE events enter an atomic logical envelope; payload execution stays disabled until an authorized container phase.
 - [Self-healing boundary](self-healing-boundary.md) — recovery restores verified managed:// snapshots to the same logical location; host-level rollback and payload execution stay forbidden.
 - [Virus intelligence boundary](virus-intelligence-boundary.md) — verified catalog metadata is separate from private sample bytes; matching never grants execution.
+- [Voice command safety](voice-command-safety.md) — spoken requests become typed, previewed, confirmed actions; transcripts never become executable input.

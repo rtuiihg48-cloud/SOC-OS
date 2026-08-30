@@ -124,6 +124,158 @@ export interface VoiceTranscription {
   audioStored: false;
 }
 
+export interface PreviewVoiceCommandBody {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  transcript: string;
+}
+
+export interface ExecuteVoiceCommandBody {
+  /**
+     * @minLength 1
+     * @maxLength 1000
+     */
+  transcript: string;
+  confirmed: true;
+}
+
+export type VoiceCommandCriterionType = typeof VoiceCommandCriterionType[keyof typeof VoiceCommandCriterionType];
+
+
+export const VoiceCommandCriterionType = {
+  SHA256: 'SHA256',
+  SAMPLE_ID: 'SAMPLE_ID',
+  FAMILY: 'FAMILY',
+  SEVERITY: 'SEVERITY',
+  INDICATOR_TYPE: 'INDICATOR_TYPE',
+} as const;
+
+export interface VoiceCommandCriterion {
+  type: VoiceCommandCriterionType;
+  /** @nullable */
+  value: string | null;
+}
+
+export type VoiceCommandPlanIntent = typeof VoiceCommandPlanIntent[keyof typeof VoiceCommandPlanIntent];
+
+
+export const VoiceCommandPlanIntent = {
+  TEST_VIRUS: 'TEST_VIRUS',
+  SIMULATE_DEFENSE: 'SIMULATE_DEFENSE',
+} as const;
+
+export type VoiceCommandPlanMode = typeof VoiceCommandPlanMode[keyof typeof VoiceCommandPlanMode];
+
+
+export const VoiceCommandPlanMode = {
+  TARGETED: 'TARGETED',
+  MATRIX: 'MATRIX',
+  SYNTHETIC: 'SYNTHETIC',
+} as const;
+
+export interface VoiceCommandPlan {
+  intent: VoiceCommandPlanIntent;
+  label: string;
+  mode: VoiceCommandPlanMode;
+  criteria: VoiceCommandCriterion[];
+  requiresConfirmation: true;
+  executionAllowed: false;
+  safetyNotes: string[];
+}
+
+export type VoiceCriterionResultType = typeof VoiceCriterionResultType[keyof typeof VoiceCriterionResultType];
+
+
+export const VoiceCriterionResultType = {
+  SHA256: 'SHA256',
+  SAMPLE_ID: 'SAMPLE_ID',
+  FAMILY: 'FAMILY',
+  SEVERITY: 'SEVERITY',
+  INDICATOR_TYPE: 'INDICATOR_TYPE',
+} as const;
+
+export type VoiceCriterionResultStatus = typeof VoiceCriterionResultStatus[keyof typeof VoiceCriterionResultStatus];
+
+
+export const VoiceCriterionResultStatus = {
+  MATCH: 'MATCH',
+  NO_MATCH: 'NO_MATCH',
+  AVAILABLE: 'AVAILABLE',
+} as const;
+
+export interface VoiceCriterionResult {
+  type: VoiceCriterionResultType;
+  /** @nullable */
+  value: string | null;
+  status: VoiceCriterionResultStatus;
+  count: number;
+  evidence: string;
+}
+
+export type SyntheticDefenseResultAction = typeof SyntheticDefenseResultAction[keyof typeof SyntheticDefenseResultAction];
+
+
+export const SyntheticDefenseResultAction = {
+  ALLOW: 'ALLOW',
+  WARN: 'WARN',
+  ISOLATE: 'ISOLATE',
+} as const;
+
+export type SyntheticDefenseResultStagesItem = typeof SyntheticDefenseResultStagesItem[keyof typeof SyntheticDefenseResultStagesItem];
+
+
+export const SyntheticDefenseResultStagesItem = {
+  GENERATED: 'GENERATED',
+  DETECTED: 'DETECTED',
+  QUARANTINED: 'QUARANTINED',
+  RESPONDED: 'RESPONDED',
+} as const;
+
+export interface SyntheticDefenseResult {
+  scenario: string;
+  riskScore: number;
+  action: SyntheticDefenseResultAction;
+  response: string;
+  stages: SyntheticDefenseResultStagesItem[];
+}
+
+export type VoiceCommandExecutionIntent = typeof VoiceCommandExecutionIntent[keyof typeof VoiceCommandExecutionIntent];
+
+
+export const VoiceCommandExecutionIntent = {
+  TEST_VIRUS: 'TEST_VIRUS',
+  SIMULATE_DEFENSE: 'SIMULATE_DEFENSE',
+} as const;
+
+export type VoiceCommandExecutionStatus = typeof VoiceCommandExecutionStatus[keyof typeof VoiceCommandExecutionStatus];
+
+
+export const VoiceCommandExecutionStatus = {
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export type VoiceCommandExecutionRecommendedAction = typeof VoiceCommandExecutionRecommendedAction[keyof typeof VoiceCommandExecutionRecommendedAction];
+
+
+export const VoiceCommandExecutionRecommendedAction = {
+  ALLOW: 'ALLOW',
+  WARN: 'WARN',
+  ISOLATE: 'ISOLATE',
+} as const;
+
+export interface VoiceCommandExecution {
+  intent: VoiceCommandExecutionIntent;
+  status: VoiceCommandExecutionStatus;
+  summary: string;
+  recommendedAction: VoiceCommandExecutionRecommendedAction;
+  criteriaResults: VoiceCriterionResult[];
+  syntheticDefense: SyntheticDefenseResult[];
+  executionAllowed: false;
+  auditRecorded: true;
+}
+
 export type SecurityEventAction = typeof SecurityEventAction[keyof typeof SecurityEventAction];
 
 

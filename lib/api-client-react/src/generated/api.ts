@@ -26,6 +26,7 @@ import type {
   CreateTenantBody,
   DashboardSummary,
   EventInput,
+  ExecuteVoiceCommandBody,
   HckBiosStatus,
   HealthStatus,
   ListCorrelationsParams,
@@ -52,6 +53,7 @@ import type {
   ObserverAgentRun,
   Patch,
   PipelineResult,
+  PreviewVoiceCommandBody,
   QueueStats,
   RegisterManagedResourceInput,
   RegisterManagedResourceResult,
@@ -85,6 +87,8 @@ import type {
   VirusSample,
   VirusSampleAccessInput,
   VirusSampleInput,
+  VoiceCommandExecution,
+  VoiceCommandPlan,
   VoiceTranscription
 } from './api.schemas';
 
@@ -170,13 +174,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
-
-
-
-
-
-
 export const getRunObserverAgentUrl = () => {
 
 
@@ -1464,6 +1461,148 @@ export const useTranscribeVoice = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getTranscribeVoiceMutationOptions(options));
+    }
+
+export const getPreviewVoiceCommandUrl = () => {
+
+
+
+
+  return `/api/voice/commands/preview`
+}
+
+/**
+ * @summary Parse an allowlisted SOC voice command and return its safe execution plan
+ */
+export const previewVoiceCommand = async (previewVoiceCommandBody: PreviewVoiceCommandBody, options?: RequestInit): Promise<VoiceCommandPlan> => {
+
+  return customFetch<VoiceCommandPlan>(getPreviewVoiceCommandUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      previewVoiceCommandBody,)
+  }
+);}
+
+
+
+
+export const getPreviewVoiceCommandMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewVoiceCommand>>, TError,{data: BodyType<PreviewVoiceCommandBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewVoiceCommand>>, TError,{data: BodyType<PreviewVoiceCommandBody>}, TContext> => {
+
+const mutationKey = ['previewVoiceCommand'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewVoiceCommand>>, {data: BodyType<PreviewVoiceCommandBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewVoiceCommand(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewVoiceCommandMutationResult = NonNullable<Awaited<ReturnType<typeof previewVoiceCommand>>>
+    export type PreviewVoiceCommandMutationBody = BodyType<PreviewVoiceCommandBody>
+    export type PreviewVoiceCommandMutationError = ErrorType<void>
+
+    /**
+ * @summary Parse an allowlisted SOC voice command and return its safe execution plan
+ */
+export const usePreviewVoiceCommand = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewVoiceCommand>>, TError,{data: BodyType<PreviewVoiceCommandBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewVoiceCommand>>,
+        TError,
+        {data: BodyType<PreviewVoiceCommandBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewVoiceCommandMutationOptions(options));
+    }
+
+export const getExecuteVoiceCommandUrl = () => {
+
+
+
+
+  return `/api/voice/commands/execute`
+}
+
+/**
+ * @summary Execute a confirmed allowlisted SOC voice command
+ */
+export const executeVoiceCommand = async (executeVoiceCommandBody: ExecuteVoiceCommandBody, options?: RequestInit): Promise<VoiceCommandExecution> => {
+
+  return customFetch<VoiceCommandExecution>(getExecuteVoiceCommandUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      executeVoiceCommandBody,)
+  }
+);}
+
+
+
+
+export const getExecuteVoiceCommandMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeVoiceCommand>>, TError,{data: BodyType<ExecuteVoiceCommandBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof executeVoiceCommand>>, TError,{data: BodyType<ExecuteVoiceCommandBody>}, TContext> => {
+
+const mutationKey = ['executeVoiceCommand'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof executeVoiceCommand>>, {data: BodyType<ExecuteVoiceCommandBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  executeVoiceCommand(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExecuteVoiceCommandMutationResult = NonNullable<Awaited<ReturnType<typeof executeVoiceCommand>>>
+    export type ExecuteVoiceCommandMutationBody = BodyType<ExecuteVoiceCommandBody>
+    export type ExecuteVoiceCommandMutationError = ErrorType<void>
+
+    /**
+ * @summary Execute a confirmed allowlisted SOC voice command
+ */
+export const useExecuteVoiceCommand = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof executeVoiceCommand>>, TError,{data: BodyType<ExecuteVoiceCommandBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof executeVoiceCommand>>,
+        TError,
+        {data: BodyType<ExecuteVoiceCommandBody>},
+        TContext
+      > => {
+      return useMutation(getExecuteVoiceCommandMutationOptions(options));
     }
 
 export const getListPatchesUrl = () => {

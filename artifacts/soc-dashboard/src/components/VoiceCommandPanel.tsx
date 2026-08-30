@@ -1,7 +1,13 @@
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { FileAudio, Loader2, Mic, MicOff, Radio, Send, ShieldCheck, Upload, X } from "lucide-react";
+import { FileAudio, FlaskConical, Loader2, Mic, MicOff, Radio, Send, ShieldCheck, Upload, X } from "lucide-react";
 import { useVoiceRecorder } from "@workspace/integrations-openai-ai-react";
+import {
+  useExecuteVoiceCommand,
+  usePreviewVoiceCommand,
+  type VoiceCommandExecution,
+  type VoiceCommandPlan,
+} from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,9 +51,14 @@ export function VoiceCommandPanel() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { state: recordingState, startRecording, stopRecording } = useVoiceRecorder();
+  const previewVoiceCommand = usePreviewVoiceCommand();
+  const executeVoiceCommand = useExecuteVoiceCommand();
   const [open, setOpen] = useState(false);
   const [transcript, setTranscript] = useState("");
+  const [typedCommand, setTypedCommand] = useState("");
   const [command, setCommand] = useState<VoiceCommand | null>(null);
+  const [plan, setPlan] = useState<VoiceCommandPlan | null>(null);
+  const [result, setResult] = useState<VoiceCommandExecution | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [message, setMessage] = useState("");
@@ -55,9 +66,39 @@ export function VoiceCommandPanel() {
 
   const resetResult = () => {
     setTranscript("");
+    setTypedCommand("");
     setCommand(null);
+    setPlan(null);
+    setResult(null);
     setMessage("");
     setError("");
+  };
+
+  const interpretTranscript = async (text: string) => {
+    const normalized = text.trim();
+    setTranscript(normalized);
+    setCommand(null);
+    setPlan(null);
+    setResult(null);
+    if (!normalized) {
+      setMessage("No speech was detected.");
+      return;
+    }
+
+    if (/(?:вірус|malware)/iu.test(normalized)) {
+      try {
+        const nextPlan = await previewVoiceCommand.mutateAsync({ data: { transcript: normalized } });
+        setPlan(nextPlan);
+        return;
+      } catch {
+        setError("Virus command was not recognized. Try: «протестуй вірус» or «зімітуй власні віруси і відбивай їх».");
+        return;
+      }
+    }
+
+    const localCommand = resolveCommand(normalized);
+    setCommand(localCommand);
+    if (!localCommand) setError("Command was not recognized.");
   };
 
   const processAudio = async (audio: Blob) => {
@@ -71,9 +112,7 @@ export function VoiceCommandPanel() {
     setMessage("");
     try {
       const text = await transcribeAudio(audio);
-      setTranscript(text);
-      setCommand(resolveCommand(text));
-      if (!text) setMessage("No speech was detected.");
+      await interpretTranscript(text);
     } catch (transcriptionError) {
       setError(transcriptionError instanceof Error ? transcriptionError.message : "Voice transcription failed");
     } finally {
@@ -105,10 +144,20 @@ export function VoiceCommandPanel() {
   };
 
   const executeCommand = async () => {
-    if (!command) return;
+    if (!command && !plan) return;
     setIsExecuting(true);
     setError("");
     try {
+      if (plan) {
+        const execution = await executeVoiceCommand.mutateAsync({
+          data: { transcript, confirmed: true },
+        });
+        setResult(execution);
+        setMessage(execution.summary);
+        return;
+      }
+
+      if (!command) return;
       if (command.kind === "navigate") {
         setLocation(command.path);
         setOpen(false);
@@ -144,7 +193,7 @@ export function VoiceCommandPanel() {
       </Button>
 
       {open && (
-        <Card id="voice-command-panel" className="absolute right-0 top-11 z-50 w-[min(90vw,380px)] border-primary/30 shadow-xl">
+        <Card id="voice-command-panel" className="absolute right-0 top-11 z-50 max-h-[calc(100vh-5rem)] w-[min(94vw,480px)] overflow-y-auto border-primary/30 shadow-[0_0_36px_hsl(var(--primary)/0.12)]">
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -179,6 +228,28 @@ export function VoiceCommandPanel() {
               />
             </div>
 
+            <div className="flex gap-2">
+              <input
+                value={typedCommand}
+                onChange={(event) => setTypedCommand(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && typedCommand.trim()) void interpretTranscript(typedCommand);
+                }}
+                placeholder="Або введіть команду…"
+                className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
+                disabled={isRecording || isTranscribing || isExecuting}
+                aria-label="Type voice command"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void interpretTranscript(typedCommand)}
+                disabled={!typedCommand.trim() || isRecording || isTranscribing || isExecuting}
+              >
+                Analyze
+              </Button>
+            </div>
+
             <div className="rounded-md border border-border bg-secondary/40 p-3">
               <div className="mb-2 flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
                 <FileAudio className="h-3.5 w-3.5" /> Transcript
@@ -198,6 +269,75 @@ export function VoiceCommandPanel() {
               </div>
             )}
 
+            {plan && (
+              <div className="space-y-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">Safe execution plan</div>
+                    <div className="mt-1 text-sm font-semibold">{plan.label}</div>
+                  </div>
+                  <Badge variant="outline" className="border-warn/40 text-warn">{plan.mode}</Badge>
+                </div>
+                {plan.criteria.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {plan.criteria.map((criterion) => (
+                      <Badge key={`${criterion.type}-${criterion.value ?? "all"}`} variant="secondary" className="font-mono text-[10px]">
+                        {criterion.type}{criterion.value ? `: ${criterion.value}` : ": ALL"}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-1 border-t border-primary/15 pt-2">
+                  {plan.safetyNotes.map((note) => (
+                    <p key={note} className="text-[11px] leading-4 text-muted-foreground">• {note}</p>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-safe">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Payload execution blocked
+                </div>
+              </div>
+            )}
+
+            {result && (
+              <div className="space-y-3 rounded-md border border-safe/30 bg-safe/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-mono font-bold text-safe">
+                    <FlaskConical className="h-4 w-4" /> TEST COMPLETED
+                  </div>
+                  <Badge variant="outline" className={result.recommendedAction === "ISOLATE" ? "border-critical/40 text-critical" : result.recommendedAction === "WARN" ? "border-warn/40 text-warn" : "border-safe/40 text-safe"}>
+                    {result.recommendedAction}
+                  </Badge>
+                </div>
+                {result.criteriaResults.map((criterion) => (
+                  <div key={`${criterion.type}-${criterion.value ?? "all"}`} className="grid grid-cols-[1fr_auto] gap-3 border-t border-border/70 pt-2 text-xs">
+                    <div>
+                      <div className="font-mono text-foreground">{criterion.type}{criterion.value ? ` · ${criterion.value}` : ""}</div>
+                      <div className="mt-1 text-muted-foreground">{criterion.evidence}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className={criterion.status === "NO_MATCH" ? "text-muted-foreground" : "text-safe"}>{criterion.status}</div>
+                      <div className="font-mono text-muted-foreground">{criterion.count}</div>
+                    </div>
+                  </div>
+                ))}
+                {result.syntheticDefense.map((scenario) => (
+                  <div key={scenario.scenario} className="space-y-1 border-t border-border/70 pt-2 text-xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="font-medium">{scenario.scenario}</span>
+                      <Badge variant="outline" className="shrink-0 text-[9px]">{scenario.action}</Badge>
+                    </div>
+                    <div className="font-mono text-[10px] text-muted-foreground">
+                      {scenario.stages.join(" → ")} · SCORE {scenario.riskScore}
+                    </div>
+                    <div className="text-safe">{scenario.response}</div>
+                  </div>
+                ))}
+                <div className="border-t border-safe/20 pt-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Audit recorded · execution allowed: no
+                </div>
+              </div>
+            )}
+
             {(isTranscribing || isExecuting) && (
               <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -208,8 +348,8 @@ export function VoiceCommandPanel() {
             {error && <p className="text-xs text-critical" role="alert">{error}</p>}
             {message && <p className="text-xs text-safe" role="status">{message}</p>}
 
-            <Button onClick={() => void executeCommand()} disabled={!command || isTranscribing || isExecuting} className="w-full font-mono">
-              <Send className="h-4 w-4" /> Confirm command
+            <Button onClick={() => void executeCommand()} disabled={(!command && !plan) || isTranscribing || isExecuting} className="w-full font-mono">
+              <Send className="h-4 w-4" /> {plan ? "Confirm safe test" : "Confirm command"}
             </Button>
           </CardContent>
         </Card>

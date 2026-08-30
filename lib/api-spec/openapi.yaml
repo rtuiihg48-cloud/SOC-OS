@@ -466,6 +466,48 @@ paths:
         "502":
           description: Transcription provider unavailable
 
+  /voice/commands/preview:
+    post:
+      operationId: previewVoiceCommand
+      tags: [voice]
+      summary: Parse an allowlisted SOC voice command and return its safe execution plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewVoiceCommandBody"
+      responses:
+        "200":
+          description: Safe command preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCommandPlan"
+        "400":
+          description: Unsupported or invalid command
+
+  /voice/commands/execute:
+    post:
+      operationId: executeVoiceCommand
+      tags: [voice]
+      summary: Execute a confirmed allowlisted SOC voice command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteVoiceCommandBody"
+      responses:
+        "200":
+          description: Safe command result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceCommandExecution"
+        "400":
+          description: Unsupported, invalid, or unconfirmed command
+
   /patches:
     get:
       operationId: listPatches
@@ -1374,6 +1416,130 @@ components:
           type: boolean
           enum: [false]
       required: [transcript, format, audioStored]
+
+    PreviewVoiceCommandBody:
+      type: object
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+          maxLength: 1000
+      required: [transcript]
+
+    ExecuteVoiceCommandBody:
+      type: object
+      properties:
+        transcript:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        confirmed:
+          type: boolean
+          enum: [true]
+      required: [transcript, confirmed]
+
+    VoiceCommandCriterion:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [SHA256, SAMPLE_ID, FAMILY, SEVERITY, INDICATOR_TYPE]
+        value:
+          type: ["string", "null"]
+      required: [type, value]
+
+    VoiceCommandPlan:
+      type: object
+      properties:
+        intent:
+          type: string
+          enum: [TEST_VIRUS, SIMULATE_DEFENSE]
+        label:
+          type: string
+        mode:
+          type: string
+          enum: [TARGETED, MATRIX, SYNTHETIC]
+        criteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceCommandCriterion"
+        requiresConfirmation:
+          type: boolean
+          enum: [true]
+        executionAllowed:
+          type: boolean
+          enum: [false]
+        safetyNotes:
+          type: array
+          items:
+            type: string
+      required: [intent, label, mode, criteria, requiresConfirmation, executionAllowed, safetyNotes]
+
+    VoiceCriterionResult:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [SHA256, SAMPLE_ID, FAMILY, SEVERITY, INDICATOR_TYPE]
+        value:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [MATCH, NO_MATCH, AVAILABLE]
+        count:
+          type: integer
+        evidence:
+          type: string
+      required: [type, value, status, count, evidence]
+
+    SyntheticDefenseResult:
+      type: object
+      properties:
+        scenario:
+          type: string
+        riskScore:
+          type: integer
+        action:
+          type: string
+          enum: [ALLOW, WARN, ISOLATE]
+        response:
+          type: string
+        stages:
+          type: array
+          items:
+            type: string
+            enum: [GENERATED, DETECTED, QUARANTINED, RESPONDED]
+      required: [scenario, riskScore, action, response, stages]
+
+    VoiceCommandExecution:
+      type: object
+      properties:
+        intent:
+          type: string
+          enum: [TEST_VIRUS, SIMULATE_DEFENSE]
+        status:
+          type: string
+          enum: [COMPLETED]
+        summary:
+          type: string
+        recommendedAction:
+          type: string
+          enum: [ALLOW, WARN, ISOLATE]
+        criteriaResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceCriterionResult"
+        syntheticDefense:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyntheticDefenseResult"
+        executionAllowed:
+          type: boolean
+          enum: [false]
+        auditRecorded:
+          type: boolean
+          enum: [true]
+      required: [intent, status, summary, recommendedAction, criteriaResults, syntheticDefense, executionAllowed, auditRecorded]
 
     SecurityEvent:
       type: object

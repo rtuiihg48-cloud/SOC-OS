@@ -512,6 +512,67 @@ export const TranscribeVoiceResponse = zod.object({
 
 
 /**
+ * @summary Parse an allowlisted SOC voice command and return its safe execution plan
+ */
+export const previewVoiceCommandBodyTranscriptMax = 1000;
+
+
+
+export const PreviewVoiceCommandBody = zod.object({
+  "transcript": zod.string().min(1).max(previewVoiceCommandBodyTranscriptMax)
+})
+
+export const PreviewVoiceCommandResponse = zod.object({
+  "intent": zod.enum(['TEST_VIRUS', 'SIMULATE_DEFENSE']),
+  "label": zod.string(),
+  "mode": zod.enum(['TARGETED', 'MATRIX', 'SYNTHETIC']),
+  "criteria": zod.array(zod.object({
+  "type": zod.enum(['SHA256', 'SAMPLE_ID', 'FAMILY', 'SEVERITY', 'INDICATOR_TYPE']),
+  "value": zod.string().nullable()
+})),
+  "requiresConfirmation": zod.literal(true),
+  "executionAllowed": zod.literal(false),
+  "safetyNotes": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Execute a confirmed allowlisted SOC voice command
+ */
+export const executeVoiceCommandBodyTranscriptMax = 1000;
+
+
+
+export const ExecuteVoiceCommandBody = zod.object({
+  "transcript": zod.string().min(1).max(executeVoiceCommandBodyTranscriptMax),
+  "confirmed": zod.literal(true)
+})
+
+export const ExecuteVoiceCommandResponse = zod.object({
+  "intent": zod.enum(['TEST_VIRUS', 'SIMULATE_DEFENSE']),
+  "status": zod.enum(['COMPLETED']),
+  "summary": zod.string(),
+  "recommendedAction": zod.enum(['ALLOW', 'WARN', 'ISOLATE']),
+  "criteriaResults": zod.array(zod.object({
+  "type": zod.enum(['SHA256', 'SAMPLE_ID', 'FAMILY', 'SEVERITY', 'INDICATOR_TYPE']),
+  "value": zod.string().nullable(),
+  "status": zod.enum(['MATCH', 'NO_MATCH', 'AVAILABLE']),
+  "count": zod.number(),
+  "evidence": zod.string()
+})),
+  "syntheticDefense": zod.array(zod.object({
+  "scenario": zod.string(),
+  "riskScore": zod.number(),
+  "action": zod.enum(['ALLOW', 'WARN', 'ISOLATE']),
+  "response": zod.string(),
+  "stages": zod.array(zod.enum(['GENERATED', 'DETECTED', 'QUARANTINED', 'RESPONDED']))
+})),
+  "executionAllowed": zod.literal(false),
+  "auditRecorded": zod.literal(true)
+})
+
+
+/**
  * @summary List all auto-applied patches
  */
 export const ListPatchesResponseItem = zod.object({
