@@ -3,6 +3,7 @@ import { pool, type PoolClient } from "@workspace/db";
 import { analyzeEvent, autoFix, decideAction, severityFromScore } from "./soc-engine";
 import { queueStats } from "./queue";
 import { logger } from "./logger";
+import { buildAttackLinkCandidates, type PriorAttackPrediction } from "./attack-memory-graph";
 
 const MODEL_VERSION = "cpu-history-v1";
 const LOCK_NAME = "soc-os:cpu-simulator";
@@ -23,14 +24,6 @@ interface HistoryFeature {
   averageConfidence: number;
   defenseSuccessRate: number;
   averageResidualRisk: number;
-}
-
-interface LinkCandidate {
-  fromPredictionId: number;
-  linkType: "sequence" | "same_pattern" | "same_technique" | "shared_vulnerability";
-  confidence: number;
-  evidence: Record<string, number | string | boolean | null>;
-  explanation: string;
 }
 
 export interface CpuSimulationResult {
@@ -96,17 +89,6 @@ const SCENARIOS: ScenarioTemplate[] = [
     baseMemory: 44,
   },
 ];
-
-const ATTACK_CHAIN_ORDER: Record<string, number> = {
-  discovery: 1,
-  initial_access: 2,
-  credential_access: 3,
-  privilege_escalation: 4,
-  lateral_movement: 5,
-  command_and_control: 6,
-  exfiltration: 7,
-  impact: 8,
-};
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -267,85 +249,25 @@ async function linkPrediction(
     LIMIT 50
   `, [predictionId]);
 
-  const candidates: LinkCandidate[] = [];
-  const currentOrder = ATTACK_CHAIN_ORDER[scenario.family] ?? 0;
-
-  for (const prior of previous.rows) {
-    const hoursApart = Math.max(
-      0,
-      (Date.now() - new Date(prior.created_at).getTime()) / (60 * 60 * 1000),
-    );
-    const evidence = {
-      previousFamily: prior.attack_family,
-      currentFamily: scenario.family,
-      previousTactic: prior.tactic,
-      currentTactic: prediction.analysis.mitre?.tactic ?? null,
-      previousTechniqueId: prior.technique_id,
-      currentTechniqueId: prediction.analysis.mitre?.techniqueId ?? null,
-      hoursApart: Number(hoursApart.toFixed(3)),
-    };
-
-    if (
-      prior.technique_id &&
-      prediction.analysis.mitre?.techniqueId &&
-      prior.technique_id === prediction.analysis.mitre.techniqueId
-    ) {
-      candidates.push({
-        fromPredictionId: prior.id,
-        linkType: "same_technique",
-        confidence: 0.9,
-        evidence: { ...evidence, sameTechnique: true },
-        explanation: `Both predictions map to MITRE technique ${prior.technique_id}.`,
-      });
-    }
-
-    if (prior.attack_family === scenario.family) {
-      candidates.push({
-        fromPredictionId: prior.id,
-        linkType: "same_pattern",
-        confidence: 0.72,
-        evidence: { ...evidence, sameAttackFamily: true },
-        explanation: `Both predictions belong to the ${scenario.family} attack family.`,
-      });
-    }
-
-    if (
-      prior.predicted_vulnerability &&
-      prediction.predictedVulnerability &&
-      prior.predicted_vulnerability.split(":")[0] === prediction.predictedVulnerability.split(":")[0]
-    ) {
-      candidates.push({
-        fromPredictionId: prior.id,
-        linkType: "shared_vulnerability",
-        confidence: 0.84,
-        evidence: { ...evidence, sharedVulnerabilityFamily: true },
-        explanation: `Both predictions identify a residual ${scenario.family} exposure pattern.`,
-      });
-    }
-
-    const priorOrder = ATTACK_CHAIN_ORDER[prior.attack_family] ?? 0;
-    if (priorOrder > 0 && currentOrder > priorOrder && hoursApart <= 24) {
-      const chainConfidence = clamp(0.68 + Math.min(0.18, (24 - hoursApart) / 24 * 0.18), 0, 0.95);
-      candidates.push({
-        fromPredictionId: prior.id,
-        linkType: "sequence",
-        confidence: chainConfidence,
-        evidence: { ...evidence, priorChainPosition: priorOrder, currentChainPosition: currentOrder },
-        explanation: `${prior.attack_family} precedes ${scenario.family} in the simulated attack-chain model.`,
-      });
-    }
-  }
-
-  const uniqueCandidates = new Map<string, LinkCandidate>();
-  for (const candidate of candidates) {
-    const key = `${candidate.fromPredictionId}:${candidate.linkType}`;
-    const existing = uniqueCandidates.get(key);
-    if (!existing || existing.confidence < candidate.confidence) uniqueCandidates.set(key, candidate);
-  }
-
-  const selected = [...uniqueCandidates.values()]
-    .sort((left, right) => right.confidence - left.confidence)
-    .slice(0, 8);
+  const priorPredictions: PriorAttackPrediction[] = previous.rows.map((row) => ({
+    id: row.id,
+    family: row.attack_family,
+    tactic: row.tactic,
+    techniqueId: row.technique_id,
+    predictedVulnerability: row.predicted_vulnerability,
+    createdAtMs: new Date(row.created_at).getTime(),
+  }));
+  const selected = buildAttackLinkCandidates(
+    predictionId,
+    {
+      family: scenario.family,
+      tactic: prediction.analysis.mitre?.tactic ?? null,
+      techniqueId: prediction.analysis.mitre?.techniqueId ?? null,
+      predictedVulnerability: prediction.predictedVulnerability,
+    },
+    priorPredictions,
+    Date.now(),
+  );
 
   for (const candidate of selected) {
     await client.query(`
