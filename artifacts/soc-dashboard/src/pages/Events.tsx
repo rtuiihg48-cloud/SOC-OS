@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { ShieldAlert, Crosshair, ArrowRight, Zap, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -162,10 +162,9 @@ export default function Events() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence initial={false}>
-                  {events.map((ev, i) => (
+                {events.map((ev) => (
                     <motion.tr 
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       key={ev.id}
                       className="border-b border-border hover:bg-secondary/20 font-mono text-xs transition-colors group"
                     >
@@ -240,8 +239,7 @@ export default function Events() {
                         </div>
                       </TableCell>
                     </motion.tr>
-                  ))}
-                </AnimatePresence>
+                ))}
               </TableBody>
             </Table>
           )}

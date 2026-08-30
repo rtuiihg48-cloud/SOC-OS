@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Network, RefreshCw, Activity, ShieldCheck, AlertTriangle, Zap, Server, Filter, Database, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -249,10 +249,9 @@ export default function TrafficAnalysis() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <AnimatePresence initial={false}>
-                  {flows.map((obs: TrafficObservation) => (
+                {flows.map((obs: TrafficObservation) => (
                     <motion.tr 
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       key={obs.id}
                       className={`border-b border-border hover:bg-secondary/30 font-mono text-xs transition-colors group ${
                         obs.isSynthetic ? 'bg-primary/5' : ''
@@ -370,8 +369,7 @@ export default function TrafficAnalysis() {
                         </span>
                       </TableCell>
                     </motion.tr>
-                  ))}
-                </AnimatePresence>
+                ))}
               </TableBody>
             </Table>
           )}

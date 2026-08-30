@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Play, Shield, Terminal, Zap, CheckCircle2, AlertTriangle, Bug, Wrench, ShieldAlert } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
@@ -190,8 +190,7 @@ export default function Simulation() {
       )}
 
       <div className="space-y-4">
-        <AnimatePresence>
-          {steps.map((step) => (
+        {steps.map((step) => (
             <motion.div key={step.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden">
               <div className={`p-4 rounded-lg border flex flex-col sm:flex-row sm:items-center gap-4 ${
                 step.type === 'attack' ? 'bg-critical/10 border-critical/30' :
@@ -216,8 +215,7 @@ export default function Simulation() {
                 )}
               </div>
             </motion.div>
-          ))}
-        </AnimatePresence>
+        ))}
       </div>
     </div>
   );

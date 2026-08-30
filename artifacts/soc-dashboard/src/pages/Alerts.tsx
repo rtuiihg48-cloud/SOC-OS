@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, Clock, ArrowRight, ShieldCheck, Search } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Alerts() {
@@ -93,14 +93,11 @@ export default function Alerts() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          <AnimatePresence>
-            {allAlerts.map((alert) => (
+          {allAlerts.map((alert) => (
               <motion.div
                 key={alert.id}
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                layout
               >
                 <Card className={`border ${alert.action === 'ISOLATE' ? 'bg-critical/5 border-critical/30' : 'bg-warn/5 border-warn/30'} overflow-hidden relative group`}>
                   <div className={`absolute top-0 left-0 w-1 h-full ${alert.action === 'ISOLATE' ? 'bg-critical' : 'bg-warn'}`}></div>
@@ -165,8 +162,7 @@ export default function Alerts() {
                   </CardFooter>
                 </Card>
               </motion.div>
-            ))}
-          </AnimatePresence>
+          ))}
         </div>
       )}
     </div>

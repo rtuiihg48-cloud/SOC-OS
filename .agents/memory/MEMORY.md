@@ -9,3 +9,4 @@
 - [Virus intelligence boundary](virus-intelligence-boundary.md) — verified catalog metadata is separate from private sample bytes; matching never grants execution.
 - [Voice command safety](voice-command-safety.md) — spoken requests become typed, previewed, confirmed actions; transcripts never become executable input.
 - [Traffic analysis boundary](traffic-analysis-boundary.md) — gateway metadata only; signals stay advisory until authenticated tenant scope and temporal baselines exist.
+- [React live-list ownership](react-live-list-ownership.md) — keep list removal under React ownership; avoid deferred exit orchestration for live tables and HMR-sensitive feeds.

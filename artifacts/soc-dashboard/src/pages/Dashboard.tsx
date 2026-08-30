@@ -10,7 +10,7 @@ import {
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Shield, AlertTriangle, Activity, Cpu, Database, Server, Crosshair, TrendingUp, BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -231,8 +231,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-              <AnimatePresence initial={false}>
-                {liveEvents.map((ev, i) => (
+              {liveEvents.map((ev) => (
                   <motion.div 
                     initial={{ opacity: 0, x: -20, backgroundColor: 'hsl(var(--primary)/0.2)' }}
                     animate={{ opacity: 1, x: 0, backgroundColor: 'transparent' }}
@@ -255,8 +254,7 @@ export default function Dashboard() {
                       <span className={ev.score > 75 ? 'text-critical' : ev.score > 50 ? 'text-warn' : 'text-safe'}>{ev.score}</span>
                     </div>
                   </motion.div>
-                ))}
-              </AnimatePresence>
+              ))}
               {liveEvents.length === 0 && (
                 <div className="text-center p-8 text-muted-foreground font-mono text-sm border border-dashed border-border rounded">AWAITING EVENTS...</div>
               )}
