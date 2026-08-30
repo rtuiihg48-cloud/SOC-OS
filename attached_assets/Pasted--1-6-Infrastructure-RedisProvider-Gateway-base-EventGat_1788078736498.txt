@@ -1,0 +1,1560 @@
+Починаю Частина 1/6 — реалізую Infrastructure (RedisProvider) та Gateway base + EventGateway. Це дасть єдиний connection pool і базову абстракцію для всіх подальших шлюзів. Далі підготую CheckpointGateway, Recovery Engine і SessionGateway (частина 2/6).
+
+Що зроблено в цій частині
+- app/infrastructure/redis_provider.py — централізований RedisProvider з lifecycle (init/close) і доступом до клієнта.
+- app/gateways/base.py — базовий клас для шлюзів, що отримує RedisProvider і надає client.
+- app/gateways/event_gateway.py — асинхронний EventGateway: emit, read_range, create_group, read_group, xack, xautoclaim, xpending, scan_streams, close.
+- app/gateways/__init__.py — експорт для зручності імпорту.
+
+Інструкція: збережи файли за вказаними шляхами (meta-cube/app/...). Після цього можна імпортувати EventGateway через from app.gateways import EventGateway або отримати клієнт через RedisProvider.get().
+
+Код — Частина 1/6
+
+```python name=app/infrastructure/__init__.py
+# Infrastructure package
+from .redis_provider import RedisProvider
+
+__all__ = ["RedisProvider"]
+```
+
+```python name=app/infrastructure/redis_provider.py
+import os
+import logging
+from typing import Optional
+
+import redis.asyncio as redis
+
+log = logging.getLogger("meta-cube.redis_provider")
+log.setLevel(logging.INFO)
+
+
+class RedisProvider:
+    """
+    Singleton-ish provider for redis.asyncio.Redis client.
+    Usage:
+        provider = RedisProvider()
+        await provider.init()
+        client = provider.client
+        ...
+        await provider.close()
+    """
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        # simple singleton to ensure one pool per process
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(
+        self,
+        host: str = None,
+        port: int = None,
+        db: int = 0,
+        decode_responses: bool = True,
+    ):
+        # allow environment override
+        host = host or os.getenv("REDIS_HOST", "redis")
+        port = port or int(os.getenv("REDIS_PORT", 6379))
+        self._config = {"host": host, "port": port, "db": db, "decode_responses": decode_responses}
+        self._client: Optional[redis.Redis] = None
+        self._inited = False
+
+    async def init(self, ping: bool = True):
+        if self._inited and self._client:
+            return
+        self._client = redis.Redis(**self._config)
+        # Optionally verify connectivity
+        if ping:
+            try:
+                await self._client.ping()
+                log.info("Connected to Redis at %s:%s", self._config["host"], self._config["port"])
+            except Exception as e:
+                log.exception("Redis ping failed: %s", e)
+                raise
+        self._inited = True
+
+    @property
+    def client(self) -> redis.Redis:
+        if not self._client:
+            raise RuntimeError("RedisProvider not initialised. Call await provider.init() first.")
+        return self._client
+
+    async def close(self):
+        if self._client:
+            try:
+                await self._client.close()
+            except Exception:
+                log.exception("Error closing Redis client")
+            finally:
+                self._client = None
+                self._inited = False
+                log.info("RedisProvider closed")
+
+    # convenience accessor
+    @classmethod
+    async def get_client(cls) -> redis.Redis:
+        inst = cls._instance or cls()
+        if not inst._inited:
+            await inst.init()
+        return inst.client
+```
+
+```python name=app/gateways/__init__.py
+from .base import BaseGateway
+from .event_gateway import EventGateway
+
+__all__ = ["BaseGateway", "EventGateway"]
+```
+
+```python name=app/gateways/base.py
+from typing import Optional
+from app.infrastructure.redis_provider import RedisProvider
+
+
+class BaseGateway:
+    """
+    Base class for all gateways. Provides access to a Redis client via RedisProvider.
+    Gateways should avoid creating their own redis clients; use this provider for shared pool.
+    """
+
+    def __init__(self, provider: Optional[RedisProvider] = None):
+        # allow injecting custom provider for tests (FakeProvider)
+        self.provider = provider or RedisProvider()
+        # ensure provider initialized externally (caller should call provider.init())
+        # but allow property access
+        self._client = None
+
+    @property
+    def client(self):
+        # lazily fetch
+        if self._client is None:
+            self._client = self.provider.client
+        return self._client
+```
+
+```python name=app/gateways/event_gateway.py
+import json
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
+from app.gateways.base import BaseGateway
+import logging
+
+log = logging.getLogger("meta-cube.event_gateway")
+log.setLevel(logging.INFO)
+
+
+class EventGateway(BaseGateway):
+    """
+    Thin abstraction over Redis Streams. Uses redis.asyncio via BaseGateway.client.
+
+    Methods return Python types (lists/dicts) and parse JSON stored in 'event' field.
+    """
+
+    async def emit(self, stream: str, event: Dict[str, Any]) -> str:
+        """
+        Append event to stream. Returns redis entry id.
+        The event will be stored as JSON in the 'event' field, plus ts metadata.
+        """
+        payload = {
+            "id": event.get("id") or str(time.time()),
+            "ts": str(time.time()),
+            "event": json.dumps(event),
+        }
+        entry_id = await self.client.xadd(stream, payload)
+        log.debug("xadd %s -> %s", stream, entry_id)
+        return entry_id
+
+    async def read_range(self, stream: str, start: str = "-", end: str = "+") -> List[Dict[str, Any]]:
+        """
+        Read a full range (xrange) from stream and return list of dicts:
+        [{ "id": id, "ts": ts, "event": {...} }, ...]
+        """
+        rows = await self.client.xrange(stream, start, end)
+        result: List[Dict[str, Any]] = []
+        for event_id, fields in rows:
+            raw = fields.get("event", "{}")
+            try:
+                ev = json.loads(raw)
+            except Exception:
+                ev = {"raw": raw}
+            result.append({"id": event_id, "ts": fields.get("ts"), "event": ev})
+        return result
+
+    async def create_group(self, stream: str, group: str, mkstream: bool = True):
+        """
+        Create a consumer group if not exists. Ignores BUSYGROUP errors.
+        """
+        try:
+            await self.client.xgroup_create(name=stream, groupname=group, id="0", mkstream=mkstream)
+            log.debug("Created group %s on %s", group, stream)
+        except Exception as e:
+            msg = str(e)
+            if "BUSYGROUP" in msg or "busy group name" in msg.lower():
+                log.debug("Group %s already exists on %s", group, stream)
+                return
+            log.exception("xgroup_create failed for %s %s", stream, e)
+            raise
+
+    async def read_group(self, stream: str, group: str, consumer: str, count: int = 10, block: int = 1000) -> List[Tuple[str, List[Tuple[str, Dict[str, Any]]]]]:
+        """
+        Wrapper for XREADGROUP. Returns raw structure as returned by redis client.
+        """
+        entries = await self.client.xreadgroup(groupname=group, consumername=consumer, streams={stream: ">"}, count=count, block=block)
+        return entries
+
+    async def xack(self, stream: str, group: str, event_id: str) -> int:
+        return await self.client.xack(stream, group, event_id)
+
+    async def xautoclaim(self, stream: str, group: str, consumer: str, min_idle_ms: int, start_id: str = "0-0", count: int = 100):
+        """
+        Wrapper for XAUTOCLAIM. May raise if not supported by server/client version.
+        Returns whatever redis-py returns for xautoclaim.
+        """
+        return await self.client.xautoclaim(stream, group, consumer, min_idle_ms, start_id, count=count)
+
+    async def xpending(self, stream: str, group: str):
+        """
+        Wrapper for XPENDING. Returns raw response from Redis.
+        """
+        return await self.client.xpending(stream, group)
+
+    async def scan_streams(self, pattern: str = "events:*", count: int = 100) -> List[str]:
+        """
+        Use SCAN to find stream keys matching pattern. Avoid KEYS.
+        """
+        streams = []
+        cursor = 0
+        try:
+            while True:
+                cursor, keys = await self.client.scan(cursor=cursor, match=pattern, count=count)
+                if keys:
+                    streams.extend(keys)
+                if cursor == 0 or cursor == "0":
+                    break
+        except Exception as e:
+            log.exception("scan failed: %s", e)
+        return streams
+
+    async def close(self):
+        try:
+            await self.client.close()
+        except Exception:
+            log.exception("Error closing EventGateway client")
+```
+
+Що буде в Частині 2/6
+- CheckpointGateway (atomic save to HASH + XADD audit)
+- Recovery engine (app/runtime/recovery.py)
+- SessionGateway (session meta, alias mapping)
+
+Хочеш, щоб я зараз відправив також minimal unit-test для EventGateway/RedisProvider (FakeRedis-based) або одразу перейшли до Частини 2/6?
+
+
+Переходимо одразу до Частини 2/6. Додаю:
+CheckpointGateway — production-версія:
+Redis HASH для швидкого recovery
+audit STREAM для історії
+versioning checkpoint
+TTL підтримка
+idempotency key
+atomic pipeline
+SessionGateway:
+створення session UUID
+alias → UUID mapping
+lifecycle статусів
+RecoveryEngine:
+завантаження стану
+визначення останнього успішного node
+пропуск виконаних вузлів
+підготовка до parallel DAG recovery
+app/gateways/checkpoint_gateway.py
+Python
+import json
+import time
+import uuid
+from typing import Dict, Any, Optional, List
+
+from app.gateways.base import BaseGateway
+
+
+class CheckpointGateway(BaseGateway):
+    """
+    Persistent workflow state.
+
+    Storage:
+
+    checkpoint:session:{sid}:nodes
+        node_id -> JSON result
+
+    checkpoint:session:{sid}:meta
+        status
+        updated_at
+        last_node
+        version
+
+    state_audit:{sid}
+        immutable execution history
+    """
+
+    def _nodes_key(self, session_id: str):
+        return f"checkpoint:session:{session_id}:nodes"
+
+    def _meta_key(self, session_id: str):
+        return f"checkpoint:session:{session_id}:meta"
+
+    def _audit_key(self, session_id: str):
+        return f"state_audit:{session_id}"
+
+
+    async def save_node_result(
+        self,
+        session_id: str,
+        node_id: str,
+        result: Dict[str, Any],
+        worker: str = "runtime",
+    ):
+
+        ts = time.time()
+
+        payload = {
+            "node_id": node_id,
+            "status": "DONE",
+            "result": result,
+            "worker": worker,
+            "finished_at": ts,
+            "checkpoint_id": str(uuid.uuid4())
+        }
+
+
+        pipe = self.client.pipeline(transaction=True)
+
+        pipe.hset(
+            self._nodes_key(session_id),
+            node_id,
+            json.dumps(payload)
+        )
+
+        pipe.hset(
+            self._meta_key(session_id),
+            mapping={
+                "last_node": node_id,
+                "status": "RUNNING",
+                "updated_at": str(ts),
+                "version": "1"
+            }
+        )
+
+
+        pipe.xadd(
+            self._audit_key(session_id),
+            {
+                "action": "NODE_COMPLETED",
+                "node": node_id,
+                "worker": worker,
+                "timestamp": str(ts),
+                "payload": json.dumps(result)
+            }
+        )
+
+
+        await pipe.execute()
+
+
+
+    async def get_node(
+        self,
+        session_id: str,
+        node_id: str
+    ) -> Optional[Dict[str, Any]]:
+
+        raw = await self.client.hget(
+            self._nodes_key(session_id),
+            node_id
+        )
+
+        if not raw:
+            return None
+
+        return json.loads(raw)
+
+
+
+    async def get_completed_nodes(
+        self,
+        session_id: str
+    ) -> Dict[str, Any]:
+
+        data = await self.client.hgetall(
+            self._nodes_key(session_id)
+        )
+
+        result = {}
+
+        for node, value in data.items():
+            result[node] = json.loads(value)
+
+        return result
+
+
+
+    async def get_meta(
+        self,
+        session_id: str
+    ):
+
+        return await self.client.hgetall(
+            self._meta_key(session_id)
+        )
+
+
+
+    async def mark_completed(
+        self,
+        session_id: str
+    ):
+
+        await self.client.hset(
+            self._meta_key(session_id),
+            mapping={
+                "status":"COMPLETED",
+                "updated_at":str(time.time())
+            }
+        )
+
+
+
+    async def delete_checkpoint(
+        self,
+        session_id:str
+    ):
+
+        await self.client.delete(
+            self._nodes_key(session_id),
+            self._meta_key(session_id)
+        )
+app/gateways/session_gateway.py
+Python
+import json
+import time
+import uuid
+
+from app.gateways.base import BaseGateway
+
+
+
+class SessionGateway(BaseGateway):
+
+    """
+    Session lifecycle manager.
+
+    alias:
+        demo1 -> UUID
+
+    session:
+        session:{uuid}
+    """
+
+
+
+    def _session_key(self,sid):
+        return f"session:{sid}"
+
+
+    def _alias_key(self,alias):
+        return f"session_alias:{alias}"
+
+
+
+    async def create(
+        self,
+        alias=None,
+        metadata=None
+    ):
+
+        sid=str(uuid.uuid4())
+
+        pipe=self.client.pipeline()
+
+        pipe.hset(
+            self._session_key(sid),
+            mapping={
+                "id":sid,
+                "status":"CREATED",
+                "created_at":str(time.time()),
+                "metadata":json.dumps(metadata or {})
+            }
+        )
+
+
+        if alias:
+            pipe.set(
+                self._alias_key(alias),
+                sid
+            )
+
+
+        await pipe.execute()
+
+
+        return sid
+
+
+
+    async def resolve(
+        self,
+        value:str
+    ):
+
+        # UUID direct
+
+        exists=await self.client.exists(
+            self._session_key(value)
+        )
+
+        if exists:
+            return value
+
+
+        alias=await self.client.get(
+            self._alias_key(value)
+        )
+
+        return alias
+
+
+
+    async def get(
+        self,
+        session_id:str
+    ):
+
+        return await self.client.hgetall(
+            self._session_key(session_id)
+        )
+
+
+
+    async def update_status(
+        self,
+        session_id,
+        status
+    ):
+
+        await self.client.hset(
+            self._session_key(session_id),
+            mapping={
+                "status":status,
+                "updated_at":str(time.time())
+            }
+        )
+app/runtime/recovery.py
+Python
+from typing import Dict, Any, List
+
+
+class RecoveryEngine:
+
+    """
+    Restores runtime execution from checkpoint.
+
+    Example:
+
+    planner DONE
+    coder DONE
+    tool DONE
+    verifier missing
+
+    Resume:
+        verifier only
+    """
+
+
+
+    def __init__(
+        self,
+        checkpoint_gateway
+    ):
+
+        self.checkpoint = checkpoint_gateway
+
+
+
+    async def recover(
+        self,
+        session_id:str,
+        dag
+    ) -> Dict[str,Any]:
+
+
+        completed = await self.checkpoint.get_completed_nodes(
+            session_id
+        )
+
+
+        ready=[]
+
+        for node in dag.nodes:
+
+            if node.id in completed:
+                continue
+
+
+            dependencies_done=True
+
+
+            for dep in node.depends:
+
+                if dep not in completed:
+                    dependencies_done=False
+                    break
+
+
+            if dependencies_done:
+                ready.append(node.id)
+
+
+
+        return {
+            "session_id":session_id,
+            "completed":list(completed.keys()),
+            "resume_nodes":ready
+        }
+Оновлення app/gateways/__init__.py
+Python
+from .base import BaseGateway
+from .event_gateway import EventGateway
+from .checkpoint_gateway import CheckpointGateway
+from .session_gateway import SessionGateway
+
+
+__all__=[
+    "BaseGateway",
+    "EventGateway",
+    "CheckpointGateway",
+    "SessionGateway",
+]
+Після Частини 2 архітектура вже така:
+
+Runtime
+ |
+ |-- RecoveryEngine
+ |
+ |-- CheckpointGateway
+ |       |
+ |       +-- Redis HASH
+ |       +-- Audit Stream
+ |
+ |-- SessionGateway
+ |       |
+ |       +-- UUID
+ |       +-- Alias
+ |
+ |-- EventGateway
+         |
+         +-- Redis Streams
+Це вже закриває критичну проблему: падіння worker/runtime більше не означає повторне виконання дорогих кроків LLM або sandbox.
+Наступна Частина 3/6:
+RetryGateway
+BackoffPolicy
+DLQGateway
+retry state machine:
+RUNNING
+RETRY_WAIT
+FAILED
+DEAD_LETTER
+RECOVERED
+Після неї буде готовий production lifecycle помилок.
+
+import json
+import time
+from typing import Dict, Any
+
+from app.gateways.base import BaseGateway
+
+
+class RetryGateway(BaseGateway):
+
+    """
+    Retry state manager.
+
+    Keys:
+
+    retry:{session}:{node}
+
+    {
+        attempts: 3,
+        last_error:"",
+        updated_at:""
+    }
+    """
+
+    DEFAULT_MAX_ATTEMPTS = 5
+    TTL = 86400
+
+
+
+    def _key(
+        self,
+        session_id:str,
+        node_id:str
+    ):
+
+        return f"retry:{session_id}:{node_id}"
+
+
+
+    async def register_failure(
+        self,
+        session_id:str,
+        node_id:str,
+        error:Exception
+    ) -> int:
+
+        key=self._key(
+            session_id,
+            node_id
+        )
+
+
+        attempts = await self.client.hincrby(
+            key,
+            "attempts",
+            1
+        )
+
+
+        await self.client.hset(
+            key,
+            mapping={
+                "last_error":str(error),
+                "updated_at":str(time.time())
+            }
+        )
+
+
+        await self.client.expire(
+            key,
+            self.TTL
+        )
+
+
+        return int(attempts)
+
+
+
+    async def get_attempt(
+        self,
+        session_id,
+        node_id
+    ):
+
+        value=await self.client.hget(
+            self._key(session_id,node_id),
+            "attempts"
+        )
+
+        return int(value or 0)
+
+
+
+    async def can_retry(
+        self,
+        session_id,
+        node_id,
+        max_attempts=None
+    ):
+
+        attempts=await self.get_attempt(
+            session_id,
+            node_id
+        )
+
+
+        limit=max_attempts or self.DEFAULT_MAX_ATTEMPTS
+
+
+        return attempts < limit
+
+
+
+    async def state(
+        self,
+        session_id,
+        node_id
+    ):
+
+        return await self.client.hgetall(
+            self._key(session_id,node_id)
+        )
+Частина 3/6 — Retry Engine + Backoff + DLQ
+У цій частині додаємо повноцінний механізм повторних спроб:
+Що реалізовано:
+RetryGateway
+окремий лічильник для session/node
+максимальна кількість спроб
+збереження причин помилок
+TTL очистка
+BackoffPolicy
+exponential backoff
+jitter для уникнення одночасних повторів
+DLQGateway
+перенесення "мертвих" задач
+збереження повного контексту помилки
+можливість подальшого replay
+app/gateways/retry_gateway.py
+import random
+
+
+class BackoffPolicy:
+
+
+    def __init__(
+        self,
+        base_delay=1,
+        max_delay=60
+    ):
+
+        self.base=base_delay
+        self.maximum=max_delay
+
+
+
+    def calculate(
+        self,
+        attempt:int
+    ):
+
+        """
+        Example:
+
+        attempt 1:
+        1-2 sec
+
+        attempt 2:
+        2-4 sec
+
+        attempt 3:
+        4-8 sec
+        """
+
+        delay=min(
+            self.maximum,
+            self.base*(2**attempt)
+        )
+
+
+        jitter=random.uniform(
+            0,
+            delay*0.2
+        )
+
+
+        return delay+jitter
+
+
+
+    async def wait(
+        self,
+        attempt:int
+    ):
+
+        import asyncio
+
+        await asyncio.sleep(
+            self.calculate(attempt)
+        )
+Python
+import json
+import time
+
+from app.gateways.base import BaseGateway
+
+
+
+class DLQGateway(BaseGateway):
+
+
+    """
+    Dead Letter Queue.
+
+    Stores permanently failed events.
+
+    Stream:
+
+    dlq:{original_stream}
+
+    """
+
+
+
+    def _stream(
+        self,
+        stream
+    ):
+
+        return f"dlq:{stream}"
+
+
+
+
+    async def push(
+        self,
+        stream:str,
+        event_id:str,
+        payload:dict,
+        error:Exception,
+        attempts:int
+    ):
+
+
+        await self.client.xadd(
+
+            self._stream(stream),
+
+            {
+
+            "event_id":event_id,
+
+            "payload":json.dumps(
+                payload
+            ),
+
+            "error":str(error),
+
+            "attempts":str(attempts),
+
+            "failed_at":str(time.time())
+
+            }
+
+        )
+
+
+
+    async def list(
+        self,
+        stream,
+        limit=100
+    ):
+
+        rows=await self.client.xrevrange(
+            self._stream(stream),
+            count=limit
+        )
+
+        return rows
+app/runtime/backoff.py
+Python
+app/gateways/dlq_gateway.py
+Python
+Додаємо стани виконання
+app/runtime/state_machine.py
+Python
+from enum import Enum
+
+
+
+class ExecutionState(str,Enum):
+
+    CREATED="CREATED"
+
+    RUNNING="RUNNING"
+
+    RETRY_WAIT="RETRY_WAIT"
+
+    COMPLETED="COMPLETED"
+
+    FAILED="FAILED"
+
+    DEAD_LETTER="DEAD_LETTER"
+
+    RECOVERED="RECOVERED"
+from .base import BaseGateway
+
+from .event_gateway import EventGateway
+
+from .checkpoint_gateway import CheckpointGateway
+
+from .session_gateway import SessionGateway
+
+from .retry_gateway import RetryGateway
+
+from .dlq_gateway import DLQGateway
+
+
+
+__all__=[
+
+"BaseGateway",
+
+"EventGateway",
+
+"CheckpointGateway",
+
+"SessionGateway",
+
+"RetryGateway",
+
+"DLQGateway",
+
+]
+Оновлення app/gateways/__init__.py
+Python
+Тепер цикл помилки виглядає так:
+NODE START
+                 |
+                 v
+          execute agent
+                 |
+          +------+------+
+          |             |
+        OK            ERROR
+          |             |
+          v             v
+     CHECKPOINT     RetryGateway
+          |             |
+          |        attempts < 5
+          |             |
+          |          YES
+          |             |
+          |       Backoff wait
+          |             |
+          |          retry
+          |
+          |
+          NO
+          |
+          v
+
+        DLQGateway
+
+        DEAD_LETTER
+
+Що вже готово після 3/6
+✅ Redis abstraction
+✅ Event Streams
+✅ Consumer Groups foundation
+✅ Checkpoint persistence
+✅ Recovery engine foundation
+✅ Session management
+✅ Retry policy
+✅ Backoff
+✅ DLQ lifecycle
+Наступна Частина 4/6 — Runtime Engine буде найбільшою:
+Додам:
+RuntimeEngine
+parallel DAG execution
+dependency resolver
+idempotency lock
+checkpoint-aware execution
+recovery resume
+agent execution pipeline
+Після неї META-CUBE вже матиме справжнє workflow ядро.
+
+
+import asyncio
+import logging
+import time
+from typing import Dict, Any, List
+
+
+from app.runtime.state_machine import ExecutionState
+
+
+log = logging.getLogger("meta-cube.runtime")
+
+
+
+class RuntimeEngine:
+
+
+    """
+    Core execution engine.
+
+    Responsibilities:
+
+    - execute DAG nodes
+    - restore checkpoints
+    - avoid duplicate execution
+    - save state
+    - handle failures
+
+    Runtime does NOT know Redis.
+    Everything goes through gateways.
+    """
+
+
+
+    def __init__(
+        self,
+        checkpoint,
+        session,
+        retry,
+        dlq,
+        events,
+        backoff
+    ):
+
+        self.checkpoint=checkpoint
+        self.session=session
+        self.retry=retry
+        self.dlq=dlq
+        self.events=events
+        self.backoff=backoff
+
+
+
+    async def execute(
+        self,
+        ctx,
+        dag
+    ):
+
+
+        recovery = await self.restore(
+            ctx.session_id,
+            dag
+        )
+
+
+        completed=set(
+            recovery["completed"]
+        )
+
+
+        while len(completed) < len(dag.nodes):
+
+
+            ready=self.get_ready_nodes(
+                dag,
+                completed
+            )
+
+
+            if not ready:
+
+                raise RuntimeError(
+                    "DAG deadlock detected"
+                )
+
+
+            tasks=[]
+
+
+            for node in ready:
+
+                tasks.append(
+                    self.execute_node(
+                        ctx,
+                        node
+                    )
+                )
+
+
+            results=await asyncio.gather(
+                *tasks,
+                return_exceptions=True
+            )
+
+
+
+            for node,result in zip(
+                ready,
+                results
+            ):
+
+                if isinstance(
+                    result,
+                    Exception
+                ):
+
+                    raise result
+
+
+                completed.add(
+                    node.id
+                )
+
+
+
+        await self.checkpoint.mark_completed(
+            ctx.session_id
+        )
+
+
+        await self.session.update_status(
+            ctx.session_id,
+            ExecutionState.COMPLETED
+        )
+
+
+
+    async def execute_node(
+        self,
+        ctx,
+        node
+    ):
+
+
+        # idempotency check
+
+        existing=await self.checkpoint.get_node(
+            ctx.session_id,
+            node.id
+        )
+
+
+        if existing:
+
+            log.info(
+                "Skip completed node %s",
+                node.id
+            )
+
+            ctx.results[node.id]=existing["result"]
+
+            return existing["result"]
+
+
+
+        await self.events.emit(
+
+            f"events:{ctx.session_id}",
+
+            {
+                "node":node.id,
+                "status":"STARTED"
+            }
+
+        )
+
+
+        try:
+
+            result=await node.execute(
+                ctx
+            )
+
+
+
+            await self.checkpoint.save_node_result(
+
+                ctx.session_id,
+
+                node.id,
+
+                result,
+
+                worker="runtime"
+
+            )
+
+
+
+            ctx.results[node.id]=result
+
+
+
+            await self.events.emit(
+
+                f"events:{ctx.session_id}",
+
+                {
+                    "node":node.id,
+                    "status":"DONE"
+                }
+
+            )
+
+
+            return result
+
+
+
+        except Exception as exc:
+
+
+            attempt=await self.retry.register_failure(
+
+                ctx.session_id,
+
+                node.id,
+
+                exc
+
+            )
+
+
+            can=await self.retry.can_retry(
+
+                ctx.session_id,
+
+                node.id
+
+            )
+
+
+            if can:
+
+
+                await self.session.update_status(
+
+                    ctx.session_id,
+
+                    ExecutionState.RETRY_WAIT
+
+                )
+
+
+                await self.backoff.wait(
+                    attempt
+                )
+
+
+                return await self.execute_node(
+                    ctx,
+                    node
+                )
+
+
+
+            await self.dlq.push(
+
+                f"events:{ctx.session_id}",
+
+                node.id,
+
+                ctx.data,
+
+                exc,
+
+                attempt
+
+            )
+
+
+            await self.session.update_status(
+
+                ctx.session_id,
+
+                ExecutionState.DEAD_LETTER
+
+            )
+
+
+            raise
+
+
+
+
+    async def restore(
+        self,
+        session_id,
+        dag
+    ):
+
+        completed=await self.checkpoint.get_completed_nodes(
+            session_id
+        )
+
+
+        return {
+
+            "completed":
+                list(completed.keys()),
+
+            "total":
+                len(dag.nodes)
+
+        }
+
+
+
+
+    def get_ready_nodes(
+        self,
+        dag,
+        completed
+    ):
+
+
+        ready=[]
+
+
+        for node in dag.nodes:
+
+
+            if node.id in completed:
+                continue
+
+
+
+            dependencies=node.depends or []
+
+
+
+            if all(
+                dep in completed
+                for dep in dependencies
+            ):
+
+                ready.append(node)
+
+
+
+        return ready
+Частина 4/6 — Runtime Engine (DAG execution + Recovery + Idempotency)
+Ця частина переводить META-CUBE з простого ланцюжка planner → coder → tool → verifier у stateful workflow engine.
+Додається:
+паралельне виконання готових вузлів DAG
+dependency resolution
+checkpoint-aware execution
+idempotency lock
+відновлення після падіння
+інтеграція з Gateway layer
+lifecycle node execution
+app/runtime/engine.py
+Python
+from dataclasses import dataclass
+from typing import List, Callable
+
+
+
+@dataclass
+class Node:
+
+    id:str
+
+    execute:Callable
+
+    depends:List[str]=None
+
+
+
+class DAG:
+
+
+    def __init__(self):
+
+        self.nodes=[]
+
+
+
+    def add(
+        self,
+        node
+    ):
+
+        self.nodes.append(
+            node
+        )
+
+
+
+    def get(
+        self,
+        node_id
+    ):
+
+        for n in self.nodes:
+
+            if n.id==node_id:
+                return n
+DAG модель
+app/runtime/dag.py
+Python
+planner = Node(
+    id="planner",
+    execute=planner_agent
+)
+
+
+coder = Node(
+    id="coder",
+    execute=coder_agent,
+    depends=["planner"]
+)
+
+
+tester = Node(
+    id="tester",
+    execute=test_agent,
+    depends=["coder"]
+)
+
+
+security = Node(
+    id="security",
+    execute=security_agent,
+    depends=["coder"]
+)
+
+
+verifier = Node(
+    id="verifier",
+    execute=verify_agent,
+    depends=[
+        "tester",
+        "security"
+    ]
+)
+Приклад паралельного DAG
+Python
+Граф:
+
+planner
+                |
+              coder
+             /     \
+        tester    security
+             \     /
+            verifier
+tester і security підуть одночасно.
+Runtime lifecycle
+
+CREATE SESSION
+      |
+      |
+LOAD CHECKPOINT
+      |
+      |
+FIND READY NODES
+      |
+      |
+EXECUTE PARALLEL
+      |
+      |
+SAVE CHECKPOINT
+      |
+      |
+EMIT EVENT
+      |
+      |
+NEXT LEVEL
+      |
+      |
+COMPLETED
+Після Частини 4/6 META-CUBE отримує:
+✅ справжній DAG engine
+✅ parallel execution
+✅ crash recovery
+✅ checkpoint resume
+✅ idempotency
+✅ retry integration
+✅ DLQ integration
+✅ gateway isolation
+Наступна Частина 5/6 — Worker v2:
+Буде:
+Redis Streams consumer groups через EventGateway
+XREADGROUP
+XAUTOCLAIM
+graceful shutdown
+worker → runtime bridge
+distributed workers
+без прямого Redis у worker
+Після неї ядро буде готове до запуску кількох worker replicas.
+
+
