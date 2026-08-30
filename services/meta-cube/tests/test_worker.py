@@ -91,9 +91,10 @@ class FlakyStream(FakeStream):
     def __init__(self):
         super().__init__()
         self.fail_publish = True
-        self.fail_read = True
+        self.fail_read = False
         self.reconnects = 0
         self.connected = True
+        self.reconnected = asyncio.Event()
 
     @property
     def available(self):
@@ -121,6 +122,7 @@ class FlakyStream(FakeStream):
     async def connect(self):
         self.reconnects += 1
         self.connected = True
+        self.reconnected.set()
         return True
 
 
@@ -133,10 +135,15 @@ async def test_transport_outages_republish_durable_acceptance_without_restart(tm
     record = engine.accept(EventRequest(steps=[StepSpec(id="one", action="value", value=1)]))
     await worker.submit(record.id)  # injected XADD failure does not escape
     assert worker.transport_degraded
-    await asyncio.sleep(0.18)
+    await asyncio.wait_for(stream.reconnected.wait(), timeout=0.5)
+    for _ in range(20):
+        if engine.get(record.id).status.value == "completed":
+            break
+        await asyncio.sleep(0.01)
     await worker.stop()
     assert engine.get(record.id).status.value == "completed"
     assert stream.reconnects >= 1
+    assert len(engine.checkpoints(record.id)) == 1
 
 
 class InitiallyDownStream(FakeStream):

@@ -27,7 +27,7 @@ class FileStore:
         self._lock = threading.RLock()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if not self.path.exists():
-            self._write({"executions": {}, "idempotency": {}, "checkpoints": {}, "dlq": {}})
+            self._write({"executions": {}, "idempotency": {}, "operations": {}, "checkpoints": {}, "dlq": {}})
 
     def read(self) -> dict[str, Any]:
         with self._lock:

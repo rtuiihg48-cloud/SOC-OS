@@ -393,11 +393,12 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
   const prevHash = last[0]?.hash ?? "GENESIS";
   const redTeamResults = runSelfRedTeam(prevHash);
 
-  const vulnerabilities = [];
+  const vulnerabilities: Array<{ attack: string; score: number; action: string; tactic: string | null; technique: string | null; fix: string | null }> = [];
   let patchesApplied = 0;
 
+  await db.transaction(async (tx) => {
   for (const { result, fix } of redTeamResults) {
-    await db.insert(securityEventsTable).values({
+    await tx.insert(securityEventsTable).values({
       tenantId,
       event: result.event,
       score: result.score,
@@ -416,7 +417,7 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
 
     if (fix) {
       const fixHash = computeHash(`SELF_FIX: ${fix}`, 0, "PATCHED", result.hash, Date.now());
-      await db.insert(securityEventsTable).values({
+      await tx.insert(securityEventsTable).values({
         tenantId,
         event: `SELF_FIX: ${fix}`,
         score: 0,
@@ -432,7 +433,7 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
         prevHash: result.hash,
       });
 
-      await db.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
+      await tx.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
       patchesApplied++;
     }
 
@@ -445,6 +446,8 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
       fix: fix ?? null,
     });
   }
+  await appendAudit(tx, { tenantId, principal: req.principal!, action: "testing:self-test", targetType: "self_test_run", targetId: req.principal!.correlationId, decision: "COMMITTED", reasonCode: "SELF_TEST_RECORDED", correlationId: req.principal!.correlationId, metadata: { generatedEvents: redTeamResults.length, patchesApplied } });
+  });
 
   const maxScore = Math.max(...vulnerabilities.map((v) => v.score), 0);
   const systemStatus = maxScore >= 15 ? "CRITICAL" : maxScore >= 7 ? "ALERT" : "MONITORING";
@@ -469,8 +472,8 @@ router.post("/simulate", requireCapability("testing:run", singleTenantScope), as
   const prevHash = last[0]?.hash ?? "GENESIS";
   const baseResult = buildEventResult("user login scan attempt", prevHash, 45, 60);
 
-  const [baseEvent] = await db
-    .insert(securityEventsTable)
+  const simulation = await db.transaction(async (tx) => {
+  const [baseEvent] = await tx.insert(securityEventsTable)
     .values({
       tenantId,
       event: baseResult.event,
@@ -496,7 +499,7 @@ router.post("/simulate", requireCapability("testing:run", singleTenantScope), as
   let patchesApplied = 0;
 
   for (const { result, fix } of redTeamResults) {
-    await db.insert(securityEventsTable).values({
+    await tx.insert(securityEventsTable).values({
       tenantId,
       event: result.event,
       score: result.score,
@@ -514,17 +517,20 @@ router.post("/simulate", requireCapability("testing:run", singleTenantScope), as
     });
 
     if (fix) {
-      await db.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
+      await tx.insert(patchesTable).values({ tenantId, attack: result.event, fix, tactic: result.tactic });
       selfHealingEvents.push({ attack: result.event, tactic: result.tactic, fix });
       patchesApplied++;
     }
   }
+  await appendAudit(tx, { tenantId, principal: req.principal!, action: "testing:simulate", targetType: "simulation_run", targetId: req.principal!.correlationId, decision: "COMMITTED", reasonCode: "SIMULATION_RECORDED", correlationId: req.principal!.correlationId, metadata: { totalProcessed: redTeamResults.length + 1, patchesApplied } });
+  return { baseEvent, selfHealingEvents, patchesApplied, totalProcessed: redTeamResults.length + 1 };
+  });
 
   res.json({
-    baseEvent: formatEvent(baseEvent),
-    selfHealingEvents,
-    totalProcessed: redTeamResults.length + 1,
-    patchesApplied,
+    baseEvent: formatEvent(simulation.baseEvent),
+    selfHealingEvents: simulation.selfHealingEvents,
+    totalProcessed: simulation.totalProcessed,
+    patchesApplied: simulation.patchesApplied,
   });
 });
 

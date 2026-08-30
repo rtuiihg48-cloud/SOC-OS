@@ -11,6 +11,8 @@ import { CpuSimulatorScheduler } from "./lib/cpu-simulator";
 import { queueStats } from "./lib/queue";
 import { callMetaCube } from "./lib/meta-cube-client";
 import { bootHckBios, getRequiredHckTables } from "./lib/hck-bios";
+import { assertAuditReadiness } from "./lib/audit";
+import { bindAfterBios } from "./lib/startup-orchestration";
 
 const rawPort = process.env["PORT"];
 
@@ -75,9 +77,12 @@ async function seedDefaultData() {
   }
 }
 
-server.listen(port, async () => {
-  logger.info({ port }, "SOC-OS V50 server listening");
-  await seedDefaultData();
+async function startServer() {
+  const production = process.env["NODE_ENV"] === "production";
+  const auditReadiness = await assertAuditReadiness(pool, production);
+  if (!auditReadiness.ready) {
+    logger.warn({ failures: auditReadiness.failures }, "Audit readiness is not enforced outside production");
+  }
   const bios = await bootHckBios({
     async checkDatabase() {
       const result = await pool.query<{ ok: number }>("SELECT 1 AS ok");
@@ -94,15 +99,39 @@ server.listen(port, async () => {
       return { missing: getRequiredHckTables().filter((table) => !present.has(table)) };
     },
     async checkMetaCube() {
-      return await callMetaCube("healthz", {
-        correlationId: "hck-bios-boot",
-        context: { tenantId: 1, principalType: "SERVICE", principalId: "api-server-bios", capability: "execution:health", correlationId: "hck-bios-boot" },
-      }) as Record<string, unknown>;
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          return await callMetaCube("healthz", {
+            correlationId: "hck-bios-boot",
+            context: { tenantId: 1, principalType: "SERVICE", principalId: "api-server-bios", capability: "execution:health", correlationId: "hck-bios-boot" },
+          }) as Record<string, unknown>;
+        } catch (error) {
+          lastError = error;
+          if (attempt < 4) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
+      }
+      throw lastError;
     },
     getQueueStatus: () => queueStats(),
   });
   logger.info({ status: bios.status, stages: bios.stages }, "HCK-BIOS boot complete");
-  cpuSimulator.start();
+  bindAfterBios(bios, production, (onListening) => {
+    server.listen(port, async () => {
+      logger.info({ port }, "SOC-OS V50 server listening");
+      await seedDefaultData();
+      onListening();
+    });
+  }, () => {
+    cpuSimulator.start();
+  });
+}
+
+void startServer().catch((err) => {
+  logger.fatal({ err }, "Server startup failed control-plane readiness");
+  void pool.end().finally(() => process.exit(1));
 });
 
 server.on("error", (err) => {

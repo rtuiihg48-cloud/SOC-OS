@@ -25,3 +25,17 @@ CREATE TABLE IF NOT EXISTS meta_cube_dlq (
   created_at timestamptz NOT NULL, data jsonb NOT NULL
 );
 CREATE INDEX IF NOT EXISTS meta_cube_dlq_execution_idx ON meta_cube_dlq(execution_id);
+-- Operation keys are separate from submit keys.  The broad unique constraint
+-- makes reusing a key for another execution or operation an explicit conflict.
+CREATE TABLE IF NOT EXISTS meta_cube_operation_idempotency (
+  tenant_id bigint NOT NULL,
+  execution_id text NOT NULL REFERENCES meta_cube_executions(id) ON DELETE CASCADE,
+  operation text NOT NULL,
+  idempotency_key text NOT NULL,
+  response_data jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (tenant_id, execution_id, operation, idempotency_key),
+  UNIQUE (tenant_id, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS meta_cube_operation_idempotency_execution_idx
+  ON meta_cube_operation_idempotency(execution_id);

@@ -1074,6 +1074,8 @@ export const ListTenantsResponseItem = zod.object({
   "name": zod.string(),
   "apiKey": zod.string(),
   "plan": zod.enum(['starter', 'pro', 'enterprise']),
+  "status": zod.enum(['ACTIVE', 'DISABLED']),
+  "deactivatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "eventCount": zod.number().optional()
 })
@@ -1104,16 +1106,29 @@ export const GetTenantResponse = zod.object({
   "name": zod.string(),
   "apiKey": zod.string(),
   "plan": zod.enum(['starter', 'pro', 'enterprise']),
+  "status": zod.enum(['ACTIVE', 'DISABLED']),
+  "deactivatedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date(),
   "eventCount": zod.number().optional()
 })
 
 
 /**
- * @summary Delete a tenant
+ * @summary Deactivate a tenant while retaining audit evidence
  */
 export const DeleteTenantParams = zod.object({
   "id": zod.coerce.number()
+})
+
+export const DeleteTenantResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "apiKey": zod.string(),
+  "plan": zod.enum(['starter', 'pro', 'enterprise']),
+  "status": zod.enum(['ACTIVE', 'DISABLED']),
+  "deactivatedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "eventCount": zod.number().optional()
 })
 
 

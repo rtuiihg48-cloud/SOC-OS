@@ -950,11 +950,22 @@ export const TenantPlan = {
   enterprise: 'enterprise',
 } as const;
 
+export type TenantStatus = typeof TenantStatus[keyof typeof TenantStatus];
+
+
+export const TenantStatus = {
+  ACTIVE: 'ACTIVE',
+  DISABLED: 'DISABLED',
+} as const;
+
 export interface Tenant {
   id: number;
   name: string;
   apiKey: string;
   plan: TenantPlan;
+  status: TenantStatus;
+  /** @nullable */
+  deactivatedAt: string | null;
   createdAt: string;
   eventCount?: number;
 }

@@ -165,7 +165,17 @@ export async function bootHckBios(dependencies: HckBiosDependencies): Promise<Hc
     })));
     stages.push(await runStage("meta_cube", async () => {
       const result = await dependencies.checkMetaCube();
-      const degraded = result.status !== "ok";
+      const production = process.env["NODE_ENV"] === "production";
+      const healthy = result.status === "ok";
+      const authoritative = result.persistence === "postgres";
+      if (production && (!healthy || !authoritative)) {
+        return {
+          status: "failed",
+          detail: "META-CUBE must report status ok with PostgreSQL persistence in production.",
+          data: result,
+        };
+      }
+      const degraded = !healthy;
       return {
         status: degraded ? "degraded" : "ready",
         detail: degraded ? "META-CUBE responded but is not fully healthy." : "META-CUBE health check passed.",

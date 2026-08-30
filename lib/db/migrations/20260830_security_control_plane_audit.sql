@@ -1,4 +1,13 @@
--- Security Control Plane + immutable audit chain. Apply with the DB migration role.
+-- Security Control Plane + immutable audit chain. Apply with a migration-owner role.
+-- Production provisioning: create/login-manage the distinct soc_os_api role in the
+-- deployment control plane, without a password in this migration. It must not be a
+-- superuser or own either audit table. When that role already exists, this migration
+-- grants only the audit permissions needed by appendAudit:
+--   audit_records: SELECT, INSERT
+--   audit_chain_heads: SELECT, INSERT, UPDATE
+--   audit_records_id_seq: USAGE, SELECT
+-- The API role must not receive UPDATE, DELETE, TRUNCATE, or TRIGGER on audit_records.
+-- Production startup verifies this fail-closed.
 CREATE TABLE IF NOT EXISTS control_plane_users (id serial PRIMARY KEY, clerk_user_id text NOT NULL UNIQUE, status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DISABLED')), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS tenant_memberships (id serial PRIMARY KEY, user_id integer NOT NULL REFERENCES control_plane_users(id) ON DELETE RESTRICT, tenant_id integer NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT, role text NOT NULL CHECK (role IN ('SOC_ADMIN','ANALYST','VIEWER')), status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DISABLED')), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id, tenant_id));
 CREATE INDEX IF NOT EXISTS tenant_memberships_tenant_status_idx ON tenant_memberships(tenant_id,status);
@@ -11,4 +20,45 @@ CREATE OR REPLACE FUNCTION reject_audit_record_mutation() RETURNS trigger LANGUA
 DROP TRIGGER IF EXISTS audit_records_immutable ON audit_records;
 CREATE TRIGGER audit_records_immutable BEFORE UPDATE OR DELETE ON audit_records FOR EACH ROW EXECUTE FUNCTION reject_audit_record_mutation();
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_records FROM PUBLIC;
-GRANT SELECT, INSERT ON audit_records, audit_chain_heads TO CURRENT_USER;
+REVOKE TRIGGER ON audit_records FROM PUBLIC;
+REVOKE ALL ON audit_records FROM PUBLIC;
+REVOKE ALL ON audit_chain_heads FROM PUBLIC;
+REVOKE ALL ON SEQUENCE audit_records_id_seq FROM PUBLIC;
+
+-- Owner-run deployment provisioning. This intentionally does not CREATE ROLE or
+-- assign credentials: managed deployment control planes must provision soc_os_api
+-- separately. Re-running it resets this role's direct audit-object grants to the
+-- least-privilege contract. It refuses an unsafe owner or superuser role rather
+-- than silently making a production connection appear safe.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'soc_os_api') THEN
+    IF (SELECT rolsuper FROM pg_roles WHERE rolname = 'soc_os_api') THEN
+      RAISE EXCEPTION 'soc_os_api must not be a superuser';
+    END IF;
+    IF EXISTS (
+      SELECT 1
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_roles r ON r.oid = c.relowner
+      WHERE n.nspname = 'public'
+        AND c.relname IN ('audit_records', 'audit_chain_heads')
+        AND r.rolname = 'soc_os_api'
+    ) THEN
+      RAISE EXCEPTION 'soc_os_api must not own audit tables';
+    END IF;
+
+    REVOKE ALL PRIVILEGES ON audit_records, audit_chain_heads FROM soc_os_api;
+    REVOKE TRIGGER ON audit_records FROM soc_os_api;
+    REVOKE ALL PRIVILEGES ON SEQUENCE audit_records_id_seq FROM soc_os_api;
+    GRANT SELECT, INSERT ON audit_records TO soc_os_api;
+    GRANT SELECT, INSERT, UPDATE ON audit_chain_heads TO soc_os_api;
+    GRANT USAGE, SELECT ON SEQUENCE audit_records_id_seq TO soc_os_api;
+  END IF;
+END $$;
+
+-- Development-only convenience grant for the migration session. It is not a
+-- production role-provisioning mechanism and does not establish production safety.
+GRANT SELECT, INSERT ON audit_records TO CURRENT_USER;
+GRANT SELECT, INSERT, UPDATE ON audit_chain_heads TO CURRENT_USER;
+GRANT USAGE, SELECT ON SEQUENCE audit_records_id_seq TO CURRENT_USER;

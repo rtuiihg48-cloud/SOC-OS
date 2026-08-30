@@ -6,6 +6,8 @@ import {
   selfHealingRestorePointsTable,
 } from "@workspace/db";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { appendAudit } from "./audit";
+import type { Principal } from "./control-policy";
 
 export const SELF_HEALING_POLICY = {
   maxStateBytes: 64 * 1024,
@@ -14,6 +16,7 @@ export const SELF_HEALING_POLICY = {
 };
 
 type JsonRecord = Record<string, unknown>;
+type AuditContext = { principal: Principal; correlationId: string };
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -61,6 +64,7 @@ export async function registerVerifiedManagedResource(input: {
   resourceKey: string;
   location: string;
   state: JsonRecord;
+  audit?: AuditContext;
 }) {
   const stateHash = hashManagedState(input.state);
 
@@ -108,11 +112,17 @@ export async function registerVerifiedManagedResource(input: {
       })
       .returning();
 
+    if (input.audit) await appendAudit(tx, {
+      tenantId: input.tenantId, principal: input.audit.principal, action: "self_healing:resource:register",
+      targetType: "managed_resource", targetId: String(resource.id), decision: "COMMITTED",
+      reasonCode: existing ? "MANAGED_RESOURCE_UPDATED" : "MANAGED_RESOURCE_REGISTERED",
+      correlationId: input.audit.correlationId, metadata: { resourceKey: resource.resourceKey, location: resource.location, restorePointId: restorePoint.id },
+    });
     return { resource, restorePoint };
   });
 }
 
-export async function previewVerifiedRestorePoint(restorePointId: number, tenantId: number | null) {
+export async function previewVerifiedRestorePoint(restorePointId: number, tenantId: number | null, audit?: AuditContext) {
   return db.transaction(async (tx) => {
     const [restorePoint] = await tx
       .select()
@@ -133,7 +143,7 @@ export async function previewVerifiedRestorePoint(restorePointId: number, tenant
       hashManagedState(restorePoint.state) === restorePoint.stateHash;
     const sameLocation = resource.location === restorePoint.location;
 
-    await tx.insert(selfHealingActionsTable).values({
+    const [action] = await tx.insert(selfHealingActionsTable).values({
       tenantId: restorePoint.tenantId,
       restorePointId: restorePoint.id,
       resourceKey: restorePoint.resourceKey,
@@ -147,6 +157,12 @@ export async function previewVerifiedRestorePoint(restorePointId: number, tenant
           ? "Restore point passed hash and same-location verification"
           : "Restore point rejected by hash or same-location verification",
       completedAt: new Date(),
+    }).returning();
+    if (audit) await appendAudit(tx, {
+      tenantId: restorePoint.tenantId, principal: audit.principal, action: "self_healing:restore:preview",
+      targetType: "self_healing_action", targetId: String(action.id), decision: "COMMITTED",
+      reasonCode: integrityVerified && sameLocation ? "RESTORE_PREVIEW_READY" : "RESTORE_PREVIEW_REJECTED",
+      correlationId: audit.correlationId, metadata: { restorePointId, resourceKey: restorePoint.resourceKey },
     });
 
     return {
@@ -169,6 +185,7 @@ export async function applyVerifiedRestorePoint(input: {
   eventId?: number | null;
   mode: "APPLY" | "AUTO";
   observedState?: JsonRecord;
+  audit?: AuditContext;
 }) {
   return db.transaction(async (tx) => {
     const [restorePoint] = await tx
@@ -216,6 +233,7 @@ export async function applyVerifiedRestorePoint(input: {
         .set({ integrityStatus: "DEGRADED", updatedAt: new Date() })
         .where(eq(managedResourcesTable.id, resource.id));
 
+      if (input.audit) await appendAudit(tx, { tenantId: restorePoint.tenantId, principal: input.audit.principal, action: "self_healing:restore:apply", targetType: "self_healing_action", targetId: String(action.id), decision: "COMMITTED", reasonCode: "RESTORE_REJECTED", correlationId: input.audit.correlationId, metadata: { restorePointId: restorePoint.id, resourceKey: restorePoint.resourceKey } });
       return { resource, action, integrityVerified: false, executionAllowed: false as const };
     }
 
@@ -252,6 +270,7 @@ export async function applyVerifiedRestorePoint(input: {
       })
       .returning();
 
+    if (input.audit) await appendAudit(tx, { tenantId: restorePoint.tenantId, principal: input.audit.principal, action: "self_healing:restore:apply", targetType: "self_healing_action", targetId: String(action.id), decision: "COMMITTED", reasonCode: postRestoreVerified ? "RESTORE_APPLIED" : "RESTORE_VERIFICATION_FAILED", correlationId: input.audit.correlationId, metadata: { restorePointId: restorePoint.id, resourceKey: restorePoint.resourceKey, executionAllowed: false } });
     return {
       resource: restoredResource,
       action,
@@ -281,6 +300,7 @@ export async function automaticallyRestoreManagedResource(input: {
       eventId: input.eventId,
       mode: "AUTO",
       observedState: input.observedState,
+      audit: { principal: { principalId: "self-healing-system", principalType: "SERVICE", tenantIds: input.tenantId === null ? [] : [input.tenantId], roles: [], capabilities: [], authMethod: "SCOPED_CREDENTIAL", credentialVersion: 0, correlationId: `auto-restore:${input.eventId}` }, correlationId: `auto-restore:${input.eventId}` },
     });
   }
 
@@ -290,8 +310,9 @@ export async function automaticallyRestoreManagedResource(input: {
     .where(resourceScope(input.resourceKey, input.tenantId))
     .limit(1);
 
-  const [action] = await db
-    .insert(selfHealingActionsTable)
+  const servicePrincipal: Principal = { principalId: "self-healing-system", principalType: "SERVICE", tenantIds: input.tenantId === null ? [] : [input.tenantId], roles: [], capabilities: [], authMethod: "SCOPED_CREDENTIAL", credentialVersion: 0, correlationId: `auto-restore:${input.eventId}` };
+  return db.transaction(async (tx) => {
+  const [action] = await tx.insert(selfHealingActionsTable)
     .values({
       tenantId: input.tenantId,
       eventId: input.eventId,
@@ -310,16 +331,18 @@ export async function automaticallyRestoreManagedResource(input: {
     .returning();
 
   if (resource) {
-    await db
+    await tx
       .update(managedResourcesTable)
       .set({ integrityStatus: "QUARANTINED", updatedAt: new Date() })
       .where(eq(managedResourcesTable.id, resource.id));
   }
 
+  await appendAudit(tx, { tenantId: input.tenantId, principal: servicePrincipal, action: "self_healing:restore:auto", targetType: "self_healing_action", targetId: String(action.id), decision: "COMMITTED", reasonCode: "NO_VERIFIED_RESTORE_POINT", correlationId: servicePrincipal.correlationId, metadata: { resourceKey: input.resourceKey, eventId: input.eventId } });
   return {
     resource: resource ?? null,
     action,
     integrityVerified: false,
     executionAllowed: SELF_HEALING_POLICY.executionAllowed,
   };
+  });
 }

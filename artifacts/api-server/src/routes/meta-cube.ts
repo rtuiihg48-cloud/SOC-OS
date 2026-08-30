@@ -17,6 +17,7 @@ import { callMetaCube, MetaCubeClientError } from "../lib/meta-cube-client";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import { db } from "@workspace/db";
 import { appendAudit } from "../lib/audit";
+import { auditedHandoff, validatedIdempotencyKey } from "../lib/meta-cube-handoff";
 
 const router: IRouter = Router();
 function bridgeContext(req: Request, capability: string, idempotencyKey?: string) {
@@ -28,15 +29,35 @@ function bridgeContext(req: Request, capability: string, idempotencyKey?: string
 const healthBridgeContext = (correlationId: string) => ({
   tenantId: 1, principalType: "SERVICE", principalId: "api-server-health", capability: "execution:health", correlationId,
 });
-async function recordQueued(req: Request, action: string, targetId: string): Promise<void> {
+async function recordAttempt(
+  req: Request,
+  action: string,
+  targetId: string,
+  decision: "QUEUED" | "ACCEPTED" | "FAILED" | "DENIED",
+  reasonCode: string,
+  metadata: Record<string, unknown> = {},
+): Promise<void> {
   const tenantId = singleTenantScope(req);
-  await db.transaction((tx) => appendAudit(tx, { tenantId, principal: req.principal!, action, targetType: "meta_cube_execution", targetId, decision: "QUEUED", reasonCode: "META_CUBE_REQUEST_QUEUED", correlationId: String(req.id), metadata: { idempotencyKey: req.header("idempotency-key")?.slice(0, 128) } }));
+  await db.transaction((tx) => appendAudit(tx, {
+    tenantId, principal: req.principal!, action, targetType: "meta_cube_execution",
+    targetId, decision, reasonCode, correlationId: String(req.id), metadata,
+  }));
+}
+async function recordFailedAttempt(req: Request, action: string, targetId: string, error: unknown, idempotencyKey: string): Promise<void> {
+  const denied = error instanceof MetaCubeClientError && error.status >= 400 && error.status < 500;
+  try {
+    await recordAttempt(req, action, targetId, denied ? "DENIED" : "FAILED", denied ? "META_CUBE_REQUEST_DENIED" : "META_CUBE_REQUEST_FAILED", {
+      idempotencyKey, upstreamStatus: error instanceof MetaCubeClientError ? error.status : null,
+    });
+  } catch (auditError) {
+    req.log.error({ err: auditError }, "Failed to record META-CUBE failed attempt");
+  }
 }
 function requireIdempotency(req: Request, res: Response, bodyKey?: string): string | undefined {
   // Submission already exposes idempotencyKey in its generated body contract.
   // Retry/recover use the generated client's RequestInit header option.
-  const key = req.header("idempotency-key") ?? bodyKey;
-  if (!key || key.length > 128) { res.status(400).json({ error: "IDEMPOTENCY_KEY_REQUIRED", code: "IDEMPOTENCY_KEY_REQUIRED" }); return; }
+  const key = validatedIdempotencyKey(req.header("idempotency-key"), bodyKey);
+  if (!key) { res.status(400).json({ error: "IDEMPOTENCY_KEY_REQUIRED", code: "IDEMPOTENCY_KEY_REQUIRED" }); return; }
   return key;
 }
 
@@ -86,23 +107,24 @@ router.post("/meta-cube/executions", requireCapability("execution:submit", singl
     res.status(400).json({ error: body.error.message });
     return;
   }
+  const idempotencyKey = requireIdempotency(req, res, body.data.idempotencyKey);
+  if (!idempotencyKey) return;
+  let parsed: ReturnType<typeof GetMetaCubeExecutionResponse.parse>;
   try {
-    // The audit is intentionally QUEUED, never a claim that META-CUBE finished.
-    // No auth-context header is forwarded until META-CUBE validates the contract.
-    await recordQueued(req, "execution:submit", body.data.idempotencyKey ?? String(req.id));
-    const idempotencyKey = requireIdempotency(req, res, body.data.idempotencyKey);
-    if (!idempotencyKey) return;
-    const data = await callMetaCube("v1/events", {
-      method: "POST",
-      body: { ...body.data, idempotencyKey },
-      correlationId: String(req.id),
-      context: bridgeContext(req, "execution:submit", idempotencyKey),
-    });
-    res.status(202).json(GetMetaCubeExecutionResponse.parse(data));
+    parsed = await auditedHandoff(
+      async () => GetMetaCubeExecutionResponse.parse(await callMetaCube("v1/events", {
+        method: "POST", body: { ...body.data, idempotencyKey },
+        correlationId: String(req.id), context: bridgeContext(req, "execution:submit", idempotencyKey),
+      })),
+      async (accepted) => recordAttempt(req, "execution:submit", accepted.id, "QUEUED", "META_CUBE_REQUEST_QUEUED", { idempotencyKey, executionId: accepted.id }),
+      async (error) => recordFailedAttempt(req, "execution:submit", idempotencyKey, error, idempotencyKey),
+    );
   } catch (error) {
     req.log.warn({ err: error }, "META-CUBE execution submission failed");
     sendError(res, error);
+    return;
   }
+  res.status(202).json(parsed);
 });
 
 router.get("/meta-cube/executions/:id", requireCapability("execution:read", singleTenantScope), async (req, res): Promise<void> => {
@@ -130,16 +152,21 @@ router.post("/meta-cube/executions/:id/retry", requireCapability("execution:retr
     res.status(400).json({ error: params.error.message });
     return;
   }
+  let parsed: ReturnType<typeof GetMetaCubeExecutionResponse.parse>;
   try {
-    await recordQueued(req, "execution:retry", params.data.id);
-    const data = await callMetaCube(
-      `v1/executions/${encodeURIComponent(params.data.id)}/retry`,
-      { method: "POST", correlationId: String(req.id), context: bridgeContext(req, "execution:retry", idempotencyKey) },
+    parsed = await auditedHandoff(
+      async () => GetMetaCubeExecutionResponse.parse(await callMetaCube(
+        `v1/executions/${encodeURIComponent(params.data.id)}/retry`,
+        { method: "POST", correlationId: String(req.id), context: bridgeContext(req, "execution:retry", idempotencyKey) },
+      )),
+      async (accepted) => recordAttempt(req, "execution:retry", accepted.id, "ACCEPTED", "META_CUBE_RETRY_ACCEPTED", { idempotencyKey, requestedExecutionId: params.data.id, executionId: accepted.id }),
+      async (error) => recordFailedAttempt(req, "execution:retry", params.data.id, error, idempotencyKey),
     );
-    res.status(202).json(GetMetaCubeExecutionResponse.parse(data));
   } catch (error) {
     sendError(res, error);
+    return;
   }
+  res.status(202).json(parsed);
 });
 
 router.post("/meta-cube/executions/:id/recover", requireCapability("execution:recover", singleTenantScope), async (req, res): Promise<void> => {
@@ -150,16 +177,21 @@ router.post("/meta-cube/executions/:id/recover", requireCapability("execution:re
     res.status(400).json({ error: params.error.message });
     return;
   }
+  let parsed: ReturnType<typeof GetMetaCubeExecutionResponse.parse>;
   try {
-    await recordQueued(req, "execution:recover", params.data.id);
-    const data = await callMetaCube(
-      `v1/executions/${encodeURIComponent(params.data.id)}/recover`,
-      { method: "POST", correlationId: String(req.id), context: bridgeContext(req, "execution:recover", idempotencyKey) },
+    parsed = await auditedHandoff(
+      async () => GetMetaCubeExecutionResponse.parse(await callMetaCube(
+        `v1/executions/${encodeURIComponent(params.data.id)}/recover`,
+        { method: "POST", correlationId: String(req.id), context: bridgeContext(req, "execution:recover", idempotencyKey) },
+      )),
+      async (accepted) => recordAttempt(req, "execution:recover", accepted.id, "ACCEPTED", "META_CUBE_RECOVERY_ACCEPTED", { idempotencyKey, requestedExecutionId: params.data.id, executionId: accepted.id }),
+      async (error) => recordFailedAttempt(req, "execution:recover", params.data.id, error, idempotencyKey),
     );
-    res.status(202).json(GetMetaCubeExecutionResponse.parse(data));
   } catch (error) {
     sendError(res, error);
+    return;
   }
+  res.status(202).json(parsed);
 });
 
 router.get("/meta-cube/dlq", requireCapability("execution:dlq:operate", singleTenantScope), async (req, res): Promise<void> => {

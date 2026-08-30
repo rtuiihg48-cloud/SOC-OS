@@ -72,9 +72,14 @@ class ExecutionWorker:
             try:
                 await self.redis.publish(self.stream, {"execution_id": execution_id})
             except Exception:
-                # The FileStore entry remains queued. _redis_loop's durable
-                # rescan is the outbox; local fallback executes it immediately.
+                # Invalidate the failed client before local fallback. Otherwise
+                # the Redis loop can keep treating a broken XADD transport as
+                # available and never enter its reconnect/outbox-rescan path.
                 self.transport_degraded = True
+                try:
+                    await self.redis.close()
+                except Exception:
+                    pass
                 await self.queue.put(execution_id)
         else:
             await self.queue.put(execution_id)

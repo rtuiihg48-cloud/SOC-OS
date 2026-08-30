@@ -1,4 +1,6 @@
-from meta_cube.engine import ExecutionEngine
+import pytest
+
+from meta_cube.engine import ExecutionEngine, IdempotencyConflict
 from meta_cube.models import EventRequest, ExecutionStatus, StepSpec
 
 
@@ -46,3 +48,20 @@ def test_dag_execution_preserves_dependencies(tmp_path):
     ]))
     assert result.status == ExecutionStatus.COMPLETED
     assert result.results["join"]["dependencies"] == {"a": "a", "b": "b"}
+
+
+def test_manual_operation_replays_durable_winner_and_rejects_retargeting(tmp_path):
+    path = tmp_path / "state.json"
+    engine = ExecutionEngine(path)
+    failed = engine.submit(EventRequest(
+        steps=[StepSpec(id="broken", action="fail")], max_attempts=1,
+    ))
+    winner = engine.transition_operation(0, failed.id, "retry", "manual-key")
+    assert winner.status == ExecutionStatus.CREATED
+
+    # A fresh engine simulates a process restart and must return the original
+    # operation response instead of attempting a second transition.
+    replay = ExecutionEngine(path).transition_operation(0, failed.id, "retry", "manual-key")
+    assert replay.model_dump() == winner.model_dump()
+    with pytest.raises(IdempotencyConflict, match="different operation or execution"):
+        ExecutionEngine(path).transition_operation(0, failed.id, "recover", "manual-key")

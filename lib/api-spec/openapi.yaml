@@ -985,7 +985,7 @@ paths:
     delete:
       operationId: deleteTenant
       tags: [tenants]
-      summary: Delete a tenant
+      summary: Deactivate a tenant while retaining audit evidence
       parameters:
         - name: id
           in: path
@@ -993,8 +993,12 @@ paths:
           schema:
             type: integer
       responses:
-        "204":
-          description: Deleted
+        "200":
+          description: Tenant deactivated (or already inactive)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
 
   # ─── RULES ────────────────────────────────────────────────────────────────
   /rules:
@@ -2456,12 +2460,18 @@ components:
         plan:
           type: string
           enum: [starter, pro, enterprise]
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED]
+        deactivatedAt:
+          type: ["string", "null"]
+          format: date-time
         createdAt:
           type: string
           format: date-time
         eventCount:
           type: integer
-      required: [id, name, apiKey, plan, createdAt]
+      required: [id, name, apiKey, plan, status, deactivatedAt, createdAt]
 
     CreateTenantBody:
       type: object

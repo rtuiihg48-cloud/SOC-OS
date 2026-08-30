@@ -4,9 +4,11 @@ import hashlib
 import hmac
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
 from meta_cube.api import create_app
+from meta_cube.store import FileStore
 from test_worker import InitiallyDownStream
 
 
@@ -22,6 +24,35 @@ def test_direct_requests_fail_closed(tmp_path, monkeypatch):
     monkeypatch.setenv("META_CUBE_INTERNAL_SECRET", "test-internal-secret")
     with TestClient(create_app(tmp_path / "state.json")) as client:
         assert client.get("/v1/executions").status_code == 401
+
+
+def test_production_requires_explicit_postgres_storage(monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_ENV", "production")
+    monkeypatch.delenv("META_CUBE_STORAGE", raising=False)
+    with pytest.raises(RuntimeError, match="META_CUBE_STORAGE=postgres"):
+        create_app()
+
+
+def test_production_rejects_file_storage_even_with_test_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_ENV", "production")
+    monkeypatch.setenv("META_CUBE_STORAGE", "file")
+    with pytest.raises(RuntimeError, match="META_CUBE_STORAGE=postgres"):
+        create_app(tmp_path / "state.json")
+
+
+def test_production_postgres_requires_database_url(monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_ENV", "production")
+    monkeypatch.setenv("META_CUBE_STORAGE", "postgres")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="DATABASE_URL"):
+        create_app()
+
+
+def test_development_allows_file_storage_fallback(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEPLOYMENT_ENV", "development")
+    monkeypatch.delenv("META_CUBE_STORAGE", raising=False)
+    app = create_app(tmp_path / "state.json")
+    assert isinstance(app.state.engine.store, FileStore)
 
 
 def test_tenant_filter_and_submit_idempotency_conflict(tmp_path, monkeypatch):

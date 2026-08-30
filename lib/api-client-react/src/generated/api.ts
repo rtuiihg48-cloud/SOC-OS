@@ -3546,11 +3546,11 @@ export const getDeleteTenantUrl = (id: number,) => {
 }
 
 /**
- * @summary Delete a tenant
+ * @summary Deactivate a tenant while retaining audit evidence
  */
-export const deleteTenant = async (id: number, options?: RequestInit): Promise<void> => {
+export const deleteTenant = async (id: number, options?: RequestInit): Promise<Tenant> => {
 
-  return customFetch<void>(getDeleteTenantUrl(id),
+  return customFetch<Tenant>(getDeleteTenantUrl(id),
   {
     ...options,
     method: 'DELETE'
@@ -3594,7 +3594,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteTenantMutationError = ErrorType<unknown>
 
     /**
- * @summary Delete a tenant
+ * @summary Deactivate a tenant while retaining audit evidence
  */
 export const useDeleteTenant = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTenant>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}

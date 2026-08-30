@@ -148,6 +148,52 @@ class ExecutionEngine:
                 data["executions"][execution_id] = record.model_dump(mode="json")
                 self.store.update(data)
 
+    def transition_operation(self, tenant_id: int, execution_id: str, action: str,
+                             idempotency_key: str) -> ExecutionRecord:
+        """Durably apply a manual API operation or replay its winning response."""
+        if hasattr(self.store, "transition_operation"):
+            try:
+                raw = self.store.transition_operation(tenant_id, execution_id, action, idempotency_key)  # type: ignore[attr-defined]
+            except ValueError as exc:
+                raise IdempotencyConflict(str(exc)) from exc
+            return ExecutionRecord.model_validate(raw)
+        # File mode remains process-local by design, but keeps the same
+        # replay/conflict contract and persists the winner for restarts.
+        with self._execution_lock:
+            with self.store.lock(f"operation:{tenant_id}:{idempotency_key}"):
+                data = self.store.read()
+                operations = data.setdefault("operations", {})
+                scoped = f"{tenant_id}:{idempotency_key}"
+                winner = operations.get(scoped)
+                if winner:
+                    if winner["execution_id"] != execution_id or winner["operation"] != action:
+                        raise IdempotencyConflict("idempotency key was already used for a different operation or execution")
+                    return ExecutionRecord.model_validate(winner["response"])
+                current = self.get(execution_id)
+                if current is None or current.tenant_id != tenant_id:
+                    raise KeyError(execution_id)
+                if action == "retry":
+                    if current.status not in {ExecutionStatus.FAILED, ExecutionStatus.DEAD_LETTER}:
+                        raise RuntimeError("retry is only valid for failed or dead-letter executions")
+                    record = self.retry(execution_id)
+                elif action == "recover":
+                    if not self.checkpoints(execution_id):
+                        raise RuntimeError("recovery requires at least one checkpoint")
+                    current.status = ExecutionStatus.RECOVERED
+                    current.recovered_at = current.updated_at = _now()
+                    data = self.store.read()
+                    data["executions"][execution_id] = current.model_dump(mode="json")
+                    self.store.update(data)
+                    record = current
+                else:
+                    raise ValueError(f"unsupported operation: {action}")
+                data = self.store.read()
+                data.setdefault("operations", {})[scoped] = {
+                    "execution_id": execution_id, "operation": action, "response": record.model_dump(mode="json"),
+                }
+                self.store.update(data)
+                return record
+
     def _run(self, execution_id: str, reset_failed: bool = False, recovered: bool = False) -> ExecutionRecord:
         data = self.store.read()
         record = ExecutionRecord.model_validate(data["executions"][execution_id])

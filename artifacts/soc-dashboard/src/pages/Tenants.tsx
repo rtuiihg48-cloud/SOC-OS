@@ -6,7 +6,7 @@ import {
   useDeleteTenant,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, Plus, Trash2, Database, Shield } from "lucide-react";
+import { Building2, Plus, Ban, Database, Shield } from "lucide-react";
 
 const PLAN_STYLES: Record<string, string> = {
   enterprise: "bg-primary/10 text-primary border-primary/30",
@@ -40,7 +40,7 @@ export default function Tenants() {
   }
 
   function handleDelete(id: number, name: string) {
-    if (!confirm(`Delete tenant "${name}"? This cannot be undone.`)) return;
+    if (!confirm(`Deactivate tenant "${name}"? Access and service credentials will be disabled while audit evidence is retained.`)) return;
     deleteTenant({ id }, { onSuccess: invalidate });
   }
 
@@ -169,9 +169,11 @@ export default function Tenants() {
                 {tenant.id !== 1 && (
                   <button
                     onClick={() => handleDelete(tenant.id, tenant.name)}
+                    title="Deactivate tenant"
+                    aria-label={`Deactivate tenant ${tenant.name}`}
                     className="p-2 rounded text-muted-foreground hover:text-critical hover:bg-critical/10 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Ban className="w-4 h-4" />
                   </button>
                 )}
               </div>

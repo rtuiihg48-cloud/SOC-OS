@@ -98,6 +98,112 @@ export async function appendAudit(tx: any, input: AuditInput) {
   await tx.update(auditChainHeadsTable).set({ sequence: payload.sequence, currentHash: hash, updatedAt: new Date() }).where(eq(auditChainHeadsTable.partitionKey, partitionKey));
   return record;
 }
+
+export type AuditReadinessRow = {
+  audit_records_exists: boolean;
+  audit_chain_heads_exists: boolean;
+  immutable_trigger_exists: boolean;
+  role_is_superuser: boolean;
+  role_owns_audit_records: boolean;
+  role_owns_audit_chain_heads: boolean;
+  can_select_audit_records: boolean;
+  can_insert_audit_records: boolean;
+  can_select_audit_chain_heads: boolean;
+  can_insert_audit_chain_heads: boolean;
+  can_update_audit_chain_heads: boolean;
+  can_use_audit_records_sequence: boolean;
+  can_select_audit_records_sequence: boolean;
+  can_update_audit_records: boolean;
+  can_delete_audit_records: boolean;
+  can_truncate_audit_records: boolean;
+  can_trigger_audit_records: boolean;
+};
+
+/** Run as the API role, never as the migration owner. */
+export const auditReadinessQuery = `
+SELECT
+  to_regclass('public.audit_records') IS NOT NULL AS audit_records_exists,
+  to_regclass('public.audit_chain_heads') IS NOT NULL AS audit_chain_heads_exists,
+  EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_records'
+      AND t.tgname = 'audit_records_immutable' AND t.tgenabled <> 'D'
+  ) AS immutable_trigger_exists,
+  (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS role_is_superuser,
+  COALESCE((SELECT c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS role_owns_audit_records,
+  COALESCE((SELECT c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_chain_heads'), false) AS role_owns_audit_chain_heads,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'SELECT')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_select_audit_records,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'INSERT')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_insert_audit_records,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'SELECT')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_chain_heads'), false) AS can_select_audit_chain_heads,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'INSERT')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_chain_heads'), false) AS can_insert_audit_chain_heads,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'UPDATE')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_chain_heads'), false) AS can_update_audit_chain_heads,
+  COALESCE(has_sequence_privilege(current_user, to_regclass('public.audit_records_id_seq'), 'USAGE'), false) AS can_use_audit_records_sequence,
+  COALESCE(has_sequence_privilege(current_user, to_regclass('public.audit_records_id_seq'), 'SELECT'), false) AS can_select_audit_records_sequence,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'UPDATE')
+   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_update_audit_records,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'DELETE')
+   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+   WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_delete_audit_records,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_truncate_audit_records,
+  COALESCE((SELECT has_table_privilege(current_user, c.oid, 'TRIGGER')
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'audit_records'), false) AS can_trigger_audit_records
+`;
+
+export function assessAuditReadiness(row: AuditReadinessRow) {
+  const failures: string[] = [];
+  if (!row.audit_records_exists) failures.push("audit_records table is missing");
+  if (!row.audit_chain_heads_exists) failures.push("audit_chain_heads table is missing");
+  if (!row.immutable_trigger_exists) failures.push("audit_records immutable trigger is missing or disabled");
+  if (row.role_is_superuser) failures.push("API database role is a superuser");
+  if (row.role_owns_audit_records) failures.push("API database role owns audit_records");
+  if (row.role_owns_audit_chain_heads) failures.push("API database role owns audit_chain_heads");
+  if (!row.can_select_audit_records) failures.push("API database role cannot SELECT audit_records");
+  if (!row.can_insert_audit_records) failures.push("API database role cannot INSERT audit_records");
+  if (!row.can_select_audit_chain_heads) failures.push("API database role cannot SELECT audit_chain_heads");
+  if (!row.can_insert_audit_chain_heads) failures.push("API database role cannot INSERT audit_chain_heads");
+  if (!row.can_update_audit_chain_heads) failures.push("API database role cannot UPDATE audit_chain_heads");
+  if (!row.can_use_audit_records_sequence) failures.push("API database role cannot USAGE audit_records_id_seq");
+  if (!row.can_select_audit_records_sequence) failures.push("API database role cannot SELECT audit_records_id_seq");
+  if (row.can_update_audit_records) failures.push("API database role can UPDATE audit_records");
+  if (row.can_delete_audit_records) failures.push("API database role can DELETE audit_records");
+  if (row.can_truncate_audit_records) failures.push("API database role can TRUNCATE audit_records");
+  if (row.can_trigger_audit_records) failures.push("API database role can TRIGGER audit_records");
+  return { ready: failures.length === 0, failures };
+}
+
+export async function assertAuditReadiness(pool: { query: (query: string) => Promise<{ rows: AuditReadinessRow[] }> }, production: boolean) {
+  try {
+    const row = (await pool.query(auditReadinessQuery)).rows[0];
+    const assessment = row ? assessAuditReadiness(row) : { ready: false, failures: ["audit readiness query returned no result"] };
+    if (production && !assessment.ready) {
+      throw new Error(`Audit readiness failed: ${assessment.failures.join("; ")}`);
+    }
+    return assessment;
+  } catch (error) {
+    if (production) throw error;
+    return { ready: false, failures: [error instanceof Error ? error.message : "audit readiness query failed"] };
+  }
+}
 export async function verifyAudit(db: any, tenantId: number | null, from?: Date, to?: Date) {
   const partitionKey = partitionFor(tenantId);
   const predicates = [eq(auditRecordsTable.partitionKey, partitionFor(tenantId))];

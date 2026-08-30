@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditHash, canonicalAuditPayload, sanitizeMetadata } from "./audit";
+import { assessAuditReadiness, auditHash, canonicalAuditPayload, sanitizeMetadata } from "./audit";
 import { authorize, capabilitiesForRoles, type Principal } from "./control-policy";
 
 const admin: Principal = { principalId: "1", principalType: "USER", tenantIds: [7], roles: ["SOC_ADMIN"], capabilities: capabilitiesForRoles(["SOC_ADMIN"]), authMethod: "CLERK", credentialVersion: 1, correlationId: "test" };
@@ -20,5 +20,26 @@ describe("security control plane", () => {
     expect(canonicalAuditPayload(first)).toBe(canonicalAuditPayload(second));
     expect(auditHash(first)).toBe(auditHash(second));
     expect(() => sanitizeMetadata({ value: undefined })).toThrow("JSON-compatible");
+  });
+  it("fails closed when the production API role can mutate audit evidence", () => {
+    const safe = {
+      audit_records_exists: true, audit_chain_heads_exists: true, immutable_trigger_exists: true,
+      role_is_superuser: false, role_owns_audit_records: false,
+      role_owns_audit_chain_heads: false,
+      can_select_audit_records: true, can_insert_audit_records: true,
+      can_select_audit_chain_heads: true, can_insert_audit_chain_heads: true, can_update_audit_chain_heads: true,
+      can_use_audit_records_sequence: true, can_select_audit_records_sequence: true,
+      can_update_audit_records: false, can_delete_audit_records: false, can_truncate_audit_records: false, can_trigger_audit_records: false,
+    };
+    expect(assessAuditReadiness(safe)).toEqual({ ready: true, failures: [] });
+    expect(assessAuditReadiness({ ...safe, can_delete_audit_records: true })).toEqual(
+      expect.objectContaining({ ready: false, failures: expect.arrayContaining(["API database role can DELETE audit_records"]) }),
+    );
+    expect(assessAuditReadiness({ ...safe, can_update_audit_chain_heads: false })).toEqual(
+      expect.objectContaining({ ready: false, failures: expect.arrayContaining(["API database role cannot UPDATE audit_chain_heads"]) }),
+    );
+    expect(assessAuditReadiness({ ...safe, can_trigger_audit_records: true })).toEqual(
+      expect.objectContaining({ ready: false, failures: expect.arrayContaining(["API database role can TRIGGER audit_records"]) }),
+    );
   });
 });

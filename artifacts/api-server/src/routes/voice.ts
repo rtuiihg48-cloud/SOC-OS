@@ -18,6 +18,7 @@ import {
 import { ExecuteVoiceCommandBody, PreviewVoiceCommandBody } from "@workspace/api-zod";
 import { and, count, eq, ilike } from "drizzle-orm";
 import { autoFix, buildEventResult } from "../lib/soc-engine";
+import { appendAudit } from "../lib/audit";
 
 const router = Router();
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -261,7 +262,8 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
     const criteriaResults = await Promise.all(plan.criteria.map(runCriterion));
     const hasMatch = criteriaResults.some(({ status }) => status === "MATCH");
     const recommendedAction = recommendedActionFor(plan.criteria, hasMatch);
-    await db.insert(virusDatabaseAuditTable).values({
+    await db.transaction(async (tx) => {
+    const [auditRow] = await tx.insert(virusDatabaseAuditTable).values({
       action: "VOICE_VIRUS_TEST",
       entityType: "voice_command",
       principalRef: principal(req),
@@ -272,6 +274,8 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
         recommendedAction,
         executionAllowed: false,
       },
+    }).returning();
+    await appendAudit(tx, { tenantId: req.principal!.tenantIds[0]!, principal: req.principal!, action: "voice:virus:test", targetType: "voice_command", targetId: String(auditRow.id), decision: "COMMITTED", reasonCode: "VOICE_VIRUS_TEST_RECORDED", correlationId: req.principal!.correlationId, metadata: { mode: plan.mode, recommendedAction, executionAllowed: false } });
     });
     res.json({
       intent: plan.intent,
@@ -305,7 +309,8 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
     };
   });
   const recommendedAction = syntheticDefense.some(({ action }) => action === "ISOLATE") ? "ISOLATE" as const : "WARN" as const;
-  await db.insert(virusDatabaseAuditTable).values({
+  await db.transaction(async (tx) => {
+  const [auditRow] = await tx.insert(virusDatabaseAuditTable).values({
     action: "VOICE_SYNTHETIC_DEFENSE",
     entityType: "voice_command",
     principalRef: principal(req),
@@ -316,6 +321,8 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
       executionAllowed: false,
       persistedToLiveEvents: false,
     },
+  }).returning();
+  await appendAudit(tx, { tenantId: req.principal!.tenantIds[0]!, principal: req.principal!, action: "voice:synthetic:defense", targetType: "voice_command", targetId: String(auditRow.id), decision: "COMMITTED", reasonCode: "VOICE_SYNTHETIC_DEFENSE_RECORDED", correlationId: req.principal!.correlationId, metadata: { scenarioCount: syntheticDefense.length, recommendedAction, executionAllowed: false, persistedToLiveEvents: false } });
   });
   res.json({
     intent: plan.intent,

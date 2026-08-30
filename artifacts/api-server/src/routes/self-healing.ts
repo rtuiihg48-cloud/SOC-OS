@@ -61,6 +61,7 @@ router.post("/self-healing/resources", requireCapability("self_healing:apply", s
     resourceKey: parsed.data.resourceKey,
     location: parsed.data.location,
     state: parsed.data.state,
+    audit: { principal: req.principal!, correlationId: req.principal!.correlationId },
   });
 
   res.status(201).json({
@@ -128,7 +129,7 @@ router.post("/self-healing/restore-points/:id/preview", requireCapability("self_
     res.status(404).json({ error: "Restore point or managed resource not found" });
     return;
   }
-  const result = await previewVerifiedRestorePoint(id, tenantId);
+  const result = await previewVerifiedRestorePoint(id, tenantId, { principal: req.principal!, correlationId: req.principal!.correlationId });
   if (!result) {
     res.status(404).json({ error: "Restore point or managed resource not found" });
     return;
@@ -168,6 +169,7 @@ router.post("/self-healing/restore-points/:id/apply", requireCapability("self_he
     tenantId,
     eventId: parsed.data.eventId ?? null,
     mode: "APPLY",
+    audit: { principal: req.principal!, correlationId: req.principal!.correlationId },
   });
   if (!result) {
     res.status(404).json({ error: "Restore point or managed resource not found" });

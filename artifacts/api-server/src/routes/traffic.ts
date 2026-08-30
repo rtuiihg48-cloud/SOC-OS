@@ -8,6 +8,7 @@ import {
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { analyzeTraffic } from "../lib/traffic-engine";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { appendAudit } from "../lib/audit";
 
 const router = Router();
 const ALLOWED_PROTOCOLS = new Set([
@@ -56,6 +57,7 @@ function validateTelemetry(
 async function insertObservation(
   input: ReturnType<typeof IngestTrafficTelemetryBody.parse>,
   tenantId: number,
+  executor: typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0] = db,
   isSynthetic = false,
 ) {
   const protocol = input.protocol.toUpperCase();
@@ -71,7 +73,7 @@ async function insertObservation(
     heartbeatStatus: input.heartbeatStatus,
     heartbeatLatencyMs: input.heartbeatLatencyMs,
   });
-  const [row] = await db
+  const [row] = await executor
     .insert(trafficObservationsTable)
     .values({
       // Telemetry's declared tenant is untrusted; credential/session scope is authoritative.
@@ -114,7 +116,18 @@ router.post("/traffic/telemetry", requireCapability("events:ingest", singleTenan
     return;
   }
   try {
-    const row = await insertObservation(parsed.data, req.principal!.tenantIds[0]!);
+    const tenantId = req.principal!.tenantIds[0]!;
+    const row = await db.transaction(async (tx) => {
+      const created = await insertObservation(parsed.data, tenantId, tx);
+      await appendAudit(tx, {
+        tenantId, principal: req.principal!, action: "traffic:telemetry:ingest",
+        targetType: "traffic_observation", targetId: String(created.id),
+        decision: "COMMITTED", reasonCode: "TRAFFIC_TELEMETRY_RECORDED",
+        correlationId: req.principal!.correlationId,
+        metadata: { gatewayId: created.gatewayId, observationType: created.observationType, isSynthetic: false },
+      });
+      return created;
+    });
     res.status(201).json(formatObservation(row));
   } catch (error) {
     if (hasDatabaseCode(error, "23505")) {
@@ -283,10 +296,20 @@ router.post("/traffic/synthetic", requireCapability("events:ingest", singleTenan
       tlsServerName: "synthetic-storage.invalid",
     },
   ];
-  const rows = [];
-  for (const input of inputs) {
-    rows.push(await insertObservation(IngestTrafficTelemetryBody.parse(input), req.principal!.tenantIds[0]!, true));
-  }
+  const tenantId = req.principal!.tenantIds[0]!;
+  const rows = await db.transaction(async (tx) => {
+    const created = [];
+    for (const input of inputs) {
+      created.push(await insertObservation(IngestTrafficTelemetryBody.parse(input), tenantId, tx, true));
+    }
+    await appendAudit(tx, {
+      tenantId, principal: req.principal!, action: "traffic:synthetic:create",
+      targetType: "traffic_synthetic_run", targetId: runId, decision: "COMMITTED",
+      reasonCode: "SYNTHETIC_TRAFFIC_RECORDED", correlationId: req.principal!.correlationId,
+      metadata: { observationCount: created.length, gatewayId: "synthetic-gateway" },
+    });
+    return created;
+  });
   res.status(201).json(rows.map(formatObservation));
 });
 

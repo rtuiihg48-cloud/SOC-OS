@@ -12,6 +12,13 @@ from psycopg_pool import ConnectionPool
 class PostgresStore:
     """PostgreSQL implementation of Store using short parameterized queries."""
 
+    _AUTHORITATIVE_TABLES = (
+        "meta_cube_executions",
+        "meta_cube_checkpoints",
+        "meta_cube_dlq",
+        "meta_cube_operation_idempotency",
+    )
+
     def __init__(self, database_url: str, min_size: int | None = None, max_size: int | None = None) -> None:
         self.database_url = database_url
         self.pool = ConnectionPool(
@@ -23,9 +30,31 @@ class PostgresStore:
         self._local = threading.local()
 
     def open(self) -> None:
-        self.pool.open(wait=True)
-        with self.pool.connection() as conn:
-            conn.execute("SELECT 1")
+        try:
+            self.pool.open(wait=True)
+            with self.pool.connection() as conn:
+                conn.execute("SELECT 1")
+                self._verify_authoritative_schema(conn)
+        except Exception:
+            self.pool.close()
+            raise
+
+    @classmethod
+    def _verify_authoritative_schema(cls, conn) -> None:
+        """Fail closed unless the authoritative META-CUBE migration is installed."""
+        rows = conn.execute(
+            """SELECT table_name
+               FROM information_schema.tables
+               WHERE table_schema = 'public' AND table_name = ANY(%s)""",
+            (list(cls._AUTHORITATIVE_TABLES),),
+        )
+        present = {row[0] for row in rows}
+        missing = [table for table in cls._AUTHORITATIVE_TABLES if table not in present]
+        if missing:
+            raise RuntimeError(
+                "META-CUBE authoritative migration is not installed; missing tables: "
+                + ", ".join(missing)
+            )
 
     def close(self) -> None:
         self.pool.close()
@@ -175,3 +204,89 @@ class PostgresStore:
         else:
             connection.execute("DELETE FROM meta_cube_dlq WHERE execution_id=%s", (execution_id,))
             connection.commit()
+
+    def transition_operation(self, tenant_id: int, execution_id: str, operation: str,
+                             idempotency_key: str) -> dict[str, Any]:
+        """Claim an operation key and persist its state transition atomically.
+
+        This deliberately uses the same checked-out session for the advisory
+        lock, unique claim, and execution update.  A replay returns the JSON
+        response captured by the winning request, not the execution's later
+        worker-mutated state.
+        """
+        with self.pool.connection() as conn:
+            scope = f"execution:{execution_id}"
+            with conn.transaction():
+                # Transaction-scoped locking is acquired inside the transaction
+                # whose commit publishes both the transition and its response.
+                # A waiter cannot proceed until that commit is visible.
+                conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (scope,))
+                existing = conn.execute(
+                        """SELECT execution_id, operation, response_data
+                           FROM meta_cube_operation_idempotency
+                           WHERE tenant_id=%s AND idempotency_key=%s""",
+                        (tenant_id, idempotency_key),
+                ).fetchone()
+                if existing:
+                    if existing[0] != execution_id or existing[1] != operation:
+                        raise ValueError("idempotency key was already used for a different operation or execution")
+                    return existing[2]
+                row = conn.execute(
+                    "SELECT data FROM meta_cube_executions WHERE id=%s AND tenant_id=%s FOR UPDATE",
+                    (execution_id, tenant_id),
+                ).fetchone()
+                if row is None:
+                    raise KeyError(execution_id)
+                record = row[0]
+                if operation == "retry":
+                    if record["status"] not in {"failed", "dead_letter"}:
+                        raise RuntimeError("retry is only valid for failed or dead-letter executions")
+                    incomplete = next((step["id"] for step in record["steps"]
+                                       if step["id"] not in record["results"]), None)
+                    if incomplete is not None:
+                        record["attempts"][incomplete] = 0
+                    record["status"], record["error"], record["finished_at"] = "created", None, None
+                elif operation == "recover":
+                    checkpoint = conn.execute(
+                        "SELECT 1 FROM meta_cube_checkpoints WHERE execution_id=%s LIMIT 1", (execution_id,)
+                    ).fetchone()
+                    if checkpoint is None:
+                        raise RuntimeError("recovery requires at least one checkpoint")
+                    record["status"] = "recovered"
+                    record["recovered_at"] = record["updated_at"]
+                else:
+                    raise ValueError(f"unsupported operation: {operation}")
+                # Keep the durable response identical to the accepted
+                # transition and update the denormalized columns too.
+                from datetime import UTC, datetime
+                record["updated_at"] = datetime.now(UTC).isoformat()
+                conn.execute(
+                    """UPDATE meta_cube_executions SET status=%s, completed_steps=%s, attempts=%s,
+                       error=%s, updated_at=%s, finished_at=%s, data=%s WHERE id=%s""",
+                    (record["status"], Jsonb(list(record["results"])), Jsonb(record["attempts"]),
+                     record["error"], record["updated_at"], record.get("finished_at"), Jsonb(record), execution_id),
+                )
+                if operation == "retry":
+                    conn.execute("DELETE FROM meta_cube_dlq WHERE execution_id=%s", (execution_id,))
+                claimed = conn.execute(
+                    """INSERT INTO meta_cube_operation_idempotency
+                       (tenant_id, execution_id, operation, idempotency_key, response_data)
+                       VALUES (%s,%s,%s,%s,%s)
+                       ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
+                       RETURNING execution_id, operation, response_data""",
+                    (tenant_id, execution_id, operation, idempotency_key, Jsonb(record)),
+                ).fetchone()
+                if claimed is None:
+                    # A different execution's advisory lock cannot protect
+                    # this key, so resolve the table-level unique race after
+                    # PostgreSQL has waited for its winner.
+                    winner = conn.execute(
+                        """SELECT execution_id, operation, response_data
+                           FROM meta_cube_operation_idempotency
+                           WHERE tenant_id=%s AND idempotency_key=%s""",
+                        (tenant_id, idempotency_key),
+                    ).fetchone()
+                    if winner and winner[0] == execution_id and winner[1] == operation:
+                        return winner[2]
+                    raise ValueError("idempotency key was already used for a different operation or execution")
+                return record

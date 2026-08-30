@@ -26,6 +26,8 @@ import {
 } from "@workspace/api-zod";
 import { and, count, desc, eq, ilike, inArray } from "drizzle-orm";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { appendAudit } from "../lib/audit";
+import type { Principal } from "../lib/control-policy";
 
 const router = Router();
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -56,8 +58,16 @@ async function audit(
     principalRef: string;
     outcome: "ALLOWED" | "DENIED" | "COMPLETED" | "FAILED";
     details?: Record<string, unknown>;
+    canonicalPrincipal: Principal;
+    correlationId: string;
   },
 ) {
+  // A standalone local-audit write is still durable state. Ensure its canonical
+  // chain record commits or rolls back with it just like domain mutations.
+  if (executor === db) {
+    await db.transaction((tx) => audit(tx, input));
+    return;
+  }
   await executor.insert(virusDatabaseAuditTable).values({
     tenantId: input.tenantId ?? null,
     action: input.action,
@@ -66,6 +76,12 @@ async function audit(
     principalRef: input.principalRef,
     outcome: input.outcome,
     details: input.details ?? {},
+  });
+  await appendAudit(executor, {
+    tenantId: input.tenantId ?? null, principal: input.canonicalPrincipal,
+    action: `virus:${input.action.toLowerCase()}`, targetType: input.entityType,
+    targetId: String(input.entityId ?? "none"), decision: "COMMITTED",
+    reasonCode: input.action, correlationId: input.correlationId, metadata: input.details,
   });
 }
 
@@ -270,6 +286,7 @@ router.post("/virus-db/entries", requireCapability("virus:write", singleTenantSc
         principalRef: principal(req),
         outcome: "COMPLETED",
         details: { sha256, sourceId, indicatorType: "SHA256" },
+        canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
       });
       return entry.id;
     });
@@ -310,6 +327,7 @@ router.post("/virus-db/indicators/lookup", requireCapability("virus:read", singl
       principalRef: principal(req),
       outcome: "COMPLETED",
       details: { matched: false, sha256 },
+      canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
     });
     res.json({
       matched: false,
@@ -331,8 +349,8 @@ router.post("/virus-db/indicators/lookup", requireCapability("virus:read", singl
       res.status(404).json({ error: "Security event not found" });
       return;
     }
-    const [row] = await db
-      .insert(virusMatchesTable)
+    const [row] = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(virusMatchesTable)
       .values({
         tenantId,
         eventId: parsed.data.eventId,
@@ -348,6 +366,14 @@ router.post("/virus-db/indicators/lookup", requireCapability("virus:read", singl
         evidenceReference: `event:${parsed.data.eventId}:sha256:${sha256}`,
       })
       .returning();
+      await appendAudit(tx, {
+        tenantId, principal: req.principal!, action: "virus:exact_hash_match:create",
+        targetType: "virus_match", targetId: String(created.id), decision: "COMMITTED",
+        reasonCode: "EXACT_HASH_MATCH_RECORDED", correlationId: req.principal!.correlationId,
+        metadata: { indicatorId: indicator.id, eventId: parsed.data.eventId },
+      });
+      return [created];
+    });
     match = formatMatch(row);
   }
   await audit(db, {
@@ -358,6 +384,7 @@ router.post("/virus-db/indicators/lookup", requireCapability("virus:read", singl
     principalRef: principal(req),
     outcome: "COMPLETED",
     details: { matched: true, sha256, eventId: parsed.data.eventId ?? null },
+    canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
   });
   res.json({
     matched: true,
@@ -421,6 +448,7 @@ router.post("/virus-db/samples/intake", requireCapability("virus:write", singleT
         principalRef: principal(req),
         outcome: "COMPLETED",
         details: { sha256, sizeBytes: row.sizeBytes, binaryStored: false },
+        canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
       });
       return row;
     });
@@ -464,6 +492,7 @@ router.post("/virus-db/samples/:id/download-request", requireCapability("virus:r
       principalRef: principal(req),
       outcome: "DENIED",
       details: { reason: "AUTHORIZATION_EXECUTION_PLANE_NOT_CONFIGURED" },
+      canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
     });
   });
   res.status(403).json({ error: "Private sample download is disabled until authorization is configured" });
@@ -494,6 +523,7 @@ router.post("/virus-db/feeds", requireCapability("virus:write", singleTenantScop
         principalRef: principal(req),
         outcome: "COMPLETED",
         details: { adapterKind: row.adapterKind },
+        canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
       });
       return row;
     });
@@ -538,6 +568,7 @@ router.post("/virus-db/feeds/:id/sync", requireCapability("virus:write", singleT
         principalRef: principal(req),
         outcome: "COMPLETED",
         details: { sourceId, sourceVersion: row.sourceVersion },
+        canonicalPrincipal: req.principal!, correlationId: req.principal!.correlationId,
       });
       return row;
     });

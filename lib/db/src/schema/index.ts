@@ -10,8 +10,10 @@ export const tenantsTable = pgTable("tenants", {
   name: text("name").notNull(),
   apiKey: text("api_key").notNull(),
   plan: text("plan").notNull().default("starter"), // starter | pro | enterprise
+  status: text("status").notNull().default("ACTIVE"),
+  deactivatedAt: timestamp("deactivated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [check("tenants_status_check", sql`${table.status} IN ('ACTIVE','DISABLED')`)]);
 
 // ─── Security control-plane identities and immutable audit evidence ──────────
 export const controlPlaneUsersTable = pgTable("control_plane_users", {
@@ -542,7 +544,7 @@ export const virusDatabaseAuditTable = pgTable("virus_database_audit", {
 ]);
 
 // ─── Derived types ────────────────────────────────────────────────────────────
-export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
+export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true, status: true, deactivatedAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenantsTable.$inferSelect;
 

@@ -10,14 +10,36 @@ from meta_cube.models import EventRequest, ExecutionStatus, StepSpec
 from meta_cube.postgres_store import PostgresStore
 
 
-pytestmark = pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="requires DATABASE_URL")
+class _SchemaResult:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
+class _SchemaConnection:
+    def __init__(self, tables: list[str]):
+        self.tables = tables
+
+    def execute(self, *_args, **_kwargs):
+        return _SchemaResult([(table,) for table in self.tables])
+
+
+def test_authoritative_schema_check_rejects_missing_migration_tables():
+    with pytest.raises(RuntimeError, match="authoritative migration.*meta_cube_dlq"):
+        PostgresStore._verify_authoritative_schema(
+            _SchemaConnection(["meta_cube_executions", "meta_cube_checkpoints", "meta_cube_operation_idempotency"])
+        )
 
 
 def _migration_exists(store: PostgresStore) -> bool:
     with store.pool.connection() as connection:
-        return connection.execute("SELECT to_regclass('meta_cube_executions')").fetchone()[0] is not None
+        return all(connection.execute("SELECT to_regclass(%s)", (name,)).fetchone()[0] is not None
+                   for name in ("meta_cube_executions", "meta_cube_operation_idempotency"))
 
 
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="requires DATABASE_URL")
 def test_postgres_instances_are_idempotent_and_visible():
     """Uses only unique test IDs and removes only rows created by this test."""
     url = os.environ["DATABASE_URL"]
@@ -63,8 +85,18 @@ def test_postgres_instances_are_idempotent_and_visible():
         created_ids.append(failed.id)
         assert failed.status == ExecutionStatus.DEAD_LETTER
         assert any(item.execution_id == failed.id for item in engine_b.dlq())
-        retried = engine_b.retry(failed.id)
-        assert retried.status == ExecutionStatus.CREATED
+        barrier = threading.Barrier(2)
+
+        def retry(engine: ExecutionEngine):
+            barrier.wait()
+            return engine.transition_operation(0, failed.id, "retry", f"{token}-manual-retry")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            retried = list(executor.map(retry, (engine_a, engine_b)))
+        assert {record.status for record in retried} == {ExecutionStatus.CREATED}
+        # The response is captured at the winning transition, so it remains
+        # stable even when read through another store/process afterwards.
+        assert engine_b.transition_operation(0, failed.id, "retry", f"{token}-manual-retry").model_dump() == retried[0].model_dump()
         assert not any(item.execution_id == failed.id for item in engine_a.dlq())
     finally:
         # FK cascade deletes checkpoints and DLQ rows. Parameterized per-ID
@@ -78,6 +110,7 @@ def test_postgres_instances_are_idempotent_and_visible():
         second.close()
 
 
+@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="requires DATABASE_URL")
 def test_postgres_pool_one_accept_and_atomic_retry_rollback():
     """A scoped accept must not checkout a second connection from pool size one."""
     url = os.environ["DATABASE_URL"]

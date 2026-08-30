@@ -130,10 +130,21 @@ def execution_view(record: ExecutionRecord) -> ExecutionView:
 
 def create_app(state_path: str | Path | None = None, redis_adapter: RedisStreamAdapter | None = None,
                storage_mode: str | None = None) -> FastAPI:
+    deployment_environment = (
+        os.getenv("DEPLOYMENT_ENV")
+        or os.getenv("NODE_ENV")
+        or os.getenv("ENVIRONMENT")
+        or "development"
+    ).lower()
+    production = deployment_environment == "production"
     # A supplied path is an intentional isolated file-store injection for
-    # tests/tools. The module-level production app calls this with no path.
+    # tests/tools, but never overrides production durability requirements.
     storage_mode = (storage_mode or ("file" if state_path is not None
                                      else os.getenv("META_CUBE_STORAGE", "file"))).lower()
+    if production and storage_mode != "postgres":
+        raise RuntimeError(
+            "META_CUBE_STORAGE=postgres is required when the deployment environment is production"
+        )
     if storage_mode == "postgres":
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
@@ -204,36 +215,29 @@ def create_app(state_path: str | Path | None = None, redis_adapter: RedisStreamA
     @app.post("/v1/executions/{execution_id}/retry", response_model=ExecutionView,
               response_model_by_alias=True, status_code=202)
     async def retry(execution_id: str, context: BridgeContext = Depends(require_bridge("execution:retry"))) -> ExecutionView:
-        current = engine.get(execution_id)
-        if current is None or current.tenant_id != context.tenant_id:
-            raise HTTPException(404, "execution not found")
         if not context.idempotency_key:
             raise HTTPException(400, "idempotency key is required")
-        duplicate = engine.operation(execution_id, "retry", context.idempotency_key)
-        if duplicate:
-            return execution_view(duplicate)
-        if current.status not in {ExecutionStatus.FAILED, ExecutionStatus.DEAD_LETTER}:
-            raise HTTPException(409, "retry is only valid for failed or dead-letter executions")
-        record = engine.retry(execution_id)
-        engine.remember_operation(execution_id, "retry", context.idempotency_key)
+        try:
+            record = engine.transition_operation(context.tenant_id, execution_id, "retry", context.idempotency_key)
+        except KeyError:
+            raise HTTPException(404, "execution not found") from None
+        except (IdempotencyConflict, RuntimeError) as exc:
+            raise HTTPException(409, str(exc)) from exc
         await worker.submit(record.id)
         return execution_view(record)
 
     @app.post("/v1/executions/{execution_id}/recover", response_model=ExecutionView,
               response_model_by_alias=True, status_code=202)
     async def recover(execution_id: str, context: BridgeContext = Depends(require_bridge("execution:recover"))) -> ExecutionView:
-        current = engine.get(execution_id)
-        if current is None or current.tenant_id != context.tenant_id:
-            raise HTTPException(404, "execution not found")
         if not context.idempotency_key:
             raise HTTPException(400, "idempotency key is required")
-        duplicate = engine.operation(execution_id, "recover", context.idempotency_key)
-        if duplicate:
-            return execution_view(duplicate)
-        if not engine.checkpoints(execution_id):
-            raise HTTPException(409, "recovery requires at least one checkpoint")
-        record = engine.recover(execution_id)
-        engine.remember_operation(execution_id, "recover", context.idempotency_key)
+        try:
+            record = engine.transition_operation(context.tenant_id, execution_id, "recover", context.idempotency_key)
+        except KeyError:
+            raise HTTPException(404, "execution not found") from None
+        except (IdempotencyConflict, RuntimeError) as exc:
+            raise HTTPException(409, str(exc)) from exc
+        await worker.submit(record.id)
         return execution_view(record)
 
     @app.get("/v1/dlq", response_model=list[ExecutionView], response_model_by_alias=True)
