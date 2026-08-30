@@ -37,6 +37,8 @@ import type {
   MetaCubeExecutionInput,
   MetaCubeHealth,
   MitreStat,
+  ObserverAgentInput,
+  ObserverAgentRun,
   Patch,
   PipelineResult,
   QueueStats,
@@ -142,6 +144,77 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getRunObserverAgentUrl = () => {
+
+
+
+
+  return `/api/agent/observe`
+}
+
+/**
+ * @summary Run a policy-gated observer-only analysis
+ */
+export const runObserverAgent = async (observerAgentInput: ObserverAgentInput, options?: RequestInit): Promise<ObserverAgentRun> => {
+
+  return customFetch<ObserverAgentRun>(getRunObserverAgentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      observerAgentInput,)
+  }
+);}
+
+
+
+
+export const getRunObserverAgentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runObserverAgent>>, TError,{data: BodyType<ObserverAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runObserverAgent>>, TError,{data: BodyType<ObserverAgentInput>}, TContext> => {
+
+const mutationKey = ['runObserverAgent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runObserverAgent>>, {data: BodyType<ObserverAgentInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  runObserverAgent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunObserverAgentMutationResult = NonNullable<Awaited<ReturnType<typeof runObserverAgent>>>
+    export type RunObserverAgentMutationBody = BodyType<ObserverAgentInput>
+    export type RunObserverAgentMutationError = ErrorType<void>
+
+    /**
+ * @summary Run a policy-gated observer-only analysis
+ */
+export const useRunObserverAgent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runObserverAgent>>, TError,{data: BodyType<ObserverAgentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runObserverAgent>>,
+        TError,
+        {data: BodyType<ObserverAgentInput>},
+        TContext
+      > => {
+      return useMutation(getRunObserverAgentMutationOptions(options));
+    }
 
 export const getListEventsUrl = (params?: ListEventsParams,) => {
   const normalizedParams = new URLSearchParams();

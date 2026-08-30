@@ -9,6 +9,56 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ObserverAgentInputTaskType = typeof ObserverAgentInputTaskType[keyof typeof ObserverAgentInputTaskType];
+
+
+export const ObserverAgentInputTaskType = {
+  analyze_event: 'analyze_event',
+  analyze_system: 'analyze_system',
+  inspect_memory: 'inspect_memory',
+} as const;
+
+export interface ObserverAgentInput {
+  taskType: ObserverAgentInputTaskType;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  instruction: string;
+  /** @maxLength 10000 */
+  event?: string;
+  /** @minimum 1 */
+  tenantId?: number;
+}
+
+export type ObserverAgentRunStatus = typeof ObserverAgentRunStatus[keyof typeof ObserverAgentRunStatus];
+
+
+export const ObserverAgentRunStatus = {
+  blocked: 'blocked',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type ObserverAgentRunPolicy = { [key: string]: unknown };
+
+export type ObserverAgentRunPlanItem = { [key: string]: unknown };
+
+export type ObserverAgentRunResultsItem = { [key: string]: unknown };
+
+export type ObserverAgentRunReflection = { [key: string]: unknown };
+
+export interface ObserverAgentRun {
+  runId: string;
+  status: ObserverAgentRunStatus;
+  input: ObserverAgentInput;
+  policy: ObserverAgentRunPolicy;
+  plan: ObserverAgentRunPlanItem[];
+  results: ObserverAgentRunResultsItem[];
+  reflection: ObserverAgentRunReflection;
+  productionChanged: false;
+}
+
 export type VoiceTranscriptionFormat = typeof VoiceTranscriptionFormat[keyof typeof VoiceTranscriptionFormat];
 
 

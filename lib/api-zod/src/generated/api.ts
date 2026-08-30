@@ -17,6 +17,47 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Run a policy-gated observer-only analysis
+ */
+export const runObserverAgentBodyInstructionMax = 2000;
+
+export const runObserverAgentBodyEventMax = 10000;
+
+
+
+
+export const RunObserverAgentBody = zod.object({
+  "taskType": zod.enum(['analyze_event', 'analyze_system', 'inspect_memory']),
+  "instruction": zod.string().min(1).max(runObserverAgentBodyInstructionMax),
+  "event": zod.string().max(runObserverAgentBodyEventMax).optional(),
+  "tenantId": zod.number().min(1).optional()
+})
+
+export const runObserverAgentResponseInputInstructionMax = 2000;
+
+export const runObserverAgentResponseInputEventMax = 10000;
+
+
+
+
+export const RunObserverAgentResponse = zod.object({
+  "runId": zod.string().uuid(),
+  "status": zod.enum(['blocked', 'completed', 'failed']),
+  "input": zod.object({
+  "taskType": zod.enum(['analyze_event', 'analyze_system', 'inspect_memory']),
+  "instruction": zod.string().min(1).max(runObserverAgentResponseInputInstructionMax),
+  "event": zod.string().max(runObserverAgentResponseInputEventMax).optional(),
+  "tenantId": zod.number().min(1).optional()
+}),
+  "policy": zod.record(zod.string(), zod.unknown()),
+  "plan": zod.array(zod.record(zod.string(), zod.unknown())),
+  "results": zod.array(zod.record(zod.string(), zod.unknown())),
+  "reflection": zod.record(zod.string(), zod.unknown()),
+  "productionChanged": zod.literal(false)
+})
+
+
+/**
  * @summary List security events
  */
 export const ListEventsQueryParams = zod.object({

@@ -24,6 +24,8 @@ tags:
     description: Attack chain correlations
   - name: runtime
     description: META-CUBE execution runtime
+  - name: agent
+    description: Observer-only agent analysis
 paths:
   /healthz:
     get:
@@ -37,6 +39,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /agent/observe:
+    post:
+      operationId: runObserverAgent
+      tags: [agent]
+      summary: Run a policy-gated observer-only analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObserverAgentInput"
+      responses:
+        "200":
+          description: Observer analysis completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObserverAgentRun"
+        "400":
+          description: Invalid observer request
+        "403":
+          description: Policy blocked the requested action
 
   /events:
     get:
@@ -713,6 +738,56 @@ components:
         status:
           type: string
       required: [status]
+
+    ObserverAgentInput:
+      type: object
+      properties:
+        taskType:
+          type: string
+          enum: [analyze_event, analyze_system, inspect_memory]
+        instruction:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        event:
+          type: string
+          maxLength: 10000
+        tenantId:
+          type: integer
+          minimum: 1
+      required: [taskType, instruction]
+
+    ObserverAgentRun:
+      type: object
+      properties:
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [blocked, completed, failed]
+        input:
+          $ref: "#/components/schemas/ObserverAgentInput"
+        policy:
+          type: object
+          additionalProperties: true
+        plan:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        reflection:
+          type: object
+          additionalProperties: true
+        productionChanged:
+          type: boolean
+          enum: [false]
+      required: [runId, status, input, policy, plan, results, reflection, productionChanged]
 
     VoiceTranscription:
       type: object

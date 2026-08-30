@@ -261,6 +261,7 @@ export function analyzeEvent(
   event: string,
   cpuUsage = 0,
   memUsage = 0,
+  options: { trackVelocity?: boolean } = {},
 ): {
   score: number;
   severity: Severity;
@@ -277,7 +278,7 @@ export function analyzeEvent(
   if (memUsage > 85) score += 5;
   if (cpuUsage > 70 && memUsage > 70) score += 3;
 
-  const velocityFlag = score > 0 ? checkVelocity(velocityKey) : false;
+  const velocityFlag = score > 0 && options.trackVelocity !== false ? checkVelocity(velocityKey) : false;
   if (velocityFlag) score += VELOCITY_BONUS;
 
   return {

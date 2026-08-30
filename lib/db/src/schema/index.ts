@@ -168,6 +168,28 @@ export const dnaPredictionLayerObservationsTable = pgTable("dna_prediction_layer
   check("dna_prediction_layer_observations_confidence_check", sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`),
 ]);
 
+export const agentObserverRunsTable = pgTable("agent_observer_runs", {
+  id: serial("id").primaryKey(),
+  runId: text("run_id").notNull(),
+  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  taskType: text("task_type").notNull(),
+  instruction: text("instruction").notNull(),
+  status: text("status").notNull(),
+  policy: jsonb("policy").$type<Record<string, unknown>>().notNull(),
+  plan: jsonb("plan").$type<unknown[]>().notNull(),
+  results: jsonb("results").$type<unknown[]>().notNull(),
+  reflection: jsonb("reflection").$type<Record<string, unknown>>().notNull(),
+  productionChanged: boolean("production_changed").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("agent_observer_runs_run_id_uidx").on(table.runId),
+  index("agent_observer_runs_tenant_created_at_idx").on(table.tenantId, table.createdAt),
+  index("agent_observer_runs_status_created_at_idx").on(table.status, table.createdAt),
+  check("agent_observer_runs_task_type_check", sql`${table.taskType} IN ('analyze_event', 'analyze_system', 'inspect_memory')`),
+  check("agent_observer_runs_status_check", sql`${table.status} IN ('blocked', 'completed', 'failed')`),
+  check("agent_observer_runs_production_changed_check", sql`${table.productionChanged} = false`),
+]);
+
 // ─── Derived types ────────────────────────────────────────────────────────────
 export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -204,3 +226,7 @@ export type DnaAttackLink = typeof dnaAttackLinksTable.$inferSelect;
 export const insertDnaPredictionLayerObservationSchema = createInsertSchema(dnaPredictionLayerObservationsTable).omit({ id: true, createdAt: true });
 export type InsertDnaPredictionLayerObservation = z.infer<typeof insertDnaPredictionLayerObservationSchema>;
 export type DnaPredictionLayerObservation = typeof dnaPredictionLayerObservationsTable.$inferSelect;
+
+export const insertAgentObserverRunSchema = createInsertSchema(agentObserverRunsTable).omit({ id: true, createdAt: true });
+export type InsertAgentObserverRun = z.infer<typeof insertAgentObserverRunSchema>;
+export type AgentObserverRun = typeof agentObserverRunsTable.$inferSelect;

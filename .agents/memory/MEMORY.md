@@ -2,3 +2,4 @@
 - [PostgreSQL execution transactions](postgres-execution-transactions.md) — advisory-lock work must reuse its pooled connection; coupled state transitions commit atomically.
 - [DNA attack graph](dna-attack-graph.md) — attack links are derived append-only memory with evidence; graph failures never block prediction/outcome facts.
 - [Isolated analysis layers](isolated-analysis-layers.md) — Markov and quantum outputs stay separate observations; either layer may fail without blocking DNA facts.
+- [Observer-only agent loop](observer-only-agent-loop.md) — agent tools are read-only, policy-gated, audited, and isolated from live detection state.

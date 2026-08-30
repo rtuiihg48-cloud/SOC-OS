@@ -334,7 +334,7 @@ function predictScenario(
   const historicalPressure = Math.round((feature?.averageResidualRisk ?? 0) * 0.25);
   const cpuUsage = clamp(scenario.baseCpu + (sampleCount % 9), 0, 95);
   const memoryUsage = clamp(scenario.baseMemory + (sampleCount % 7), 0, 95);
-  const analysis = analyzeEvent(scenario.event, cpuUsage, memoryUsage);
+  const analysis = analyzeEvent(scenario.event, cpuUsage, memoryUsage, { trackVelocity: false });
   const riskScore = Math.max(analysis.score, Math.round(feature?.averageRisk ?? 0)) + historicalPressure;
   const predictedAction = decideAction(riskScore);
   const proposedDefense = autoFix(scenario.event);
