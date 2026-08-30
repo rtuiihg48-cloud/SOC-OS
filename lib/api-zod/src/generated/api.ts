@@ -58,6 +58,22 @@ export const RunObserverAgentResponse = zod.object({
 
 
 /**
+ * @summary Get HCK-BIOS boot and runtime diagnostics
+ */
+export const GetBootStatusResponse = zod.object({
+  "name": zod.enum(['HCK-BIOS']),
+  "modelVersion": zod.enum(['hck-bios-v1']),
+  "status": zod.enum(['offline', 'booting', 'ready', 'degraded', 'failed']),
+  "bootedAt": zod.coerce.date().nullable(),
+  "productionMutationsAllowed": zod.literal(false),
+  "executionPlane": zod.enum(['isolated']),
+  "capabilities": zod.array(zod.record(zod.string(), zod.unknown())),
+  "topology": zod.record(zod.string(), zod.unknown()),
+  "stages": zod.array(zod.record(zod.string(), zod.unknown()))
+})
+
+
+/**
  * @summary List security events
  */
 export const ListEventsQueryParams = zod.object({

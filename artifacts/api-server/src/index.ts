@@ -8,6 +8,9 @@ import { eq, count } from "drizzle-orm";
 import { DEFAULT_SYSTEM_RULES } from "./lib/rules-engine";
 import crypto from "crypto";
 import { CpuSimulatorScheduler } from "./lib/cpu-simulator";
+import { queueStats } from "./lib/queue";
+import { callMetaCube } from "./lib/meta-cube-client";
+import { bootHckBios, getRequiredHckTables } from "./lib/hck-bios";
 
 const rawPort = process.env["PORT"];
 
@@ -75,6 +78,27 @@ async function seedDefaultData() {
 server.listen(port, async () => {
   logger.info({ port }, "SOC-OS V50 server listening");
   await seedDefaultData();
+  const bios = await bootHckBios({
+    async checkDatabase() {
+      const result = await pool.query<{ ok: number }>("SELECT 1 AS ok");
+      return { connected: result.rows[0]?.ok === 1 };
+    },
+    async checkSchema() {
+      const result = await pool.query<{ table_name: string }>(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+        [getRequiredHckTables()],
+      );
+      const present = new Set(result.rows.map((row) => row.table_name));
+      return { missing: getRequiredHckTables().filter((table) => !present.has(table)) };
+    },
+    async checkMetaCube() {
+      return await callMetaCube("healthz", { correlationId: "hck-bios-boot" }) as Record<string, unknown>;
+    },
+    getQueueStatus: () => queueStats(),
+  });
+  logger.info({ status: bios.status, stages: bios.stages }, "HCK-BIOS boot complete");
   cpuSimulator.start();
 });
 

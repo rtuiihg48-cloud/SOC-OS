@@ -25,6 +25,7 @@ import type {
   CreateTenantBody,
   DashboardSummary,
   EventInput,
+  HckBiosStatus,
   HealthStatus,
   ListCorrelationsParams,
   ListEventsParams,
@@ -215,6 +216,83 @@ export const useRunObserverAgent = <TError = ErrorType<void>,
       > => {
       return useMutation(getRunObserverAgentMutationOptions(options));
     }
+
+export const getGetBootStatusUrl = () => {
+
+
+
+
+  return `/api/boot/status`
+}
+
+/**
+ * @summary Get HCK-BIOS boot and runtime diagnostics
+ */
+export const getBootStatus = async ( options?: RequestInit): Promise<HckBiosStatus> => {
+
+  return customFetch<HckBiosStatus>(getGetBootStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBootStatusQueryKey = () => {
+    return [
+    `/api/boot/status`
+    ] as const;
+    }
+
+
+export const getGetBootStatusQueryOptions = <TData = Awaited<ReturnType<typeof getBootStatus>>, TError = ErrorType<HckBiosStatus>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBootStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBootStatus>>> = ({ signal }) => getBootStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBootStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBootStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getBootStatus>>>
+export type GetBootStatusQueryError = ErrorType<HckBiosStatus>
+
+
+/**
+ * @summary Get HCK-BIOS boot and runtime diagnostics
+ */
+
+export function useGetBootStatus<TData = Awaited<ReturnType<typeof getBootStatus>>, TError = ErrorType<HckBiosStatus>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBootStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListEventsUrl = (params?: ListEventsParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -59,6 +59,57 @@ export interface ObserverAgentRun {
   productionChanged: false;
 }
 
+export type HckBiosStatusName = typeof HckBiosStatusName[keyof typeof HckBiosStatusName];
+
+
+export const HckBiosStatusName = {
+  'HCK-BIOS': 'HCK-BIOS',
+} as const;
+
+export type HckBiosStatusModelVersion = typeof HckBiosStatusModelVersion[keyof typeof HckBiosStatusModelVersion];
+
+
+export const HckBiosStatusModelVersion = {
+  'hck-bios-v1': 'hck-bios-v1',
+} as const;
+
+export type HckBiosStatusStatus = typeof HckBiosStatusStatus[keyof typeof HckBiosStatusStatus];
+
+
+export const HckBiosStatusStatus = {
+  offline: 'offline',
+  booting: 'booting',
+  ready: 'ready',
+  degraded: 'degraded',
+  failed: 'failed',
+} as const;
+
+export type HckBiosStatusExecutionPlane = typeof HckBiosStatusExecutionPlane[keyof typeof HckBiosStatusExecutionPlane];
+
+
+export const HckBiosStatusExecutionPlane = {
+  isolated: 'isolated',
+} as const;
+
+export type HckBiosStatusCapabilitiesItem = { [key: string]: unknown };
+
+export type HckBiosStatusTopology = { [key: string]: unknown };
+
+export type HckBiosStatusStagesItem = { [key: string]: unknown };
+
+export interface HckBiosStatus {
+  name: HckBiosStatusName;
+  modelVersion: HckBiosStatusModelVersion;
+  status: HckBiosStatusStatus;
+  /** @nullable */
+  bootedAt: string | null;
+  productionMutationsAllowed: false;
+  executionPlane: HckBiosStatusExecutionPlane;
+  capabilities: HckBiosStatusCapabilitiesItem[];
+  topology: HckBiosStatusTopology;
+  stages: HckBiosStatusStagesItem[];
+}
+
 export type VoiceTranscriptionFormat = typeof VoiceTranscriptionFormat[keyof typeof VoiceTranscriptionFormat];
 
 

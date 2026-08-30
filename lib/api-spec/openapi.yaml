@@ -26,6 +26,8 @@ tags:
     description: META-CUBE execution runtime
   - name: agent
     description: Observer-only agent analysis
+  - name: boot
+    description: HCK-BIOS runtime diagnostics
 paths:
   /healthz:
     get:
@@ -62,6 +64,25 @@ paths:
           description: Invalid observer request
         "403":
           description: Policy blocked the requested action
+
+  /boot/status:
+    get:
+      operationId: getBootStatus
+      tags: [boot]
+      summary: Get HCK-BIOS boot and runtime diagnostics
+      responses:
+        "200":
+          description: Boot status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HckBiosStatus"
+        "503":
+          description: Boot failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HckBiosStatus"
 
   /events:
     get:
@@ -788,6 +809,42 @@ components:
           type: boolean
           enum: [false]
       required: [runId, status, input, policy, plan, results, reflection, productionChanged]
+
+    HckBiosStatus:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [HCK-BIOS]
+        modelVersion:
+          type: string
+          enum: [hck-bios-v1]
+        status:
+          type: string
+          enum: [offline, booting, ready, degraded, failed]
+        bootedAt:
+          type: ["string", "null"]
+          format: date-time
+        productionMutationsAllowed:
+          type: boolean
+          enum: [false]
+        executionPlane:
+          type: string
+          enum: [isolated]
+        capabilities:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        topology:
+          type: object
+          additionalProperties: true
+        stages:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [name, modelVersion, status, bootedAt, productionMutationsAllowed, executionPlane, capabilities, topology, stages]
 
     VoiceTranscription:
       type: object

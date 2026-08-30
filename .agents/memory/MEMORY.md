@@ -3,3 +3,4 @@
 - [DNA attack graph](dna-attack-graph.md) — attack links are derived append-only memory with evidence; graph failures never block prediction/outcome facts.
 - [Isolated analysis layers](isolated-analysis-layers.md) — Markov and quantum outputs stay separate observations; either layer may fail without blocking DNA facts.
 - [Observer-only agent loop](observer-only-agent-loop.md) — agent tools are read-only, policy-gated, audited, and isolated from live detection state.
+- [HCK-BIOS boundary](hck-bios-boundary.md) — boot stages report real readiness; hardware-like layers stay diagnostic and never replace execution or storage semantics.
