@@ -28,7 +28,14 @@ import type {
   HealthStatus,
   ListCorrelationsParams,
   ListEventsParams,
+  ListMetaCubeCheckpointsParams,
+  ListMetaCubeDlqParams,
+  ListMetaCubeExecutionsParams,
   ListRulesParams,
+  MetaCubeCheckpoint,
+  MetaCubeExecution,
+  MetaCubeExecutionInput,
+  MetaCubeHealth,
   MitreStat,
   Patch,
   PipelineResult,
@@ -1106,6 +1113,623 @@ export function useGetQueueStats<TData = Awaited<ReturnType<typeof getQueueStats
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetQueueStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMetaCubeHealthUrl = () => {
+
+
+
+
+  return `/api/meta-cube/health`
+}
+
+/**
+ * @summary Get META-CUBE execution service health
+ */
+export const getMetaCubeHealth = async ( options?: RequestInit): Promise<MetaCubeHealth> => {
+
+  return customFetch<MetaCubeHealth>(getGetMetaCubeHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMetaCubeHealthQueryKey = () => {
+    return [
+    `/api/meta-cube/health`
+    ] as const;
+    }
+
+
+export const getGetMetaCubeHealthQueryOptions = <TData = Awaited<ReturnType<typeof getMetaCubeHealth>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMetaCubeHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetaCubeHealth>>> = ({ signal }) => getMetaCubeHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMetaCubeHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getMetaCubeHealth>>>
+export type GetMetaCubeHealthQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get META-CUBE execution service health
+ */
+
+export function useGetMetaCubeHealth<TData = Awaited<ReturnType<typeof getMetaCubeHealth>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMetaCubeHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMetaCubeExecutionsUrl = (params?: ListMetaCubeExecutionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/meta-cube/executions?${stringifiedParams}` : `/api/meta-cube/executions`
+}
+
+/**
+ * @summary List META-CUBE executions
+ */
+export const listMetaCubeExecutions = async (params?: ListMetaCubeExecutionsParams, options?: RequestInit): Promise<MetaCubeExecution[]> => {
+
+  return customFetch<MetaCubeExecution[]>(getListMetaCubeExecutionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMetaCubeExecutionsQueryKey = (params?: ListMetaCubeExecutionsParams,) => {
+    return [
+    `/api/meta-cube/executions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMetaCubeExecutionsQueryOptions = <TData = Awaited<ReturnType<typeof listMetaCubeExecutions>>, TError = ErrorType<void>>(params?: ListMetaCubeExecutionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeExecutions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMetaCubeExecutionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMetaCubeExecutions>>> = ({ signal }) => listMetaCubeExecutions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeExecutions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMetaCubeExecutionsQueryResult = NonNullable<Awaited<ReturnType<typeof listMetaCubeExecutions>>>
+export type ListMetaCubeExecutionsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List META-CUBE executions
+ */
+
+export function useListMetaCubeExecutions<TData = Awaited<ReturnType<typeof listMetaCubeExecutions>>, TError = ErrorType<void>>(
+ params?: ListMetaCubeExecutionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeExecutions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMetaCubeExecutionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateMetaCubeExecutionUrl = () => {
+
+
+
+
+  return `/api/meta-cube/executions`
+}
+
+/**
+ * @summary Submit a META-CUBE execution
+ */
+export const createMetaCubeExecution = async (metaCubeExecutionInput: MetaCubeExecutionInput, options?: RequestInit): Promise<MetaCubeExecution> => {
+
+  return customFetch<MetaCubeExecution>(getCreateMetaCubeExecutionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      metaCubeExecutionInput,)
+  }
+);}
+
+
+
+
+export const getCreateMetaCubeExecutionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMetaCubeExecution>>, TError,{data: BodyType<MetaCubeExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createMetaCubeExecution>>, TError,{data: BodyType<MetaCubeExecutionInput>}, TContext> => {
+
+const mutationKey = ['createMetaCubeExecution'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createMetaCubeExecution>>, {data: BodyType<MetaCubeExecutionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createMetaCubeExecution(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateMetaCubeExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof createMetaCubeExecution>>>
+    export type CreateMetaCubeExecutionMutationBody = BodyType<MetaCubeExecutionInput>
+    export type CreateMetaCubeExecutionMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit a META-CUBE execution
+ */
+export const useCreateMetaCubeExecution = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createMetaCubeExecution>>, TError,{data: BodyType<MetaCubeExecutionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createMetaCubeExecution>>,
+        TError,
+        {data: BodyType<MetaCubeExecutionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateMetaCubeExecutionMutationOptions(options));
+    }
+
+export const getGetMetaCubeExecutionUrl = (id: string,) => {
+
+
+
+
+  return `/api/meta-cube/executions/${id}`
+}
+
+/**
+ * @summary Get a META-CUBE execution
+ */
+export const getMetaCubeExecution = async (id: string, options?: RequestInit): Promise<MetaCubeExecution> => {
+
+  return customFetch<MetaCubeExecution>(getGetMetaCubeExecutionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMetaCubeExecutionQueryKey = (id: string,) => {
+    return [
+    `/api/meta-cube/executions/${id}`
+    ] as const;
+    }
+
+
+export const getGetMetaCubeExecutionQueryOptions = <TData = Awaited<ReturnType<typeof getMetaCubeExecution>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeExecution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMetaCubeExecutionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMetaCubeExecution>>> = ({ signal }) => getMetaCubeExecution(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeExecution>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMetaCubeExecutionQueryResult = NonNullable<Awaited<ReturnType<typeof getMetaCubeExecution>>>
+export type GetMetaCubeExecutionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a META-CUBE execution
+ */
+
+export function useGetMetaCubeExecution<TData = Awaited<ReturnType<typeof getMetaCubeExecution>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMetaCubeExecution>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMetaCubeExecutionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRetryMetaCubeExecutionUrl = (id: string,) => {
+
+
+
+
+  return `/api/meta-cube/executions/${id}/retry`
+}
+
+/**
+ * @summary Retry a failed META-CUBE execution
+ */
+export const retryMetaCubeExecution = async (id: string, options?: RequestInit): Promise<MetaCubeExecution> => {
+
+  return customFetch<MetaCubeExecution>(getRetryMetaCubeExecutionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRetryMetaCubeExecutionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryMetaCubeExecution>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof retryMetaCubeExecution>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['retryMetaCubeExecution'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof retryMetaCubeExecution>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  retryMetaCubeExecution(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RetryMetaCubeExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof retryMetaCubeExecution>>>
+
+    export type RetryMetaCubeExecutionMutationError = ErrorType<void>
+
+    /**
+ * @summary Retry a failed META-CUBE execution
+ */
+export const useRetryMetaCubeExecution = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof retryMetaCubeExecution>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof retryMetaCubeExecution>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRetryMetaCubeExecutionMutationOptions(options));
+    }
+
+export const getRecoverMetaCubeExecutionUrl = (id: string,) => {
+
+
+
+
+  return `/api/meta-cube/executions/${id}/recover`
+}
+
+/**
+ * @summary Recover a META-CUBE execution from its checkpoint
+ */
+export const recoverMetaCubeExecution = async (id: string, options?: RequestInit): Promise<MetaCubeExecution> => {
+
+  return customFetch<MetaCubeExecution>(getRecoverMetaCubeExecutionUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRecoverMetaCubeExecutionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recoverMetaCubeExecution>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recoverMetaCubeExecution>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['recoverMetaCubeExecution'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recoverMetaCubeExecution>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  recoverMetaCubeExecution(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecoverMetaCubeExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof recoverMetaCubeExecution>>>
+
+    export type RecoverMetaCubeExecutionMutationError = ErrorType<void>
+
+    /**
+ * @summary Recover a META-CUBE execution from its checkpoint
+ */
+export const useRecoverMetaCubeExecution = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recoverMetaCubeExecution>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recoverMetaCubeExecution>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getRecoverMetaCubeExecutionMutationOptions(options));
+    }
+
+export const getListMetaCubeDlqUrl = (params?: ListMetaCubeDlqParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/meta-cube/dlq?${stringifiedParams}` : `/api/meta-cube/dlq`
+}
+
+/**
+ * @summary List META-CUBE dead-letter executions
+ */
+export const listMetaCubeDlq = async (params?: ListMetaCubeDlqParams, options?: RequestInit): Promise<MetaCubeExecution[]> => {
+
+  return customFetch<MetaCubeExecution[]>(getListMetaCubeDlqUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMetaCubeDlqQueryKey = (params?: ListMetaCubeDlqParams,) => {
+    return [
+    `/api/meta-cube/dlq`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMetaCubeDlqQueryOptions = <TData = Awaited<ReturnType<typeof listMetaCubeDlq>>, TError = ErrorType<void>>(params?: ListMetaCubeDlqParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeDlq>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMetaCubeDlqQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMetaCubeDlq>>> = ({ signal }) => listMetaCubeDlq(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeDlq>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMetaCubeDlqQueryResult = NonNullable<Awaited<ReturnType<typeof listMetaCubeDlq>>>
+export type ListMetaCubeDlqQueryError = ErrorType<void>
+
+
+/**
+ * @summary List META-CUBE dead-letter executions
+ */
+
+export function useListMetaCubeDlq<TData = Awaited<ReturnType<typeof listMetaCubeDlq>>, TError = ErrorType<void>>(
+ params?: ListMetaCubeDlqParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeDlq>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMetaCubeDlqQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListMetaCubeCheckpointsUrl = (params?: ListMetaCubeCheckpointsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/meta-cube/checkpoints?${stringifiedParams}` : `/api/meta-cube/checkpoints`
+}
+
+/**
+ * @summary List META-CUBE checkpoints
+ */
+export const listMetaCubeCheckpoints = async (params?: ListMetaCubeCheckpointsParams, options?: RequestInit): Promise<MetaCubeCheckpoint[]> => {
+
+  return customFetch<MetaCubeCheckpoint[]>(getListMetaCubeCheckpointsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMetaCubeCheckpointsQueryKey = (params?: ListMetaCubeCheckpointsParams,) => {
+    return [
+    `/api/meta-cube/checkpoints`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListMetaCubeCheckpointsQueryOptions = <TData = Awaited<ReturnType<typeof listMetaCubeCheckpoints>>, TError = ErrorType<void>>(params?: ListMetaCubeCheckpointsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeCheckpoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMetaCubeCheckpointsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMetaCubeCheckpoints>>> = ({ signal }) => listMetaCubeCheckpoints(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeCheckpoints>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMetaCubeCheckpointsQueryResult = NonNullable<Awaited<ReturnType<typeof listMetaCubeCheckpoints>>>
+export type ListMetaCubeCheckpointsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List META-CUBE checkpoints
+ */
+
+export function useListMetaCubeCheckpoints<TData = Awaited<ReturnType<typeof listMetaCubeCheckpoints>>, TError = ErrorType<void>>(
+ params?: ListMetaCubeCheckpointsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMetaCubeCheckpoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMetaCubeCheckpointsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

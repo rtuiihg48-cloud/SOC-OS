@@ -1,12 +1,12 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2 } from "lucide-react";
-import { useGetDashboard } from "@workspace/api-client-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare } from "lucide-react";
+import { useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { data: dashboard } = useGetDashboard({
-    query: { refetchInterval: 5000 }
+    query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() }
   });
 
   const navItems = [
@@ -19,6 +19,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/rules", label: "Rules Engine", icon: Zap },
     { href: "/correlations", label: "Correlations", icon: Link2 },
     { href: "/tenants", label: "Tenants", icon: Building2 },
+    { href: "/runtime", label: "Runtime", icon: TerminalSquare },
   ];
 
   const statusColor = 

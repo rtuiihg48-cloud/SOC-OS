@@ -22,6 +22,8 @@ tags:
     description: Rules engine management
   - name: correlations
     description: Attack chain correlations
+  - name: runtime
+    description: META-CUBE execution runtime
 paths:
   /healthz:
     get:
@@ -260,6 +262,191 @@ paths:
               schema:
                 $ref: "#/components/schemas/QueueStats"
 
+  # ─── META-CUBE RUNTIME ─────────────────────────────────────────────────────
+  /meta-cube/health:
+    get:
+      operationId: getMetaCubeHealth
+      tags: [runtime]
+      summary: Get META-CUBE execution service health
+      responses:
+        "200":
+          description: META-CUBE health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaCubeHealth"
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/executions:
+    get:
+      operationId: listMetaCubeExecutions
+      tags: [runtime]
+      summary: List META-CUBE executions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, running, succeeded, failed, retrying, dead_letter, recovered]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: META-CUBE executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaCubeExecution"
+        "503":
+          description: META-CUBE unavailable
+    post:
+      operationId: createMetaCubeExecution
+      tags: [runtime]
+      summary: Submit a META-CUBE execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetaCubeExecutionInput"
+      responses:
+        "202":
+          description: Execution accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaCubeExecution"
+        "400":
+          description: Invalid execution
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/executions/{id}:
+    get:
+      operationId: getMetaCubeExecution
+      tags: [runtime]
+      summary: Get a META-CUBE execution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: META-CUBE execution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaCubeExecution"
+        "404":
+          description: Execution not found
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/executions/{id}/retry:
+    post:
+      operationId: retryMetaCubeExecution
+      tags: [runtime]
+      summary: Retry a failed META-CUBE execution
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Retry accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaCubeExecution"
+        "404":
+          description: Execution not found
+        "409":
+          description: Execution cannot be retried
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/executions/{id}/recover:
+    post:
+      operationId: recoverMetaCubeExecution
+      tags: [runtime]
+      summary: Recover a META-CUBE execution from its checkpoint
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Recovery accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetaCubeExecution"
+        "404":
+          description: Execution not found
+        "409":
+          description: Execution has no recoverable checkpoint
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/dlq:
+    get:
+      operationId: listMetaCubeDlq
+      tags: [runtime]
+      summary: List META-CUBE dead-letter executions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Dead-letter executions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaCubeExecution"
+        "503":
+          description: META-CUBE unavailable
+
+  /meta-cube/checkpoints:
+    get:
+      operationId: listMetaCubeCheckpoints
+      tags: [runtime]
+      summary: List META-CUBE checkpoints
+      parameters:
+        - name: executionId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Runtime checkpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaCubeCheckpoint"
+        "503":
+          description: META-CUBE unavailable
+
   # ─── TENANTS ──────────────────────────────────────────────────────────────
   /tenants:
     get:
@@ -370,7 +557,7 @@ paths:
       operationId: updateRule
       tags: [rules]
       summary: Update a detection rule
-      parameters: як
+      parameters:
         - name: id
           in: path
           required: true
@@ -950,3 +1137,100 @@ components:
           type: string
           format: date-time
       required: [id, threatType, severity, confidence, summary, eventIds, createdAt]
+
+    MetaCubeHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+        service:
+          type: string
+        persistence:
+          type: string
+          enum: [local, postgres, redis]
+        worker:
+          type: string
+          enum: [running, stopped, idle]
+        version:
+          type: string
+      required: [status, service, persistence, worker, version]
+
+    MetaCubeExecutionInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        payload:
+          type: object
+          additionalProperties: true
+        steps:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        idempotencyKey:
+          type: string
+        maxRetries:
+          type: integer
+          minimum: 0
+          maximum: 10
+      required: [name, payload, steps]
+
+    MetaCubeExecution:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, retrying, dead_letter, recovered]
+        payload:
+          type: object
+          additionalProperties: true
+        steps:
+          type: array
+          items:
+            type: string
+        completedSteps:
+          type: array
+          items:
+            type: string
+        attempts:
+          type: integer
+        maxRetries:
+          type: integer
+        error:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [id, name, status, payload, steps, completedSteps, attempts, maxRetries, error, createdAt, updatedAt, finishedAt]
+
+    MetaCubeCheckpoint:
+      type: object
+      properties:
+        id:
+          type: string
+        executionId:
+          type: string
+        completedSteps:
+          type: array
+          items:
+            type: string
+        state:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, executionId, completedSteps, state, createdAt]

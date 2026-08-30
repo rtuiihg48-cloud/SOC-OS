@@ -344,6 +344,150 @@ export const GetQueueStatsResponse = zod.object({
 
 
 /**
+ * @summary Get META-CUBE execution service health
+ */
+export const GetMetaCubeHealthResponse = zod.object({
+  "status": zod.enum(['ok', 'degraded']),
+  "service": zod.string(),
+  "persistence": zod.enum(['local', 'postgres', 'redis']),
+  "worker": zod.enum(['running', 'stopped', 'idle']),
+  "version": zod.string()
+})
+
+
+/**
+ * @summary List META-CUBE executions
+ */
+export const listMetaCubeExecutionsQueryLimitMax = 100;
+
+
+
+export const ListMetaCubeExecutionsQueryParams = zod.object({
+  "status": zod.enum(['queued', 'running', 'succeeded', 'failed', 'retrying', 'dead_letter', 'recovered']).optional(),
+  "limit": zod.coerce.number().min(1).max(listMetaCubeExecutionsQueryLimitMax).optional()
+})
+
+export const ListMetaCubeExecutionsResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['queued', 'running', 'succeeded', 'failed', 'retrying', 'dead_letter', 'recovered']),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "steps": zod.array(zod.string()),
+  "completedSteps": zod.array(zod.string()),
+  "attempts": zod.number(),
+  "maxRetries": zod.number(),
+  "error": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "finishedAt": zod.coerce.date().nullable()
+})
+export const ListMetaCubeExecutionsResponse = zod.array(ListMetaCubeExecutionsResponseItem)
+
+
+/**
+ * @summary Submit a META-CUBE execution
+ */
+
+
+export const createMetaCubeExecutionBodyMaxRetriesMin = 0;
+export const createMetaCubeExecutionBodyMaxRetriesMax = 10;
+
+
+
+export const CreateMetaCubeExecutionBody = zod.object({
+  "name": zod.string().min(1),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "steps": zod.array(zod.string()).min(1),
+  "idempotencyKey": zod.string().optional(),
+  "maxRetries": zod.number().min(createMetaCubeExecutionBodyMaxRetriesMin).max(createMetaCubeExecutionBodyMaxRetriesMax).optional()
+})
+
+
+/**
+ * @summary Get a META-CUBE execution
+ */
+export const GetMetaCubeExecutionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetMetaCubeExecutionResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['queued', 'running', 'succeeded', 'failed', 'retrying', 'dead_letter', 'recovered']),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "steps": zod.array(zod.string()),
+  "completedSteps": zod.array(zod.string()),
+  "attempts": zod.number(),
+  "maxRetries": zod.number(),
+  "error": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "finishedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Retry a failed META-CUBE execution
+ */
+export const RetryMetaCubeExecutionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary Recover a META-CUBE execution from its checkpoint
+ */
+export const RecoverMetaCubeExecutionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary List META-CUBE dead-letter executions
+ */
+export const listMetaCubeDlqQueryLimitMax = 100;
+
+
+
+export const ListMetaCubeDlqQueryParams = zod.object({
+  "limit": zod.coerce.number().min(1).max(listMetaCubeDlqQueryLimitMax).optional()
+})
+
+export const ListMetaCubeDlqResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "status": zod.enum(['queued', 'running', 'succeeded', 'failed', 'retrying', 'dead_letter', 'recovered']),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "steps": zod.array(zod.string()),
+  "completedSteps": zod.array(zod.string()),
+  "attempts": zod.number(),
+  "maxRetries": zod.number(),
+  "error": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "finishedAt": zod.coerce.date().nullable()
+})
+export const ListMetaCubeDlqResponse = zod.array(ListMetaCubeDlqResponseItem)
+
+
+/**
+ * @summary List META-CUBE checkpoints
+ */
+export const ListMetaCubeCheckpointsQueryParams = zod.object({
+  "executionId": zod.coerce.string().optional()
+})
+
+export const ListMetaCubeCheckpointsResponseItem = zod.object({
+  "id": zod.string(),
+  "executionId": zod.string(),
+  "completedSteps": zod.array(zod.string()),
+  "state": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date()
+})
+export const ListMetaCubeCheckpointsResponse = zod.array(ListMetaCubeCheckpointsResponseItem)
+
+
+/**
  * @summary List all tenants
  */
 export const ListTenantsResponseItem = zod.object({

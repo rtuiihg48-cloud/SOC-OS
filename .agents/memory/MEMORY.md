@@ -1,0 +1,1 @@
+- [Redis reliability boundary](redis-reliability-boundary.md) — report transport separately from authoritative storage; durable acceptance needs replay after queue outages.

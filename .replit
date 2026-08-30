@@ -1,4 +1,4 @@
-modules = ["nodejs-24", "postgresql-16"]
+modules = ["nodejs-24", "postgresql-16", "python-3.12"]
 
 [deployment]
 router = "application"
@@ -11,6 +11,35 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/soc-dashboard: web"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "artifacts/api-server: API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "META-CUBE Execution Service"
+
+[[workflows.workflow]]
+name = "META-CUBE Execution Service"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd services/meta-cube && python main.py"
+waitForPort = 8008
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -21,3 +50,4 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+packages = ["postgresql"]

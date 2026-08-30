@@ -13,6 +13,7 @@ import Alerts from "@/pages/Alerts";
 import RulesEngine from "@/pages/RulesEngine";
 import Correlations from "@/pages/Correlations";
 import Tenants from "@/pages/Tenants";
+import Runtime from "@/pages/Runtime";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/rules" component={RulesEngine} />
         <Route path="/correlations" component={Correlations} />
         <Route path="/tenants" component={Tenants} />
+        <Route path="/runtime" component={Runtime} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

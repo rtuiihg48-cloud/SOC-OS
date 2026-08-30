@@ -373,12 +373,138 @@ export interface ToggleRuleBody {
   enabled: boolean;
 }
 
+export type MetaCubeHealthStatus = typeof MetaCubeHealthStatus[keyof typeof MetaCubeHealthStatus];
+
+
+export const MetaCubeHealthStatus = {
+  ok: 'ok',
+  degraded: 'degraded',
+} as const;
+
+export type MetaCubeHealthPersistence = typeof MetaCubeHealthPersistence[keyof typeof MetaCubeHealthPersistence];
+
+
+export const MetaCubeHealthPersistence = {
+  local: 'local',
+  postgres: 'postgres',
+  redis: 'redis',
+} as const;
+
+export type MetaCubeHealthWorker = typeof MetaCubeHealthWorker[keyof typeof MetaCubeHealthWorker];
+
+
+export const MetaCubeHealthWorker = {
+  running: 'running',
+  stopped: 'stopped',
+  idle: 'idle',
+} as const;
+
+export interface MetaCubeHealth {
+  status: MetaCubeHealthStatus;
+  service: string;
+  persistence: MetaCubeHealthPersistence;
+  worker: MetaCubeHealthWorker;
+  version: string;
+}
+
+export type MetaCubeExecutionInputPayload = { [key: string]: unknown };
+
+export interface MetaCubeExecutionInput {
+  /** @minLength 1 */
+  name: string;
+  payload: MetaCubeExecutionInputPayload;
+  /** @minItems 1 */
+  steps: string[];
+  idempotencyKey?: string;
+  /**
+     * @minimum 0
+     * @maximum 10
+     */
+  maxRetries?: number;
+}
+
+export type MetaCubeExecutionStatus = typeof MetaCubeExecutionStatus[keyof typeof MetaCubeExecutionStatus];
+
+
+export const MetaCubeExecutionStatus = {
+  queued: 'queued',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  retrying: 'retrying',
+  dead_letter: 'dead_letter',
+  recovered: 'recovered',
+} as const;
+
+export type MetaCubeExecutionPayload = { [key: string]: unknown };
+
+export interface MetaCubeExecution {
+  id: string;
+  name: string;
+  status: MetaCubeExecutionStatus;
+  payload: MetaCubeExecutionPayload;
+  steps: string[];
+  completedSteps: string[];
+  attempts: number;
+  maxRetries: number;
+  /** @nullable */
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @nullable */
+  finishedAt: string | null;
+}
+
+export type MetaCubeCheckpointState = { [key: string]: unknown };
+
+export interface MetaCubeCheckpoint {
+  id: string;
+  executionId: string;
+  completedSteps: string[];
+  state: MetaCubeCheckpointState;
+  createdAt: string;
+}
+
 export type ListEventsParams = {
 action?: string;
 status?: string;
 tactic?: string;
 tenantId?: number;
 limit?: number;
+};
+
+export type ListMetaCubeExecutionsParams = {
+status?: ListMetaCubeExecutionsStatus;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListMetaCubeExecutionsStatus = typeof ListMetaCubeExecutionsStatus[keyof typeof ListMetaCubeExecutionsStatus];
+
+
+export const ListMetaCubeExecutionsStatus = {
+  queued: 'queued',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  retrying: 'retrying',
+  dead_letter: 'dead_letter',
+  recovered: 'recovered',
+} as const;
+
+export type ListMetaCubeDlqParams = {
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type ListMetaCubeCheckpointsParams = {
+executionId?: string;
 };
 
 export type ListRulesParams = {

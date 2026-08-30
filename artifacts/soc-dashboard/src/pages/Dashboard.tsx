@@ -1,4 +1,13 @@
-import { useGetDashboard, useGetSystemMetrics, useGetMitreStats, useGetRiskTimeline } from "@workspace/api-client-react";
+import { 
+  useGetDashboard, 
+  useGetSystemMetrics, 
+  useGetMitreStats, 
+  useGetRiskTimeline,
+  getGetDashboardQueryKey,
+  getGetSystemMetricsQueryKey,
+  getGetMitreStatsQueryKey,
+  getGetRiskTimelineQueryKey
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
@@ -6,10 +15,10 @@ import { Shield, AlertTriangle, Activity, Cpu, Database, Server, Crosshair, Tren
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const { data: dashboard, isLoading: loadDash } = useGetDashboard({ query: { refetchInterval: 5000 } });
-  const { data: metrics, isLoading: loadMetrics } = useGetSystemMetrics({ query: { refetchInterval: 3000 } });
-  const { data: mitreStats, isLoading: loadMitre } = useGetMitreStats({ query: { refetchInterval: 10000 } });
-  const { data: riskTimeline, isLoading: loadRisk } = useGetRiskTimeline({ query: { refetchInterval: 10000 } });
+  const { data: dashboard, isLoading: loadDash } = useGetDashboard({ query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() } });
+  const { data: metrics, isLoading: loadMetrics } = useGetSystemMetrics({ query: { refetchInterval: 3000, queryKey: getGetSystemMetricsQueryKey() } });
+  const { data: mitreStats, isLoading: loadMitre } = useGetMitreStats({ query: { refetchInterval: 10000, queryKey: getGetMitreStatsQueryKey() } });
+  const { data: riskTimeline, isLoading: loadRisk } = useGetRiskTimeline({ query: { refetchInterval: 10000, queryKey: getGetRiskTimelineQueryKey() } });
 
   const [liveEvents, setLiveEvents] = useState<any[]>([]);
 

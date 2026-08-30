@@ -5,7 +5,8 @@ import dashboardRouter from "./dashboard";
 import tenantsRouter from "./tenants";
 import rulesRouter from "./rules";
 import correlationsRouter from "./correlations";
-import { runSecurityAudit } from "@lockdoctor/analyzer";
+import metaCubeRouter from "./meta-cube";
+import { runSecurityAudit } from "../lib/lockfile-analyzer";
 
 const router: IRouter = Router();
 
@@ -15,21 +16,29 @@ router.use(dashboardRouter);
 router.use(tenantsRouter);
 router.use(rulesRouter);
 router.use(correlationsRouter);
+router.use(metaCubeRouter);
 router.post("/scan/lockfile", async (req, res) => {
+  const { apiKey, lockfileContent, packageJsonContent } = req.body;
+  if (!apiKey || !lockfileContent || !packageJsonContent) {
+    return res.status(400).json({ error: "Відсутні параметри сканування" });
+  }
+  if (
+    typeof lockfileContent !== "string" ||
+    typeof packageJsonContent !== "string"
+  ) {
+    return res.status(400).json({ error: "Некоректний формат файлів" });
+  }
+
   try {
-    const { apiKey, lockfileContent, packageJsonContent } = req.body;
-    if (!apiKey || !lockfileContent || !packageJsonContent) {
-      return res.status(400).json({ error: "Відсутні параметри сканування" });
-    }
-
     const auditResult = await runSecurityAudit({
-      lockfilePath: lockfileContent,
-      packageJsonPath: packageJsonContent,
-      tenantId: 1
+      lockfileContent,
+      packageJsonContent,
     });
-
-    return res.status(200).json({ success: true, threatLevel: auditResult.threatLevel });
-  } catch (error) {
+    return res.status(200).json({
+      success: true,
+      threatLevel: auditResult.threatLevel,
+    });
+  } catch {
     return res.status(500).json({ error: "Помилка сервера при скануванні" });
   }
 });

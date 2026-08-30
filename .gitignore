@@ -10,6 +10,10 @@ out-tsc
 
 # dependencies
 node_modules
+__pycache__/
+*.py[cod]
+.pytest_cache/
+meta-cube-state.json
 
 # IDEs and editors
 /.idea
