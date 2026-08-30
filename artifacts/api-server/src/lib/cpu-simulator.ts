@@ -25,6 +25,14 @@ interface HistoryFeature {
   averageResidualRisk: number;
 }
 
+interface LinkCandidate {
+  fromPredictionId: number;
+  linkType: "sequence" | "same_pattern" | "same_technique" | "shared_vulnerability";
+  confidence: number;
+  evidence: Record<string, number | string | boolean | null>;
+  explanation: string;
+}
+
 export interface CpuSimulationResult {
   cycleId: string;
   predictionId: number;
@@ -35,6 +43,7 @@ export interface CpuSimulationResult {
   defenseSucceeded: boolean;
   residualRisk: number;
   vulnerabilityPattern: string | null;
+  linkCount: number;
 }
 
 const SCENARIOS: ScenarioTemplate[] = [
@@ -87,6 +96,17 @@ const SCENARIOS: ScenarioTemplate[] = [
     baseMemory: 44,
   },
 ];
+
+const ATTACK_CHAIN_ORDER: Record<string, number> = {
+  discovery: 1,
+  initial_access: 2,
+  credential_access: 3,
+  privilege_escalation: 4,
+  lateral_movement: 5,
+  command_and_control: 6,
+  exfiltration: 7,
+  impact: 8,
+};
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -223,6 +243,130 @@ async function reconcilePendingOutcomes(client: PoolClient): Promise<number> {
   }
 
   return pending.rowCount ?? 0;
+}
+
+async function linkPrediction(
+  client: PoolClient,
+  predictionId: number,
+  scenario: ScenarioTemplate,
+  prediction: ReturnType<typeof predictScenario>,
+): Promise<number> {
+  const previous = await client.query<{
+    id: number;
+    attack_family: string;
+    tactic: string | null;
+    technique_id: string | null;
+    predicted_vulnerability: string | null;
+    created_at: Date;
+  }>(`
+    SELECT id, attack_family, tactic, technique_id, predicted_vulnerability, created_at
+    FROM dna_predictions
+    WHERE id <> $1
+      AND created_at >= NOW() - INTERVAL '24 hours'
+    ORDER BY created_at DESC
+    LIMIT 50
+  `, [predictionId]);
+
+  const candidates: LinkCandidate[] = [];
+  const currentOrder = ATTACK_CHAIN_ORDER[scenario.family] ?? 0;
+
+  for (const prior of previous.rows) {
+    const hoursApart = Math.max(
+      0,
+      (Date.now() - new Date(prior.created_at).getTime()) / (60 * 60 * 1000),
+    );
+    const evidence = {
+      previousFamily: prior.attack_family,
+      currentFamily: scenario.family,
+      previousTactic: prior.tactic,
+      currentTactic: prediction.analysis.mitre?.tactic ?? null,
+      previousTechniqueId: prior.technique_id,
+      currentTechniqueId: prediction.analysis.mitre?.techniqueId ?? null,
+      hoursApart: Number(hoursApart.toFixed(3)),
+    };
+
+    if (
+      prior.technique_id &&
+      prediction.analysis.mitre?.techniqueId &&
+      prior.technique_id === prediction.analysis.mitre.techniqueId
+    ) {
+      candidates.push({
+        fromPredictionId: prior.id,
+        linkType: "same_technique",
+        confidence: 0.9,
+        evidence: { ...evidence, sameTechnique: true },
+        explanation: `Both predictions map to MITRE technique ${prior.technique_id}.`,
+      });
+    }
+
+    if (prior.attack_family === scenario.family) {
+      candidates.push({
+        fromPredictionId: prior.id,
+        linkType: "same_pattern",
+        confidence: 0.72,
+        evidence: { ...evidence, sameAttackFamily: true },
+        explanation: `Both predictions belong to the ${scenario.family} attack family.`,
+      });
+    }
+
+    if (
+      prior.predicted_vulnerability &&
+      prediction.predictedVulnerability &&
+      prior.predicted_vulnerability.split(":")[0] === prediction.predictedVulnerability.split(":")[0]
+    ) {
+      candidates.push({
+        fromPredictionId: prior.id,
+        linkType: "shared_vulnerability",
+        confidence: 0.84,
+        evidence: { ...evidence, sharedVulnerabilityFamily: true },
+        explanation: `Both predictions identify a residual ${scenario.family} exposure pattern.`,
+      });
+    }
+
+    const priorOrder = ATTACK_CHAIN_ORDER[prior.attack_family] ?? 0;
+    if (priorOrder > 0 && currentOrder > priorOrder && hoursApart <= 24) {
+      const chainConfidence = clamp(0.68 + Math.min(0.18, (24 - hoursApart) / 24 * 0.18), 0, 0.95);
+      candidates.push({
+        fromPredictionId: prior.id,
+        linkType: "sequence",
+        confidence: chainConfidence,
+        evidence: { ...evidence, priorChainPosition: priorOrder, currentChainPosition: currentOrder },
+        explanation: `${prior.attack_family} precedes ${scenario.family} in the simulated attack-chain model.`,
+      });
+    }
+  }
+
+  const uniqueCandidates = new Map<string, LinkCandidate>();
+  for (const candidate of candidates) {
+    const key = `${candidate.fromPredictionId}:${candidate.linkType}`;
+    const existing = uniqueCandidates.get(key);
+    if (!existing || existing.confidence < candidate.confidence) uniqueCandidates.set(key, candidate);
+  }
+
+  const selected = [...uniqueCandidates.values()]
+    .sort((left, right) => right.confidence - left.confidence)
+    .slice(0, 8);
+
+  for (const candidate of selected) {
+    await client.query(`
+      INSERT INTO dna_attack_links (
+        from_prediction_id, to_prediction_id, link_type, confidence,
+        evidence, explanation, model_version
+      )
+      VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+      ON CONFLICT (from_prediction_id, to_prediction_id, link_type) DO NOTHING
+    `, [
+      candidate.fromPredictionId,
+      predictionId,
+      candidate.linkType,
+      candidate.confidence,
+      JSON.stringify(candidate.evidence),
+      candidate.explanation,
+      MODEL_VERSION,
+    ]);
+  }
+
+  return selected.length;
 }
 
 function selectScenario(history: Map<string, HistoryFeature>): ScenarioTemplate {
@@ -438,6 +582,13 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     await commit(client);
     transactionOpen = false;
 
+    let linkCount = 0;
+    try {
+      linkCount = await linkPrediction(client, predictionId, scenario, prediction);
+    } catch (error) {
+      logger.warn({ error, predictionId }, "Failed to extend DNA attack graph");
+    }
+
     return {
       cycleId,
       predictionId,
@@ -448,6 +599,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       defenseSucceeded: outcome.defenseSucceeded,
       residualRisk: outcome.residualRisk,
       vulnerabilityPattern: outcome.vulnerabilityPattern,
+      linkCount,
     };
   } catch (error) {
     if (transactionOpen) await rollback(client);
@@ -492,6 +644,7 @@ export class CpuSimulatorScheduler {
             confidence: result.confidence,
             verificationStatus: result.verificationStatus,
             residualRisk: result.residualRisk,
+            linkCount: result.linkCount,
           }, "CPU red-team/blue-team simulation stored in DNA memory");
         }
       } catch (error) {

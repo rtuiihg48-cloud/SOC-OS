@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, boolean, real, jsonb, index, check } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean, real, jsonb, index, check, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -132,6 +132,26 @@ export const dnaOutcomesTable = pgTable("dna_outcomes", {
   check("dna_outcomes_residual_risk_check", sql`${table.residualRisk} >= 0`),
 ]);
 
+export const dnaAttackLinksTable = pgTable("dna_attack_links", {
+  id: serial("id").primaryKey(),
+  fromPredictionId: integer("from_prediction_id").notNull().references(() => dnaPredictionsTable.id, { onDelete: "restrict" }),
+  toPredictionId: integer("to_prediction_id").notNull().references(() => dnaPredictionsTable.id, { onDelete: "restrict" }),
+  linkType: text("link_type").notNull(),
+  confidence: real("confidence").notNull(),
+  evidence: jsonb("evidence").$type<Record<string, number | string | boolean | null>>().notNull(),
+  explanation: text("explanation").notNull(),
+  modelVersion: text("model_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("dna_attack_links_pair_type_uidx").on(table.fromPredictionId, table.toPredictionId, table.linkType),
+  index("dna_attack_links_from_prediction_idx").on(table.fromPredictionId),
+  index("dna_attack_links_to_prediction_idx").on(table.toPredictionId),
+  index("dna_attack_links_type_created_at_idx").on(table.linkType, table.createdAt),
+  check("dna_attack_links_confidence_check", sql`${table.confidence} >= 0 AND ${table.confidence} <= 1`),
+  check("dna_attack_links_type_check", sql`${table.linkType} IN ('sequence', 'same_pattern', 'same_technique', 'shared_vulnerability')`),
+  check("dna_attack_links_distinct_predictions_check", sql`${table.fromPredictionId} <> ${table.toPredictionId}`),
+]);
+
 // ─── Derived types ────────────────────────────────────────────────────────────
 export const insertTenantSchema = createInsertSchema(tenantsTable).omit({ id: true, createdAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
@@ -160,3 +180,7 @@ export type DnaPrediction = typeof dnaPredictionsTable.$inferSelect;
 export const insertDnaOutcomeSchema = createInsertSchema(dnaOutcomesTable).omit({ id: true, createdAt: true });
 export type InsertDnaOutcome = z.infer<typeof insertDnaOutcomeSchema>;
 export type DnaOutcome = typeof dnaOutcomesTable.$inferSelect;
+
+export const insertDnaAttackLinkSchema = createInsertSchema(dnaAttackLinksTable).omit({ id: true, createdAt: true });
+export type InsertDnaAttackLink = z.infer<typeof insertDnaAttackLinkSchema>;
+export type DnaAttackLink = typeof dnaAttackLinksTable.$inferSelect;
