@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field, field_validator
 from .engine import ExecutionEngine
 from .models import EventRequest, ExecutionRecord, ExecutionStatus, StepSpec
 from .redis_stream import RedisStreamAdapter
+from .postgres_store import PostgresStore
+from .store import FileStore
 from .worker import ExecutionWorker
 
 
@@ -83,18 +85,35 @@ def execution_view(record: ExecutionRecord) -> ExecutionView:
     )
 
 
-def create_app(state_path: str | Path | None = None, redis_adapter: RedisStreamAdapter | None = None) -> FastAPI:
-    engine = ExecutionEngine(state_path or os.getenv("META_CUBE_STATE_PATH", "meta-cube-state.json"))
+def create_app(state_path: str | Path | None = None, redis_adapter: RedisStreamAdapter | None = None,
+               storage_mode: str | None = None) -> FastAPI:
+    # A supplied path is an intentional isolated file-store injection for
+    # tests/tools. The module-level production app calls this with no path.
+    storage_mode = (storage_mode or ("file" if state_path is not None
+                                     else os.getenv("META_CUBE_STORAGE", "file"))).lower()
+    if storage_mode == "postgres":
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL is required when META_CUBE_STORAGE=postgres")
+        store = PostgresStore(database_url)
+    elif storage_mode == "file":
+        store = FileStore(state_path or os.getenv("META_CUBE_STATE_PATH", "meta-cube-state.json"))
+    else:
+        raise RuntimeError("META_CUBE_STORAGE must be file or postgres")
+    engine = ExecutionEngine(store)
     redis = redis_adapter or RedisStreamAdapter(os.getenv("REDIS_URL"))
     worker = ExecutionWorker(engine, redis)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        if storage_mode == "postgres":
+            store.open()
         await redis.connect()
         await worker.start()
         yield
         await worker.stop()
         await redis.close()
+        store.close()
 
     app = FastAPI(title="META-CUBE Execution Service", version="1.0.0", lifespan=lifespan)
     app.state.engine, app.state.redis, app.state.worker = engine, redis, worker
@@ -103,7 +122,7 @@ def create_app(state_path: str | Path | None = None, redis_adapter: RedisStreamA
     async def healthz() -> HealthView:
         return HealthView(
             status="degraded" if redis.configured and (not redis.available or worker.transport_degraded) else "ok",
-            service="meta-cube", persistence="local",
+            service="meta-cube", persistence=storage_mode,
             worker=worker.state, version=app.version,
         )
 

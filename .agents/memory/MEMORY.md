@@ -1,1 +1,2 @@
 - [Redis reliability boundary](redis-reliability-boundary.md) — report transport separately from authoritative storage; durable acceptance needs replay after queue outages.
+- [PostgreSQL execution transactions](postgres-execution-transactions.md) — advisory-lock work must reuse its pooled connection; coupled state transitions commit atomically.

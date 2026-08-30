@@ -12,7 +12,8 @@ Security operations dashboard with a separate reliable execution plane for check
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
-- Optional env: `META_CUBE_URL` (defaults to `http://127.0.0.1:8008`), `META_CUBE_TIMEOUT_MS`, `META_CUBE_STATE_PATH`, `REDIS_URL`
+- META-CUBE env: `META_CUBE_STORAGE=file|postgres`, `META_CUBE_URL` (defaults to `http://127.0.0.1:8008`), `META_CUBE_TIMEOUT_MS`, `META_CUBE_STATE_PATH`, `REDIS_URL`
+- PostgreSQL mode uses the managed `DATABASE_URL`; pool bounds are configurable with `META_CUBE_PG_POOL_MIN` and `META_CUBE_PG_POOL_MAX`.
 
 ## Stack
 
@@ -34,7 +35,8 @@ Security operations dashboard with a separate reliable execution plane for check
 ## Architecture decisions
 
 - Express owns presentation/control APIs; META-CUBE exclusively owns worker, retry, checkpoint, recovery, and DAG behavior.
-- Local atomic file persistence is explicit development mode. Configured-but-unavailable Redis is reported as degraded rather than silently ignored.
+- PostgreSQL is the shared authoritative backend for multi-instance execution history; local atomic file persistence remains explicit development mode.
+- Redis is transport only. Configured-but-unavailable Redis is reported as degraded rather than silently ignored.
 - Browser clients call the generated `/api/meta-cube/*` contract; they never connect to FastAPI directly.
 
 ## Product

@@ -29,7 +29,7 @@ def test_health_keeps_local_authority_and_exposes_worker_state(tmp_path):
         client.app.state.redis.url = "redis://configured-but-down"
         client.app.state.worker.transport_degraded = True
         health = client.get("/healthz").json()
-        assert health["persistence"] == "local"
+        assert health["persistence"] == "file"
         assert health["status"] == "degraded"
         assert health["worker"] == "idle"
 

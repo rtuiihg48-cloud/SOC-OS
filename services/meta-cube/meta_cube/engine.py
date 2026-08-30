@@ -7,7 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from .models import Checkpoint, DeadLetterRecord, EventRequest, ExecutionRecord, ExecutionStatus, StepSpec
-from .store import FileStore
+from .store import FileStore, Store
 
 
 def _now() -> str:
@@ -17,8 +17,8 @@ def _now() -> str:
 class ExecutionEngine:
     """Deterministic in-process executor with durable event and step checkpoints."""
 
-    def __init__(self, state_path: str | Path) -> None:
-        self.store = FileStore(state_path)
+    def __init__(self, state_path: str | Path | Store) -> None:
+        self.store: Store = state_path if isinstance(state_path, Store) else FileStore(state_path)
         self._execution_lock = threading.RLock()
 
     def submit(self, event: EventRequest) -> ExecutionRecord:
@@ -27,6 +27,10 @@ class ExecutionEngine:
 
     def accept(self, event: EventRequest) -> ExecutionRecord:
         with self._execution_lock:
+            with self.store.lock(f"accept:{event.idempotency_key or event.event_id or ''}"):
+                return self._accept_locked(event)
+
+    def _accept_locked(self, event: EventRequest) -> ExecutionRecord:
             data = self.store.read()
             key = event.idempotency_key or event.event_id or str(uuid4())
             existing = data["idempotency"].get(key)
@@ -39,7 +43,10 @@ class ExecutionEngine:
                 name=event.name, status=ExecutionStatus.CREATED, payload=event.payload, steps=event.steps,
                 max_attempts=event.max_attempts, created_at=now, updated_at=now,
             )
-            data["executions"][execution_id] = record.model_dump(mode="json")
+            serialized = record.model_dump(mode="json")
+            if hasattr(self.store, "create_execution"):
+                return ExecutionRecord.model_validate(self.store.create_execution(serialized))  # type: ignore[attr-defined]
+            data["executions"][execution_id] = serialized
             data["idempotency"][key] = execution_id
             self.store.update(data)
             return record
@@ -47,9 +54,10 @@ class ExecutionEngine:
     def execute(self, execution_id: str, recovered: bool = False) -> ExecutionRecord:
         """Execute an already durable accepted event; safe to invoke more than once."""
         with self._execution_lock:
-            if self.get(execution_id) is None:
-                raise KeyError(execution_id)
-            return self._run(execution_id, recovered=recovered)
+            with self.store.lock(f"execution:{execution_id}"):
+                if self.get(execution_id) is None:
+                    raise KeyError(execution_id)
+                return self._run(execution_id, recovered=recovered)
 
     def get(self, execution_id: str) -> ExecutionRecord | None:
         raw = self.store.read()["executions"].get(execution_id)
@@ -69,31 +77,37 @@ class ExecutionEngine:
 
     def retry(self, execution_id: str) -> ExecutionRecord:
         with self._execution_lock:
-            record = self.get(execution_id)
-            if record is None:
-                raise KeyError(execution_id)
-            incomplete = next((step.id for step in record.steps if step.id not in record.results), None)
-            if incomplete is None:
-                return record
+            with self.store.lock(f"execution:{execution_id}"):
+                record = self.get(execution_id)
+                if record is None:
+                    raise KeyError(execution_id)
+                incomplete = next((step.id for step in record.steps if step.id not in record.results), None)
+                if incomplete is None:
+                    return record
             # A manual retry creates a new bounded attempt window only for the
             # failed node and intentionally retains all durable prior outputs.
-            record.attempts[incomplete] = 0
-            record.status = ExecutionStatus.CREATED
-            record.error = None
-            record.finished_at = None
-            record.updated_at = _now()
-            data = self.store.read()
-            data["dlq"] = {key: value for key, value in data["dlq"].items()
-                           if value["execution_id"] != execution_id}
-            data["executions"][execution_id] = record.model_dump(mode="json")
-            self.store.update(data)
-            return record
+                record.attempts[incomplete] = 0
+                record.status = ExecutionStatus.CREATED
+                record.error = None
+                record.finished_at = None
+                record.updated_at = _now()
+                data = self.store.read()
+                data["dlq"] = {key: value for key, value in data["dlq"].items()
+                               if value["execution_id"] != execution_id}
+                serialized = record.model_dump(mode="json")
+                if hasattr(self.store, "persist_retry"):
+                    self.store.persist_retry(serialized)  # type: ignore[attr-defined]
+                else:
+                    data["executions"][execution_id] = serialized
+                    self.store.update(data)
+                return record
 
     def recover(self, execution_id: str) -> ExecutionRecord:
         with self._execution_lock:
-            if self.get(execution_id) is None:
-                raise KeyError(execution_id)
-            return self._run(execution_id, recovered=True)
+            with self.store.lock(f"execution:{execution_id}"):
+                if self.get(execution_id) is None:
+                    raise KeyError(execution_id)
+                return self._run(execution_id, recovered=True)
 
     def _run(self, execution_id: str, reset_failed: bool = False, recovered: bool = False) -> ExecutionRecord:
         data = self.store.read()
