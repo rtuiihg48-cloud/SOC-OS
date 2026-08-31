@@ -31,30 +31,33 @@ export default function TrafficAnalysis() {
   const [observationTypeFilter, setObservationTypeFilter] = useState<string>("ALL");
   const [directionFilter, setDirectionFilter] = useState<string>("ALL");
   const [severityFilter, setSeverityFilter] = useState<string>("ALL");
+  const [protocolFilter, setProtocolFilter] = useState<string>("ALL");
+  const [syntheticPreview, setSyntheticPreview] = useState<TrafficObservation[] | undefined>();
 
   const queryParams: any = {};
   if (observationTypeFilter !== "ALL") queryParams.observationType = observationTypeFilter;
   if (directionFilter !== "ALL") queryParams.direction = directionFilter;
   if (severityFilter !== "ALL") queryParams.severity = severityFilter;
+  if (protocolFilter !== "ALL") queryParams.protocol = protocolFilter;
 
   const { data: summary, isError: isSummaryError } = useGetTrafficSummary({
-    query: { queryKey: getGetTrafficSummaryQueryKey() }
+    query: { queryKey: getGetTrafficSummaryQueryKey(), refetchInterval: 15_000 }
   });
 
   const { data: flows, isLoading, isError: isFlowsError } = useListTrafficFlows(queryParams, {
-    query: { queryKey: getListTrafficFlowsQueryKey(queryParams) }
+    query: { queryKey: getListTrafficFlowsQueryKey(queryParams), refetchInterval: 15_000 }
   });
 
   const generateSynthetic = useGenerateSyntheticTraffic();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const displayFlows = syntheticPreview ?? flows;
 
   const handleGenerateSynthetic = () => {
     generateSynthetic.mutate(undefined as any, {
-      onSuccess: () => {
-        toast({ title: "SYNTHETIC TRAFFIC GENERATED", description: "Node Gateway has injected synthetic telemetry into the analysis pipeline." });
-        queryClient.invalidateQueries({ queryKey: getGetTrafficSummaryQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getListTrafficFlowsQueryKey(queryParams) });
+      onSuccess: (preview) => {
+        setSyntheticPreview(preview);
+        toast({ title: "SYNTHETIC PREVIEW READY", description: "Demo-only results are marked synthetic and were not written to live traffic evidence." });
       },
       onError: (err: any) => {
         toast({ title: "GENERATION FAILED", description: err.message || "Unknown error", variant: "destructive" });
@@ -86,7 +89,7 @@ export default function TrafficAnalysis() {
             className="gap-2 font-mono text-xs border-dashed border-primary/50 text-primary hover:bg-primary/10"
           >
             {generateSynthetic.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            INJECT_SYNTHETIC
+            PREVIEW_SYNTHETIC
           </Button>
           <Button variant="outline" size="icon" onClick={refreshAll} className="border-border bg-card">
             <RefreshCw className="w-4 h-4 text-muted-foreground" />
@@ -94,7 +97,7 @@ export default function TrafficAnalysis() {
         </div>
       </div>
 
-      <TrafficFlowWidget flows={flows} summary={summary} isLoading={isLoading} />
+      <TrafficFlowWidget flows={displayFlows} summary={summary} isLoading={isLoading && syntheticPreview === undefined} isSyntheticPreview={syntheticPreview !== undefined} />
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 shrink-0">
@@ -165,7 +168,7 @@ export default function TrafficAnalysis() {
             <span className="font-mono text-sm uppercase tracking-widest">Filters:</span>
           </div>
 
-          <Select value={observationTypeFilter} onValueChange={setObservationTypeFilter}>
+          <Select value={observationTypeFilter} onValueChange={(value) => { setSyntheticPreview(undefined); setObservationTypeFilter(value); }}>
             <SelectTrigger className="w-[160px] font-mono text-xs bg-background">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -176,7 +179,7 @@ export default function TrafficAnalysis() {
             </SelectContent>
           </Select>
 
-          <Select value={directionFilter} onValueChange={setDirectionFilter}>
+          <Select value={directionFilter} onValueChange={(value) => { setSyntheticPreview(undefined); setDirectionFilter(value); }}>
             <SelectTrigger className="w-[160px] font-mono text-xs bg-background">
               <SelectValue placeholder="Direction" />
             </SelectTrigger>
@@ -189,7 +192,7 @@ export default function TrafficAnalysis() {
             </SelectContent>
           </Select>
 
-          <Select value={severityFilter} onValueChange={setSeverityFilter}>
+          <Select value={severityFilter} onValueChange={(value) => { setSyntheticPreview(undefined); setSeverityFilter(value); }}>
             <SelectTrigger className="w-[160px] font-mono text-xs bg-background">
               <SelectValue placeholder="Severity" />
             </SelectTrigger>
@@ -202,6 +205,18 @@ export default function TrafficAnalysis() {
             </SelectContent>
           </Select>
 
+          <Select value={protocolFilter} onValueChange={(value) => { setSyntheticPreview(undefined); setProtocolFilter(value); }}>
+            <SelectTrigger className="w-[160px] font-mono text-xs bg-background">
+              <SelectValue placeholder="Protocol" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">ALL_PROTOCOLS</SelectItem>
+              {["TCP", "UDP", "DNS", "HTTP", "HTTPS", "TLS", "QUIC", "ICMP", "UNKNOWN"].map((protocol) => (
+                <SelectItem key={protocol} value={protocol}>{protocol}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="ghost"
             size="sm"
@@ -209,6 +224,8 @@ export default function TrafficAnalysis() {
               setObservationTypeFilter("ALL");
               setDirectionFilter("ALL");
               setSeverityFilter("ALL");
+              setProtocolFilter("ALL");
+              setSyntheticPreview(undefined);
             }}
             className="font-mono text-xs ml-auto text-muted-foreground"
           >
@@ -233,7 +250,7 @@ export default function TrafficAnalysis() {
                 RETRY
               </Button>
             </div>
-          ) : !flows || flows.length === 0 ? (
+          ) : !displayFlows || displayFlows.length === 0 ? (
             <div className="w-full h-full flex flex-col items-center justify-center font-mono text-muted-foreground border border-dashed border-border m-4 rounded p-12">
               <Database className="w-8 h-8 mb-4 opacity-20" />
               NO OBSERVATIONS MATCH FILTER CRITERIA
@@ -246,13 +263,13 @@ export default function TrafficAnalysis() {
                   <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[120px]">Type / Gateway</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[120px]">Protocol / Dir</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest">Routing</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[200px]">Signals</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[200px]">Signals / SOC</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[100px]">Risk</TableHead>
                   <TableHead className="font-mono text-xs text-muted-foreground uppercase tracking-widest w-[120px] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {flows.map((obs: TrafficObservation) => (
+                {displayFlows.map((obs: TrafficObservation) => (
                     <motion.tr
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       key={obs.id}
@@ -332,11 +349,16 @@ export default function TrafficAnalysis() {
                       </TableCell>
 
                       <TableCell className="align-top pt-3">
-                        {obs.signals && obs.signals.length > 0 ? (
+                        {(obs.signals?.length ?? 0) > 0 || (obs.correlatedEvents?.length ?? 0) > 0 ? (
                           <div className="flex gap-1 flex-wrap">
                             {obs.signals.map((sig, idx) => (
                               <Badge key={idx} variant="secondary" className="font-mono text-[9px] bg-secondary/50 hover:bg-secondary truncate max-w-[180px]" title={sig}>
                                 {sig}
+                              </Badge>
+                            ))}
+                            {obs.correlatedEvents?.map((event) => (
+                              <Badge key={`event-${event.id}`} variant="outline" className="font-mono text-[9px] border-primary/50 text-primary" title={event.event}>
+                                SOC #{event.id} · {event.action}
                               </Badge>
                             ))}
                           </div>

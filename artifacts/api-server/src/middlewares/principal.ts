@@ -16,7 +16,7 @@ export async function attachPrincipal(req: Request, _res: Response, next: NextFu
       if (!prefix || !secret) { next(); return; }
       const [credential] = await db.select().from(serviceCredentialsTable).where(and(eq(serviceCredentialsTable.credentialPrefix, prefix), isNull(serviceCredentialsTable.revokedAt), or(isNull(serviceCredentialsTable.expiresAt), gt(serviceCredentialsTable.expiresAt, new Date()))));
       if (credential && timingSafeEqual(Buffer.from(credential.secretHash), Buffer.from(secretHash(secret)))) {
-        req.principal = { principalId: credential.credentialId, principalType: credential.principalType as "SERVICE" | "GATEWAY", tenantIds: [credential.tenantId], roles: [], capabilities: credential.allowedCapabilities as Principal["capabilities"], authMethod: "SCOPED_CREDENTIAL", credentialVersion: credential.credentialVersion, correlationId: String(req.id) };
+        req.principal = { principalId: credential.credentialId, principalType: credential.principalType as "SERVICE" | "GATEWAY", tenantIds: [credential.tenantId], roles: [], capabilities: credential.allowedCapabilities as Principal["capabilities"], authMethod: "SCOPED_CREDENTIAL", credentialVersion: credential.credentialVersion, correlationId: String(req.id), gatewayScope: credential.gatewayScope };
       }
       next(); return;
     }

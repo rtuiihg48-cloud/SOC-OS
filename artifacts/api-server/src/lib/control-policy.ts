@@ -7,7 +7,7 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = typeof CAPABILITIES[number];
 export type PrincipalType = "USER" | "SERVICE" | "GATEWAY";
-export type Principal = { principalId: string; principalType: PrincipalType; tenantIds: number[]; roles: string[]; capabilities: Capability[]; authMethod: "CLERK" | "SCOPED_CREDENTIAL"; credentialVersion: number; correlationId: string };
+export type Principal = { principalId: string; principalType: PrincipalType; tenantIds: number[]; roles: string[]; capabilities: Capability[]; authMethod: "CLERK" | "SCOPED_CREDENTIAL"; credentialVersion: number; correlationId: string; gatewayScope?: string | null };
 export type PolicyDecision = { allowed: boolean; decisionId: string; subject: Pick<Principal, "principalId" | "principalType">; tenantId: number | null; action: Capability; target: { type: string; id: string }; reasonCode: string; expiresAt: string | null; requiredApproval: boolean };
 
 const ROLE_CAPABILITIES: Record<string, Capability[]> = {

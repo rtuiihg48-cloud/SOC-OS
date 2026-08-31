@@ -27,6 +27,7 @@ type TrafficFlowWidgetProps = {
   flows?: TrafficObservation[];
   summary?: TrafficSummary;
   isLoading?: boolean;
+  isSyntheticPreview?: boolean;
 };
 
 type ThroughputPoint = {
@@ -41,28 +42,6 @@ const PROTOCOL_COLORS = [
   "hsl(var(--warn))",
   "hsl(var(--critical))",
   "hsl(var(--muted-foreground))",
-];
-
-const SYNTHETIC_THROUGHPUT = [
-  { inbound: 420, outbound: 280 },
-  { inbound: 510, outbound: 320 },
-  { inbound: 470, outbound: 360 },
-  { inbound: 620, outbound: 410 },
-  { inbound: 580, outbound: 390 },
-  { inbound: 760, outbound: 470 },
-  { inbound: 690, outbound: 520 },
-  { inbound: 820, outbound: 560 },
-  { inbound: 740, outbound: 500 },
-  { inbound: 910, outbound: 610 },
-  { inbound: 860, outbound: 590 },
-  { inbound: 980, outbound: 680 },
-];
-
-const SYNTHETIC_PROTOCOLS = [
-  { name: "HTTPS", value: 52 },
-  { name: "TLS", value: 24 },
-  { name: "TCP", value: 16 },
-  { name: "DNS", value: 8 },
 ];
 
 function formatRate(value: number, unit: "Kbps" | "Mbps") {
@@ -102,7 +81,7 @@ function TrafficTooltip({
   );
 }
 
-export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidgetProps) {
+export function TrafficFlowWidget({ flows, summary, isLoading, isSyntheticPreview = false }: TrafficFlowWidgetProps) {
   const isInitialLoading = isLoading && flows === undefined;
 
   const flowRows = useMemo(
@@ -110,16 +89,7 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
     [flows],
   );
 
-  const isSyntheticPreview = !isInitialLoading && flowRows.length === 0;
-
   const throughput = useMemo<ThroughputPoint[]>(() => {
-    if (isSyntheticPreview) {
-      return SYNTHETIC_THROUGHPUT.map((point, index) => ({
-        ...point,
-        label: `${String(index + 1).padStart(2, "0")}:00`,
-      }));
-    }
-
     const buckets = new Map<
       number,
       { inboundBytes: number; outboundBytes: number }
@@ -153,11 +123,9 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
     }
 
     return filled;
-  }, [flowRows, isSyntheticPreview]);
+  }, [flowRows]);
 
   const protocols = useMemo(() => {
-    if (isSyntheticPreview) return SYNTHETIC_PROTOCOLS;
-
     const counts = new Map<string, number>();
     for (const flow of flowRows) {
       const protocol = flow.protocol.trim().toUpperCase() || "UNKNOWN";
@@ -169,7 +137,7 @@ export function TrafficFlowWidget({ flows, summary, isLoading }: TrafficFlowWidg
       .slice(0, 5)
       .map(([name, value]) => ({ name, value }));
     return sorted;
-  }, [flowRows, isSyntheticPreview]);
+  }, [flowRows]);
 
   const { unit, latestInbound, latestOutbound, peakState, peakRatio, chartData } = useMemo(() => {
     const allRates = throughput.flatMap((point) => [point.inbound, point.outbound]);

@@ -526,10 +526,10 @@ paths:
     post:
       operationId: generateSyntheticTraffic
       tags: [traffic]
-      summary: Generate harmless synthetic flow summaries for analysis validation
+      summary: Preview harmless synthetic flow summaries without persisting live evidence
       responses:
-        "201":
-          description: Synthetic observations
+        "200":
+          description: Non-persistent synthetic observations
           content:
             application/json:
               schema:
@@ -1552,9 +1552,6 @@ components:
     TrafficTelemetryInput:
       type: object
       properties:
-        tenantId:
-          type: integer
-          minimum: 1
         gatewayId:
           type: string
           minLength: 1
@@ -1636,7 +1633,7 @@ components:
         id:
           type: integer
         tenantId:
-          type: ["integer", "null"]
+          type: integer
         gatewayId:
           type: string
         observationId:
@@ -1696,7 +1693,24 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, tenantId, gatewayId, observationId, observationType, observedAt, protocol, direction, bytesOut, bytesIn, packets, durationMs, isSynthetic, riskScore, severity, signals, recommendedAction, analysisVersion, createdAt]
+        correlatedEvents:
+          type: array
+          description: References to existing tenant-scoped SOC events; evidence is not duplicated.
+          items:
+            $ref: "#/components/schemas/TrafficCorrelatedEvent"
+      required: [id, tenantId, gatewayId, observationId, observationType, observedAt, protocol, direction, bytesOut, bytesIn, packets, durationMs, isSynthetic, riskScore, severity, signals, recommendedAction, analysisVersion, createdAt, correlatedEvents]
+
+    TrafficCorrelatedEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        nodeId: { type: string }
+        event: { type: string }
+        score: { type: integer }
+        action: { type: string }
+        status: { type: string }
+        timestamp: { type: string, format: date-time }
+      required: [id, nodeId, event, score, action, status, timestamp]
 
     TrafficSummary:
       type: object

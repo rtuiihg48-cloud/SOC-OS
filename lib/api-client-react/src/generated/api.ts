@@ -1742,7 +1742,7 @@ export const getGenerateSyntheticTrafficUrl = () => {
 }
 
 /**
- * @summary Generate harmless synthetic flow summaries for analysis validation
+ * @summary Preview harmless synthetic flow summaries without persisting live evidence
  */
 export const generateSyntheticTraffic = async ( options?: RequestInit): Promise<TrafficObservation[]> => {
 
@@ -1790,7 +1790,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type GenerateSyntheticTrafficMutationError = ErrorType<unknown>
 
     /**
- * @summary Generate harmless synthetic flow summaries for analysis validation
+ * @summary Preview harmless synthetic flow summaries without persisting live evidence
  */
 export const useGenerateSyntheticTraffic = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof generateSyntheticTraffic>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}

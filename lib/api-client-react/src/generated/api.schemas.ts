@@ -108,8 +108,6 @@ export const TrafficTelemetryInputHeartbeatStatus = {
 } as const;
 
 export interface TrafficTelemetryInput {
-  /** @minimum 1 */
-  tenantId?: number;
   /**
      * @minLength 1
      * @maxLength 120
@@ -200,10 +198,19 @@ export const TrafficObservationRecommendedAction = {
   ISOLATE: 'ISOLATE',
 } as const;
 
+export interface TrafficCorrelatedEvent {
+  id: number;
+  nodeId: string;
+  event: string;
+  score: number;
+  action: string;
+  status: string;
+  timestamp: string;
+}
+
 export interface TrafficObservation {
   id: number;
-  /** @nullable */
-  tenantId: number | null;
+  tenantId: number;
   gatewayId: string;
   observationId: string;
   observationType: TrafficObservationObservationType;
@@ -239,6 +246,8 @@ export interface TrafficObservation {
   recommendedAction: TrafficObservationRecommendedAction;
   analysisVersion: string;
   createdAt: string;
+  /** References to existing tenant-scoped SOC events; evidence is not duplicated. */
+  correlatedEvents: TrafficCorrelatedEvent[];
 }
 
 export type TrafficSummaryProtocolBreakdown = {[key: string]: number};

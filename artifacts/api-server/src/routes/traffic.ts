@@ -1,11 +1,11 @@
 import crypto from "node:crypto";
 import { Router } from "express";
-import { db, trafficObservationsTable } from "@workspace/db";
+import { db, securityEventsTable, trafficObservationsTable } from "@workspace/db";
 import {
   IngestTrafficTelemetryBody,
   ListTrafficFlowsQueryParams,
 } from "@workspace/api-zod";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { analyzeTraffic } from "../lib/traffic-engine";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import { appendAudit } from "../lib/audit";
@@ -24,15 +24,71 @@ function hasDatabaseCode(error: unknown, expected: string): boolean {
   return false;
 }
 
-function formatObservation(row: typeof trafficObservationsTable.$inferSelect) {
+type CorrelatedEvent = {
+  id: number;
+  nodeId: string;
+  event: string;
+  score: number;
+  action: string;
+  status: string;
+  timestamp: string;
+};
+
+function formatObservation(
+  row: typeof trafficObservationsTable.$inferSelect,
+  correlatedEvents: CorrelatedEvent[] = [],
+) {
   return {
     ...row,
     observedAt: row.observedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
+    correlatedEvents,
   };
 }
 
-function validateTelemetry(
+function canonicalTenantId(req: Parameters<typeof singleTenantScope>[0]): number {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) throw new Error("Canonical tenant scope is unavailable");
+  return tenantId;
+}
+
+async function correlateSocEvents(rows: Array<typeof trafficObservationsTable.$inferSelect>, tenantId: number) {
+  if (rows.length === 0) return new Map<number, CorrelatedEvent[]>();
+  const windows = rows.flatMap((row) =>
+    [row.sourceAsset, row.destinationAsset]
+      .filter((asset): asset is string => Boolean(asset))
+      .map((asset) => and(
+        eq(securityEventsTable.nodeId, asset),
+        gte(securityEventsTable.timestamp, new Date(row.observedAt.getTime() - 5 * 60_000)),
+        lte(securityEventsTable.timestamp, new Date(row.observedAt.getTime() + 5 * 60_000)),
+      )),
+  );
+  if (windows.length === 0) return new Map<number, CorrelatedEvent[]>();
+  const events = await db.select({
+    id: securityEventsTable.id,
+    nodeId: securityEventsTable.nodeId,
+    event: securityEventsTable.event,
+    score: securityEventsTable.score,
+    action: securityEventsTable.action,
+    status: securityEventsTable.status,
+    timestamp: securityEventsTable.timestamp,
+  }).from(securityEventsTable).where(and(
+    eq(securityEventsTable.tenantId, tenantId),
+    or(...windows),
+  )).orderBy(desc(securityEventsTable.timestamp));
+  const result = new Map<number, CorrelatedEvent[]>();
+  for (const row of rows) {
+    const matches = events
+      .filter((event) =>
+        (event.nodeId === row.sourceAsset || event.nodeId === row.destinationAsset) &&
+        Math.abs(event.timestamp.getTime() - row.observedAt.getTime()) <= 5 * 60_000)
+      .map((event) => ({ ...event, timestamp: event.timestamp.toISOString() }));
+    if (matches.length > 0) result.set(row.id, matches);
+  }
+  return result;
+}
+
+export function validateTelemetry(
   input: ReturnType<typeof IngestTrafficTelemetryBody.parse>,
 ): string | null {
   const now = Date.now();
@@ -52,6 +108,11 @@ function validateTelemetry(
     return "Unsupported traffic protocol";
   }
   return null;
+}
+
+export function gatewayScopeAllows(principal: NonNullable<Express.Request["principal"]>, gatewayId: string): boolean {
+  if (principal.principalType !== "GATEWAY") return true;
+  return typeof principal.gatewayScope === "string" && principal.gatewayScope === gatewayId;
 }
 
 async function insertObservation(
@@ -110,13 +171,17 @@ router.post("/traffic/telemetry", requireCapability("events:ingest", singleTenan
     res.status(400).json({ error: "Invalid gateway telemetry", issues: parsed.error.issues });
     return;
   }
+  if (!gatewayScopeAllows(req.principal!, parsed.data.gatewayId)) {
+    res.status(403).json({ error: "GATEWAY_SCOPE_MISMATCH", code: "GATEWAY_SCOPE_MISMATCH" });
+    return;
+  }
   const validationError = validateTelemetry(parsed.data);
   if (validationError) {
     res.status(400).json({ error: validationError });
     return;
   }
   try {
-    const tenantId = req.principal!.tenantIds[0]!;
+    const tenantId = canonicalTenantId(req);
     const row = await db.transaction(async (tx) => {
       const created = await insertObservation(parsed.data, tenantId, tx);
       await appendAudit(tx, {
@@ -145,12 +210,13 @@ router.get("/traffic/flows", requireCapability("traffic:read", singleTenantScope
     return;
   }
   const query = parsed.data;
-  const tenantId = req.principal!.tenantIds[0]!;
+  const tenantId = canonicalTenantId(req);
   const rows = await db
     .select()
     .from(trafficObservationsTable)
     .where(and(
       eq(trafficObservationsTable.tenantId, tenantId),
+      eq(trafficObservationsTable.isSynthetic, false),
       query.protocol ? eq(trafficObservationsTable.protocol, query.protocol.toUpperCase()) : undefined,
       query.action ? eq(trafficObservationsTable.recommendedAction, query.action) : undefined,
       query.severity ? eq(trafficObservationsTable.severity, query.severity) : undefined,
@@ -160,11 +226,12 @@ router.get("/traffic/flows", requireCapability("traffic:read", singleTenantScope
     ))
     .orderBy(desc(trafficObservationsTable.observedAt))
     .limit(query.limit);
-  res.json(rows.map(formatObservation));
+  const correlations = await correlateSocEvents(rows, tenantId);
+  res.json(rows.map((row) => formatObservation(row, correlations.get(row.id) ?? [])));
 });
 
 router.get("/traffic/summary", requireCapability("traffic:read", singleTenantScope), async (req, res) => {
-  const tenantId = req.principal!.tenantIds[0]!;
+  const tenantId = canonicalTenantId(req);
   const [totals] = await db
     .select({
       totalObservations: count(),
@@ -177,21 +244,21 @@ router.get("/traffic/summary", requireCapability("traffic:read", singleTenantSco
       bytesIn: sql<number>`coalesce(sum(${trafficObservationsTable.bytesIn}), 0)`,
     })
     .from(trafficObservationsTable)
-    .where(eq(trafficObservationsTable.tenantId, tenantId));
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.isSynthetic, false)));
 
   const protocolRows = await db
     .select({ protocol: trafficObservationsTable.protocol, value: count() })
     .from(trafficObservationsTable)
-    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "FLOW")))
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "FLOW"), eq(trafficObservationsTable.isSynthetic, false)))
     .groupBy(trafficObservationsTable.protocol);
   const signalRows = await db
     .select({ signals: trafficObservationsTable.signals })
     .from(trafficObservationsTable)
-    .where(eq(trafficObservationsTable.tenantId, tenantId));
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.isSynthetic, false)));
   const heartbeatRows = await db
     .select()
     .from(trafficObservationsTable)
-    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "HEARTBEAT")))
+    .where(and(eq(trafficObservationsTable.tenantId, tenantId), eq(trafficObservationsTable.observationType, "HEARTBEAT"), eq(trafficObservationsTable.isSynthetic, false)))
     .orderBy(desc(trafficObservationsTable.observedAt));
 
   const signalBreakdown: Record<string, number> = {};
@@ -296,21 +363,46 @@ router.post("/traffic/synthetic", requireCapability("events:ingest", singleTenan
       tlsServerName: "synthetic-storage.invalid",
     },
   ];
-  const tenantId = req.principal!.tenantIds[0]!;
-  const rows = await db.transaction(async (tx) => {
-    const created = [];
-    for (const input of inputs) {
-      created.push(await insertObservation(IngestTrafficTelemetryBody.parse(input), tenantId, tx, true));
-    }
-    await appendAudit(tx, {
-      tenantId, principal: req.principal!, action: "traffic:synthetic:create",
-      targetType: "traffic_synthetic_run", targetId: runId, decision: "COMMITTED",
-      reasonCode: "SYNTHETIC_TRAFFIC_RECORDED", correlationId: req.principal!.correlationId,
-      metadata: { observationCount: created.length, gatewayId: "synthetic-gateway" },
-    });
-    return created;
+  const tenantId = canonicalTenantId(req);
+  const now = new Date();
+  const rows = inputs.map((raw, index) => {
+    const input = IngestTrafficTelemetryBody.parse(raw);
+    return {
+      id: -(index + 1),
+      tenantId,
+      gatewayId: input.gatewayId,
+      observationId: input.observationId,
+      observationType: input.observationType,
+      observedAt: input.observedAt,
+      protocol: input.protocol.toUpperCase(),
+      direction: input.direction,
+      sourceAsset: input.sourceAsset ?? null,
+      destinationAsset: input.destinationAsset ?? null,
+      sourcePort: input.sourcePort ?? null,
+      destinationPort: input.destinationPort ?? null,
+      bytesOut: input.bytesOut,
+      bytesIn: input.bytesIn,
+      packets: input.packets,
+      durationMs: input.durationMs,
+      dnsQueryName: input.dnsQueryName ?? null,
+      tlsServerName: input.tlsServerName ?? null,
+      httpHost: input.httpHost ?? null,
+      heartbeatStatus: input.heartbeatStatus ?? null,
+      heartbeatLatencyMs: input.heartbeatLatencyMs ?? null,
+      isSynthetic: true,
+      ...analyzeTraffic(input),
+      createdAt: now,
+    };
   });
-  res.status(201).json(rows.map(formatObservation));
+  await db.transaction(async (tx) => {
+    await appendAudit(tx, {
+      tenantId, principal: req.principal!, action: "traffic:synthetic:preview",
+      targetType: "traffic_synthetic_run", targetId: runId, decision: "COMMITTED",
+      reasonCode: "SYNTHETIC_TRAFFIC_PREVIEWED", correlationId: req.principal!.correlationId,
+      metadata: { observationCount: rows.length, persistedToLiveTraffic: false },
+    });
+  });
+  res.status(200).json(rows.map((row) => formatObservation(row)));
 });
 
 export default router;

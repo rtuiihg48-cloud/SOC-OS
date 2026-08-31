@@ -520,7 +520,6 @@ export const UpdateEventStatusResponse = zod.object({
 /**
  * @summary Ingest a normalized Node Gateway heartbeat or flow summary
  */
-
 export const ingestTrafficTelemetryBodyGatewayIdMax = 120;
 
 export const ingestTrafficTelemetryBodyObservationIdMax = 160;
@@ -568,7 +567,6 @@ export const ingestTrafficTelemetryBodyHeartbeatLatencyMsMax = 120000;
 
 
 export const IngestTrafficTelemetryBody = zod.object({
-  "tenantId": zod.number().min(1).optional(),
   "gatewayId": zod.string().min(1).max(ingestTrafficTelemetryBodyGatewayIdMax),
   "observationId": zod.string().min(1).max(ingestTrafficTelemetryBodyObservationIdMax),
   "observationType": zod.enum(['FLOW', 'HEARTBEAT']).default(ingestTrafficTelemetryBodyObservationTypeDefault),
@@ -611,7 +609,7 @@ export const ListTrafficFlowsQueryParams = zod.object({
 
 export const ListTrafficFlowsResponseItem = zod.object({
   "id": zod.number(),
-  "tenantId": zod.number().nullable(),
+  "tenantId": zod.number(),
   "gatewayId": zod.string(),
   "observationId": zod.string(),
   "observationType": zod.enum(['FLOW', 'HEARTBEAT']),
@@ -637,7 +635,16 @@ export const ListTrafficFlowsResponseItem = zod.object({
   "signals": zod.array(zod.string()),
   "recommendedAction": zod.enum(['ALLOW', 'WARN', 'ISOLATE']),
   "analysisVersion": zod.string(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "correlatedEvents": zod.array(zod.object({
+  "id": zod.number(),
+  "nodeId": zod.string(),
+  "event": zod.string(),
+  "score": zod.number(),
+  "action": zod.string(),
+  "status": zod.string(),
+  "timestamp": zod.coerce.date()
+})).describe('References to existing tenant-scoped SOC events; evidence is not duplicated.')
 })
 export const ListTrafficFlowsResponse = zod.array(ListTrafficFlowsResponseItem)
 
@@ -665,6 +672,51 @@ export const GetTrafficSummaryResponse = zod.object({
 }),
   "generatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary Preview harmless synthetic flow summaries without persisting live evidence
+ */
+export const GenerateSyntheticTrafficResponseItem = zod.object({
+  "id": zod.number(),
+  "tenantId": zod.number(),
+  "gatewayId": zod.string(),
+  "observationId": zod.string(),
+  "observationType": zod.enum(['FLOW', 'HEARTBEAT']),
+  "observedAt": zod.coerce.date(),
+  "protocol": zod.string(),
+  "direction": zod.string(),
+  "sourceAsset": zod.string().nullish(),
+  "destinationAsset": zod.string().nullish(),
+  "sourcePort": zod.number().nullish(),
+  "destinationPort": zod.number().nullish(),
+  "bytesOut": zod.number(),
+  "bytesIn": zod.number(),
+  "packets": zod.number(),
+  "durationMs": zod.number(),
+  "dnsQueryName": zod.string().nullish(),
+  "tlsServerName": zod.string().nullish(),
+  "httpHost": zod.string().nullish(),
+  "heartbeatStatus": zod.string().nullish(),
+  "heartbeatLatencyMs": zod.number().nullish(),
+  "isSynthetic": zod.boolean(),
+  "riskScore": zod.number(),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "signals": zod.array(zod.string()),
+  "recommendedAction": zod.enum(['ALLOW', 'WARN', 'ISOLATE']),
+  "analysisVersion": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "correlatedEvents": zod.array(zod.object({
+  "id": zod.number(),
+  "nodeId": zod.string(),
+  "event": zod.string(),
+  "score": zod.number(),
+  "action": zod.string(),
+  "status": zod.string(),
+  "timestamp": zod.coerce.date()
+})).describe('References to existing tenant-scoped SOC events; evidence is not duplicated.')
+})
+export const GenerateSyntheticTrafficResponse = zod.array(GenerateSyntheticTrafficResponseItem)
 
 
 /**

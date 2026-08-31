@@ -130,7 +130,7 @@ export const securityEventsTable = pgTable("security_events", {
 // captures are intentionally not represented by this model.
 export const trafficObservationsTable = pgTable("traffic_observations", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenantsTable.id, { onDelete: "restrict" }),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
   gatewayId: text("gateway_id").notNull(),
   observationId: text("observation_id").notNull(),
   observationType: text("observation_type").notNull().default("FLOW"),
@@ -158,7 +158,7 @@ export const trafficObservationsTable = pgTable("traffic_observations", {
   analysisVersion: text("analysis_version").notNull().default("traffic-v1"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("traffic_observations_tenant_gateway_observation_uidx").on(sql`coalesce(${table.tenantId}, 0)`, table.gatewayId, table.observationId),
+  uniqueIndex("traffic_observations_tenant_gateway_observation_uidx").on(table.tenantId, table.gatewayId, table.observationId),
   index("traffic_observations_tenant_observed_idx").on(table.tenantId, table.observedAt),
   index("traffic_observations_action_observed_idx").on(table.recommendedAction, table.observedAt),
   index("traffic_observations_protocol_observed_idx").on(table.protocol, table.observedAt),
@@ -169,6 +169,7 @@ export const trafficObservationsTable = pgTable("traffic_observations", {
   check("traffic_observations_score_check", sql`${table.riskScore} BETWEEN 0 AND 100`),
   check("traffic_observations_severity_check", sql`${table.severity} IN ('LOW','MEDIUM','HIGH','CRITICAL')`),
   check("traffic_observations_action_check", sql`${table.recommendedAction} IN ('ALLOW','WARN','ISOLATE')`),
+  check("traffic_observations_heartbeat_check", sql`${table.observationType} <> 'HEARTBEAT' OR ${table.heartbeatStatus} IN ('HEALTHY','DEGRADED','OFFLINE')`),
   check("traffic_observations_metadata_only_check", sql`${table.observationType} IN ('FLOW','HEARTBEAT')`),
 ]);
 
