@@ -59,12 +59,13 @@ META_CUBE_STORAGE = "postgres"
 
 [userenv.production]
 META_CUBE_STORAGE = "postgres"
+APP_URL = "https://hello-there-rtuiihg48.replit.app"
 
 [userenv.shared]
 FREE_SECURITY_TEST_LIMIT = "3"
 WHOP_COMPANY_ID = "biz_gfLXX1hyPi4nsD"
 WHOP_PLAN_ID = "plan_nOqioR0u71s4Q"
 WHOP_PRODUCT_ID = "prod_D1lk8qqstPrkb"
-SOC_DASHBOARD_BASE_PATH = "/soc-dashboard"
+SOC_DASHBOARD_BASE_PATH = "/"
 WHOP_ANNUAL_PLAN_ID = "plan_t365hdoT5Eq5R"
 WHOP_MONTHLY_PLAN_ID = "plan_nOqioR0u71s4Q"
