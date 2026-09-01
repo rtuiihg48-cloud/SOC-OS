@@ -1043,6 +1043,136 @@ export const ResetCyberRangeResponse = zod.object({
 
 
 /**
+ * @summary Get the tenant-scoped worker registry and relay telemetry
+ */
+export const getNodeClusterResponseNodesItemCapacityMax = 8;
+
+export const getNodeClusterResponseNodesItemActiveTasksMin = 0;
+export const getNodeClusterResponseNodesItemActiveTasksMax = 8;
+
+export const getNodeClusterResponseNodesItemHealthScoreMin = 0;
+export const getNodeClusterResponseNodesItemHealthScoreMax = 100;
+
+export const getNodeClusterResponseNodesMin = 10;
+export const getNodeClusterResponseNodesMax = 10;
+
+export const getNodeClusterResponseMessagesMax = 50;
+
+export const getNodeClusterResponseQueueDepthMin = 0;
+
+export const getNodeClusterResponseActiveTasksMin = 0;
+
+export const getNodeClusterResponseCompletedTasksMin = 0;
+
+export const getNodeClusterResponseRejectedTasksMin = 0;
+
+
+
+export const GetNodeClusterResponse = zod.object({
+  "coordination": zod.enum(['INSTANCE_LOCAL_VOLATILE']),
+  "transportBoundary": zod.enum(['SIGNED_LOCAL_IPC_RELAY']),
+  "relayAuthentication": zod.enum(['ED25519_TASK_SIGNATURE']),
+  "payloadPolicy": zod.enum(['ALLOWLISTED_METADATA_ONLY']),
+  "maxNodes": zod.literal(10),
+  "nodes": zod.array(zod.object({
+  "nodeId": zod.string(),
+  "displayName": zod.string(),
+  "runtime": zod.enum(['PROCESS']),
+  "status": zod.enum(['ONLINE', 'BUSY', 'DEGRADED', 'OFFLINE', 'QUARANTINED', 'DRAINING']),
+  "capabilities": zod.array(zod.enum(['CPU', 'MEMORY', 'NUMA', 'CACHE', 'TELEMETRY'])),
+  "capacity": zod.number().min(1).max(getNodeClusterResponseNodesItemCapacityMax),
+  "activeTasks": zod.number().min(getNodeClusterResponseNodesItemActiveTasksMin).max(getNodeClusterResponseNodesItemActiveTasksMax),
+  "healthScore": zod.number().min(getNodeClusterResponseNodesItemHealthScoreMin).max(getNodeClusterResponseNodesItemHealthScoreMax),
+  "lastHeartbeat": zod.coerce.date(),
+  "boundary": zod.enum(['TRUSTED_FIXED_CODE_PROCESS']),
+  "assignedTaskIds": zod.array(zod.string())
+})).min(getNodeClusterResponseNodesMin).max(getNodeClusterResponseNodesMax),
+  "messages": zod.array(zod.object({
+  "messageId": zod.string(),
+  "taskId": zod.string(),
+  "correlationId": zod.string(),
+  "source": zod.enum(['AI_CORE']),
+  "destinationNodeId": zod.string().nullable(),
+  "kind": zod.enum(['SIMULATION', 'OBSERVATION']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']).nullable(),
+  "requiredCapabilities": zod.array(zod.enum(['CPU', 'MEMORY', 'NUMA', 'CACHE', 'TELEMETRY'])),
+  "priority": zod.enum(['LOW', 'NORMAL', 'HIGH']),
+  "status": zod.enum(['CREATED', 'QUEUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'EXECUTED', 'FAILED']),
+  "transitions": zod.array(zod.object({
+  "status": zod.enum(['CREATED', 'QUEUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'EXECUTED', 'FAILED']),
+  "at": zod.coerce.date(),
+  "reason": zod.string().nullish()
+})),
+  "submittedAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "executionMode": zod.enum(['FIXED_CODE_ONLY']),
+  "payloadPolicy": zod.enum(['ALLOWLISTED_METADATA_ONLY']),
+  "relayAuthentication": zod.enum(['ED25519_TASK_SIGNATURE']),
+  "taskSignatureVerified": zod.boolean(),
+  "resultObservation": zod.string().nullable()
+})).max(getNodeClusterResponseMessagesMax),
+  "queueDepth": zod.number().min(getNodeClusterResponseQueueDepthMin),
+  "activeTasks": zod.number().min(getNodeClusterResponseActiveTasksMin),
+  "completedTasks": zod.number().min(getNodeClusterResponseCompletedTasksMin),
+  "rejectedTasks": zod.number().min(getNodeClusterResponseRejectedTasksMin)
+})
+
+
+/**
+ * @summary List recent typed task relay messages
+ */
+export const ListNodeClusterMessagesResponseItem = zod.object({
+  "messageId": zod.string(),
+  "taskId": zod.string(),
+  "correlationId": zod.string(),
+  "source": zod.enum(['AI_CORE']),
+  "destinationNodeId": zod.string().nullable(),
+  "kind": zod.enum(['SIMULATION', 'OBSERVATION']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']).nullable(),
+  "requiredCapabilities": zod.array(zod.enum(['CPU', 'MEMORY', 'NUMA', 'CACHE', 'TELEMETRY'])),
+  "priority": zod.enum(['LOW', 'NORMAL', 'HIGH']),
+  "status": zod.enum(['CREATED', 'QUEUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'EXECUTED', 'FAILED']),
+  "transitions": zod.array(zod.object({
+  "status": zod.enum(['CREATED', 'QUEUED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'EXECUTED', 'FAILED']),
+  "at": zod.coerce.date(),
+  "reason": zod.string().nullish()
+})),
+  "submittedAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "executionMode": zod.enum(['FIXED_CODE_ONLY']),
+  "payloadPolicy": zod.enum(['ALLOWLISTED_METADATA_ONLY']),
+  "relayAuthentication": zod.enum(['ED25519_TASK_SIGNATURE']),
+  "taskSignatureVerified": zod.boolean(),
+  "resultObservation": zod.string().nullable()
+})
+export const ListNodeClusterMessagesResponse = zod.array(ListNodeClusterMessagesResponseItem)
+
+
+/**
+ * @summary Route an allowlisted fixed-code task to an eligible worker node
+ */
+export const dispatchNodeClusterTaskBodyOneRequiredCapabilitiesMax = 5;
+
+export const dispatchNodeClusterTaskBodyTwoRequiredCapabilitiesMax = 5;
+
+
+
+export const DispatchNodeClusterTaskBody = zod.union([zod.object({
+  "kind": zod.literal("SIMULATION"),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "requiredCapabilities": zod.array(zod.enum(['CPU', 'MEMORY', 'NUMA', 'CACHE', 'TELEMETRY'])).min(1).max(dispatchNodeClusterTaskBodyOneRequiredCapabilitiesMax),
+  "priority": zod.enum(['LOW', 'NORMAL', 'HIGH']).optional()
+}),zod.object({
+  "kind": zod.literal("OBSERVATION"),
+  "scenario": zod.null(),
+  "requiredCapabilities": zod.array(zod.enum(['CPU', 'MEMORY', 'NUMA', 'CACHE', 'TELEMETRY'])).min(1).max(dispatchNodeClusterTaskBodyTwoRequiredCapabilitiesMax),
+  "priority": zod.enum(['LOW', 'NORMAL', 'HIGH']).optional()
+})])
+
+
+/**
  * @summary Transcribe an audio command without storing the audio
  */
 export const TranscribeVoiceResponse = zod.object({

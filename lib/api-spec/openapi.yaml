@@ -16,6 +16,8 @@ tags:
     description: Self-healing simulation
   - name: cyber-range
     description: Tenant-scoped deterministic process-worker cyber range
+  - name: node-cluster
+    description: Tenant-scoped worker registry, task routing, and relay state
   - name: dashboard
     description: Dashboard and analytics
   - name: tenants
@@ -641,6 +643,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CyberRangeState"
+
+  /node-cluster:
+    get:
+      operationId: getNodeCluster
+      tags: [node-cluster]
+      summary: Get the tenant-scoped worker registry and relay telemetry
+      responses:
+        "200":
+          description: Current worker registry and relay state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeClusterState"
+
+  /node-cluster/messages:
+    get:
+      operationId: listNodeClusterMessages
+      tags: [node-cluster]
+      summary: List recent typed task relay messages
+      responses:
+        "200":
+          description: Recent relay messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NodeRelayMessage"
+
+  /node-cluster/tasks:
+    post:
+      operationId: dispatchNodeClusterTask
+      tags: [node-cluster]
+      summary: Route an allowlisted fixed-code task to an eligible worker node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeTaskInput"
+      responses:
+        "202":
+          description: Task accepted by the internal relay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeRelayMessage"
+        "400":
+          description: Invalid or unsupported task
 
   /voice/transcribe:
     post:
@@ -1750,6 +1801,206 @@ paths:
 
 components:
   schemas:
+    NodeRuntime:
+      type: string
+      enum: [PROCESS]
+
+    NodeStatus:
+      type: string
+      enum: [ONLINE, BUSY, DEGRADED, OFFLINE, QUARANTINED, DRAINING]
+
+    NodeCapability:
+      type: string
+      enum: [CPU, MEMORY, NUMA, CACHE, TELEMETRY]
+
+    NodeRelayStatus:
+      type: string
+      enum: [CREATED, QUEUED, ACCEPTED, REJECTED, EXPIRED, EXECUTED, FAILED]
+
+    NodeTaskKind:
+      type: string
+      enum: [SIMULATION, OBSERVATION]
+
+    NodeTaskPriority:
+      type: string
+      enum: [LOW, NORMAL, HIGH]
+
+    NodeTaskInput:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, scenario, requiredCapabilities]
+          properties:
+            kind:
+              type: string
+              const: SIMULATION
+            scenario:
+              $ref: "#/components/schemas/CyberRangeScenario"
+            requiredCapabilities:
+              type: array
+              minItems: 1
+              maxItems: 5
+              uniqueItems: true
+              items:
+                $ref: "#/components/schemas/NodeCapability"
+            priority:
+              $ref: "#/components/schemas/NodeTaskPriority"
+        - type: object
+          additionalProperties: false
+          required: [kind, scenario, requiredCapabilities]
+          properties:
+            kind:
+              type: string
+              const: OBSERVATION
+            scenario:
+              type: "null"
+            requiredCapabilities:
+              type: array
+              minItems: 1
+              maxItems: 5
+              uniqueItems: true
+              items:
+                $ref: "#/components/schemas/NodeCapability"
+            priority:
+              $ref: "#/components/schemas/NodeTaskPriority"
+
+    NodeTaskTransition:
+      type: object
+      required: [status, at]
+      properties:
+        status:
+          $ref: "#/components/schemas/NodeRelayStatus"
+        at:
+          type: string
+          format: date-time
+        reason:
+          type: [string, "null"]
+
+    NodeRecord:
+      type: object
+      required:
+        - nodeId
+        - displayName
+        - runtime
+        - status
+        - capabilities
+        - capacity
+        - activeTasks
+        - healthScore
+        - lastHeartbeat
+        - boundary
+        - assignedTaskIds
+      properties:
+        nodeId: { type: string }
+        displayName: { type: string }
+        runtime:
+          $ref: "#/components/schemas/NodeRuntime"
+        status:
+          $ref: "#/components/schemas/NodeStatus"
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeCapability"
+        capacity: { type: integer, minimum: 1, maximum: 8 }
+        activeTasks: { type: integer, minimum: 0, maximum: 8 }
+        healthScore: { type: integer, minimum: 0, maximum: 100 }
+        lastHeartbeat: { type: string, format: date-time }
+        boundary: { type: string, enum: [TRUSTED_FIXED_CODE_PROCESS] }
+        assignedTaskIds:
+          type: array
+          items: { type: string }
+
+    NodeRelayMessage:
+      type: object
+      required:
+        - messageId
+        - taskId
+        - correlationId
+        - source
+        - destinationNodeId
+        - kind
+        - scenario
+        - requiredCapabilities
+        - priority
+        - status
+        - transitions
+        - submittedAt
+        - updatedAt
+        - expiresAt
+        - executionMode
+        - payloadPolicy
+        - relayAuthentication
+        - taskSignatureVerified
+        - resultObservation
+      properties:
+        messageId: { type: string }
+        taskId: { type: string }
+        correlationId: { type: string }
+        source: { type: string, enum: [AI_CORE] }
+        destinationNodeId: { type: [string, "null"] }
+        kind:
+          $ref: "#/components/schemas/NodeTaskKind"
+        scenario:
+          allOf:
+            - $ref: "#/components/schemas/CyberRangeScenario"
+          nullable: true
+        requiredCapabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeCapability"
+        priority:
+          $ref: "#/components/schemas/NodeTaskPriority"
+        status:
+          $ref: "#/components/schemas/NodeRelayStatus"
+        transitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeTaskTransition"
+        submittedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        executionMode: { type: string, enum: [FIXED_CODE_ONLY] }
+        payloadPolicy: { type: string, enum: [ALLOWLISTED_METADATA_ONLY] }
+        relayAuthentication: { type: string, enum: [ED25519_TASK_SIGNATURE] }
+        taskSignatureVerified: { type: boolean }
+        resultObservation: { type: [string, "null"] }
+
+    NodeClusterState:
+      type: object
+      required:
+        - coordination
+        - transportBoundary
+        - relayAuthentication
+        - payloadPolicy
+        - maxNodes
+        - nodes
+        - messages
+        - queueDepth
+        - activeTasks
+        - completedTasks
+        - rejectedTasks
+      properties:
+        coordination: { type: string, enum: [INSTANCE_LOCAL_VOLATILE] }
+        transportBoundary: { type: string, enum: [SIGNED_LOCAL_IPC_RELAY] }
+        relayAuthentication: { type: string, enum: [ED25519_TASK_SIGNATURE] }
+        payloadPolicy: { type: string, enum: [ALLOWLISTED_METADATA_ONLY] }
+        maxNodes: { type: integer, enum: [10] }
+        nodes:
+          type: array
+          minItems: 10
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/NodeRecord"
+        messages:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/NodeRelayMessage"
+        queueDepth: { type: integer, minimum: 0 }
+        activeTasks: { type: integer, minimum: 0 }
+        completedTasks: { type: integer, minimum: 0 }
+        rejectedTasks: { type: integer, minimum: 0 }
+
     CyberRangeScenario:
       type: string
       enum: [MESI_COHERENCE, NUMA_LATENCY, PIPELINE_STALL, SCHEDULER_PRESSURE, QUARANTINE_PROPAGATION]

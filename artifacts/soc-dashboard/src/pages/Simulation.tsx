@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { CyberRangePanel } from "@/components/CyberRangePanel";
+import { NodeClusterPanel } from "@/components/NodeClusterPanel";
 
 type SimStep = {
   id: string;
@@ -144,6 +145,7 @@ export default function Simulation() {
         <span className={quota?.paidAccess ? "text-safe" : "text-primary"}>{quota?.paidAccess ? "PRO ACCESS ACTIVE" : `${quota?.freeRemaining ?? "—"} / ${quota?.freeLimit ?? 3} FREE TESTS REMAINING`}</span>
       </div>
       <CyberRangePanel />
+      <NodeClusterPanel />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-card/50 backdrop-blur border-primary/20 overflow-hidden relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary/50"></div>

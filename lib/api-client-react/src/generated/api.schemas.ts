@@ -5,6 +5,66 @@
  * SOC OS - SaaS Security Platform API (V30/V50)
  * OpenAPI spec version: 0.3.0
  */
+export type NodeRuntime = typeof NodeRuntime[keyof typeof NodeRuntime];
+
+
+export const NodeRuntime = {
+  PROCESS: 'PROCESS',
+} as const;
+
+export type NodeStatus = typeof NodeStatus[keyof typeof NodeStatus];
+
+
+export const NodeStatus = {
+  ONLINE: 'ONLINE',
+  BUSY: 'BUSY',
+  DEGRADED: 'DEGRADED',
+  OFFLINE: 'OFFLINE',
+  QUARANTINED: 'QUARANTINED',
+  DRAINING: 'DRAINING',
+} as const;
+
+export type NodeCapability = typeof NodeCapability[keyof typeof NodeCapability];
+
+
+export const NodeCapability = {
+  CPU: 'CPU',
+  MEMORY: 'MEMORY',
+  NUMA: 'NUMA',
+  CACHE: 'CACHE',
+  TELEMETRY: 'TELEMETRY',
+} as const;
+
+export type NodeRelayStatus = typeof NodeRelayStatus[keyof typeof NodeRelayStatus];
+
+
+export const NodeRelayStatus = {
+  CREATED: 'CREATED',
+  QUEUED: 'QUEUED',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  EXECUTED: 'EXECUTED',
+  FAILED: 'FAILED',
+} as const;
+
+export type NodeTaskKind = typeof NodeTaskKind[keyof typeof NodeTaskKind];
+
+
+export const NodeTaskKind = {
+  SIMULATION: 'SIMULATION',
+  OBSERVATION: 'OBSERVATION',
+} as const;
+
+export type NodeTaskPriority = typeof NodeTaskPriority[keyof typeof NodeTaskPriority];
+
+
+export const NodeTaskPriority = {
+  LOW: 'LOW',
+  NORMAL: 'NORMAL',
+  HIGH: 'HIGH',
+} as const;
+
 export type CyberRangeScenario = typeof CyberRangeScenario[keyof typeof CyberRangeScenario];
 
 
@@ -15,6 +75,177 @@ export const CyberRangeScenario = {
   SCHEDULER_PRESSURE: 'SCHEDULER_PRESSURE',
   QUARANTINE_PROPAGATION: 'QUARANTINE_PROPAGATION',
 } as const;
+
+export type NodeTaskInput = {
+  kind: 'SIMULATION';
+  scenario: CyberRangeScenario;
+  /**
+     * @minItems 1
+     * @maxItems 5
+     */
+  requiredCapabilities: NodeCapability[];
+  priority?: NodeTaskPriority;
+} | {
+  kind: 'OBSERVATION';
+  /** @nullable */
+  scenario: null;
+  /**
+     * @minItems 1
+     * @maxItems 5
+     */
+  requiredCapabilities: NodeCapability[];
+  priority?: NodeTaskPriority;
+};
+
+export interface NodeTaskTransition {
+  status: NodeRelayStatus;
+  at: string;
+  /** @nullable */
+  reason?: string | null;
+}
+
+export type NodeRecordBoundary = typeof NodeRecordBoundary[keyof typeof NodeRecordBoundary];
+
+
+export const NodeRecordBoundary = {
+  TRUSTED_FIXED_CODE_PROCESS: 'TRUSTED_FIXED_CODE_PROCESS',
+} as const;
+
+export interface NodeRecord {
+  nodeId: string;
+  displayName: string;
+  runtime: NodeRuntime;
+  status: NodeStatus;
+  capabilities: NodeCapability[];
+  /**
+     * @minimum 1
+     * @maximum 8
+     */
+  capacity: number;
+  /**
+     * @minimum 0
+     * @maximum 8
+     */
+  activeTasks: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  healthScore: number;
+  lastHeartbeat: string;
+  boundary: NodeRecordBoundary;
+  assignedTaskIds: string[];
+}
+
+export type NodeRelayMessageSource = typeof NodeRelayMessageSource[keyof typeof NodeRelayMessageSource];
+
+
+export const NodeRelayMessageSource = {
+  AI_CORE: 'AI_CORE',
+} as const;
+
+export type NodeRelayMessageExecutionMode = typeof NodeRelayMessageExecutionMode[keyof typeof NodeRelayMessageExecutionMode];
+
+
+export const NodeRelayMessageExecutionMode = {
+  FIXED_CODE_ONLY: 'FIXED_CODE_ONLY',
+} as const;
+
+export type NodeRelayMessagePayloadPolicy = typeof NodeRelayMessagePayloadPolicy[keyof typeof NodeRelayMessagePayloadPolicy];
+
+
+export const NodeRelayMessagePayloadPolicy = {
+  ALLOWLISTED_METADATA_ONLY: 'ALLOWLISTED_METADATA_ONLY',
+} as const;
+
+export type NodeRelayMessageRelayAuthentication = typeof NodeRelayMessageRelayAuthentication[keyof typeof NodeRelayMessageRelayAuthentication];
+
+
+export const NodeRelayMessageRelayAuthentication = {
+  ED25519_TASK_SIGNATURE: 'ED25519_TASK_SIGNATURE',
+} as const;
+
+export interface NodeRelayMessage {
+  messageId: string;
+  taskId: string;
+  correlationId: string;
+  source: NodeRelayMessageSource;
+  /** @nullable */
+  destinationNodeId: string | null;
+  kind: NodeTaskKind;
+  scenario: CyberRangeScenario | null;
+  requiredCapabilities: NodeCapability[];
+  priority: NodeTaskPriority;
+  status: NodeRelayStatus;
+  transitions: NodeTaskTransition[];
+  submittedAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  executionMode: NodeRelayMessageExecutionMode;
+  payloadPolicy: NodeRelayMessagePayloadPolicy;
+  relayAuthentication: NodeRelayMessageRelayAuthentication;
+  taskSignatureVerified: boolean;
+  /** @nullable */
+  resultObservation: string | null;
+}
+
+export type NodeClusterStateCoordination = typeof NodeClusterStateCoordination[keyof typeof NodeClusterStateCoordination];
+
+
+export const NodeClusterStateCoordination = {
+  INSTANCE_LOCAL_VOLATILE: 'INSTANCE_LOCAL_VOLATILE',
+} as const;
+
+export type NodeClusterStateTransportBoundary = typeof NodeClusterStateTransportBoundary[keyof typeof NodeClusterStateTransportBoundary];
+
+
+export const NodeClusterStateTransportBoundary = {
+  SIGNED_LOCAL_IPC_RELAY: 'SIGNED_LOCAL_IPC_RELAY',
+} as const;
+
+export type NodeClusterStateRelayAuthentication = typeof NodeClusterStateRelayAuthentication[keyof typeof NodeClusterStateRelayAuthentication];
+
+
+export const NodeClusterStateRelayAuthentication = {
+  ED25519_TASK_SIGNATURE: 'ED25519_TASK_SIGNATURE',
+} as const;
+
+export type NodeClusterStatePayloadPolicy = typeof NodeClusterStatePayloadPolicy[keyof typeof NodeClusterStatePayloadPolicy];
+
+
+export const NodeClusterStatePayloadPolicy = {
+  ALLOWLISTED_METADATA_ONLY: 'ALLOWLISTED_METADATA_ONLY',
+} as const;
+
+export type NodeClusterStateMaxNodes = typeof NodeClusterStateMaxNodes[keyof typeof NodeClusterStateMaxNodes];
+
+
+export const NodeClusterStateMaxNodes = {
+  NUMBER_10: 10,
+} as const;
+
+export interface NodeClusterState {
+  coordination: NodeClusterStateCoordination;
+  transportBoundary: NodeClusterStateTransportBoundary;
+  relayAuthentication: NodeClusterStateRelayAuthentication;
+  payloadPolicy: NodeClusterStatePayloadPolicy;
+  maxNodes: NodeClusterStateMaxNodes;
+  /**
+     * @minItems 10
+     * @maxItems 10
+     */
+  nodes: NodeRecord[];
+  /** @maxItems 50 */
+  messages: NodeRelayMessage[];
+  /** @minimum 0 */
+  queueDepth: number;
+  /** @minimum 0 */
+  activeTasks: number;
+  /** @minimum 0 */
+  completedTasks: number;
+  /** @minimum 0 */
+  rejectedTasks: number;
+}
 
 export type CyberRangeCubeStatus = typeof CyberRangeCubeStatus[keyof typeof CyberRangeCubeStatus];
 

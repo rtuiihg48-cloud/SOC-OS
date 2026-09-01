@@ -58,6 +58,7 @@ import type {
   MetaCubeExecutionInput,
   MetaCubeHealth,
   MitreStat,
+  NodeClusterState,
   NodeExchangeAccepted,
   NodeExchangeEnvelope,
   NodeExchangeHealth,
@@ -68,6 +69,8 @@ import type {
   NodeExchangeRoute,
   NodeExchangeStatusInput,
   NodeExchangeVerificationInput,
+  NodeRelayMessage,
+  NodeTaskInput,
   ObserverAgentInput,
   ObserverAgentRun,
   Patch,
@@ -2322,6 +2325,231 @@ export const useResetCyberRange = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResetCyberRangeMutationOptions(options));
+    }
+
+export const getGetNodeClusterUrl = () => {
+
+
+
+
+  return `/api/node-cluster`
+}
+
+/**
+ * @summary Get the tenant-scoped worker registry and relay telemetry
+ */
+export const getNodeCluster = async ( options?: RequestInit): Promise<NodeClusterState> => {
+
+  return customFetch<NodeClusterState>(getGetNodeClusterUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNodeClusterQueryKey = () => {
+    return [
+    `/api/node-cluster`
+    ] as const;
+    }
+
+
+export const getGetNodeClusterQueryOptions = <TData = Awaited<ReturnType<typeof getNodeCluster>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeCluster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNodeClusterQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNodeCluster>>> = ({ signal }) => getNodeCluster({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNodeCluster>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNodeClusterQueryResult = NonNullable<Awaited<ReturnType<typeof getNodeCluster>>>
+export type GetNodeClusterQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the tenant-scoped worker registry and relay telemetry
+ */
+
+export function useGetNodeCluster<TData = Awaited<ReturnType<typeof getNodeCluster>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeCluster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNodeClusterQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListNodeClusterMessagesUrl = () => {
+
+
+
+
+  return `/api/node-cluster/messages`
+}
+
+/**
+ * @summary List recent typed task relay messages
+ */
+export const listNodeClusterMessages = async ( options?: RequestInit): Promise<NodeRelayMessage[]> => {
+
+  return customFetch<NodeRelayMessage[]>(getListNodeClusterMessagesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNodeClusterMessagesQueryKey = () => {
+    return [
+    `/api/node-cluster/messages`
+    ] as const;
+    }
+
+
+export const getListNodeClusterMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listNodeClusterMessages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNodeClusterMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNodeClusterMessagesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNodeClusterMessages>>> = ({ signal }) => listNodeClusterMessages({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNodeClusterMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNodeClusterMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listNodeClusterMessages>>>
+export type ListNodeClusterMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent typed task relay messages
+ */
+
+export function useListNodeClusterMessages<TData = Awaited<ReturnType<typeof listNodeClusterMessages>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNodeClusterMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNodeClusterMessagesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDispatchNodeClusterTaskUrl = () => {
+
+
+
+
+  return `/api/node-cluster/tasks`
+}
+
+/**
+ * @summary Route an allowlisted fixed-code task to an eligible worker node
+ */
+export const dispatchNodeClusterTask = async (nodeTaskInput: NodeTaskInput, options?: RequestInit): Promise<NodeRelayMessage> => {
+
+  return customFetch<NodeRelayMessage>(getDispatchNodeClusterTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nodeTaskInput,)
+  }
+);}
+
+
+
+
+export const getDispatchNodeClusterTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dispatchNodeClusterTask>>, TError,{data: BodyType<NodeTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dispatchNodeClusterTask>>, TError,{data: BodyType<NodeTaskInput>}, TContext> => {
+
+const mutationKey = ['dispatchNodeClusterTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dispatchNodeClusterTask>>, {data: BodyType<NodeTaskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  dispatchNodeClusterTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DispatchNodeClusterTaskMutationResult = NonNullable<Awaited<ReturnType<typeof dispatchNodeClusterTask>>>
+    export type DispatchNodeClusterTaskMutationBody = BodyType<NodeTaskInput>
+    export type DispatchNodeClusterTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Route an allowlisted fixed-code task to an eligible worker node
+ */
+export const useDispatchNodeClusterTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dispatchNodeClusterTask>>, TError,{data: BodyType<NodeTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dispatchNodeClusterTask>>,
+        TError,
+        {data: BodyType<NodeTaskInput>},
+        TContext
+      > => {
+      return useMutation(getDispatchNodeClusterTaskMutationOptions(options));
     }
 
 export const getTranscribeVoiceUrl = () => {

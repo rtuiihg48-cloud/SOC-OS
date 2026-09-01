@@ -14,6 +14,7 @@ import { bootHckBios, getRequiredHckTables } from "./lib/hck-bios";
 import { assertAuditReadiness } from "./lib/audit";
 import { bindAfterBios } from "./lib/startup-orchestration";
 import { cyberRangeManager } from "./lib/cyber-range";
+import { nodeClusterManager } from "./lib/node-cluster";
 
 const rawPort = process.env["PORT"];
 
@@ -144,6 +145,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, async () => {
     logger.info({ signal }, "Stopping SOC-OS services");
     cyberRangeManager.stopAll();
+    nodeClusterManager.stopAll();
     await cpuSimulator.stop();
     server.close(() => {
       void pool.end().finally(() => process.exit(0));
