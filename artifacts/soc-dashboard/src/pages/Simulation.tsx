@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { useRunSimulation, useRunSelfTest, getGetDashboardQueryKey, getListEventsQueryKey, getListPatchesQueryKey, getGetThreatGraphQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,20 @@ export default function Simulation() {
   const runSelfTest = useRunSelfTest();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [quota, setQuota] = useState<{ freeUsed: number; freeRemaining: number; freeLimit: number; paidAccess: boolean } | null>(null);
+  useEffect(() => {
+    void fetch("/api/billing/status", { credentials: "include" }).then((response) => response.ok ? response.json() : null).then(setQuota).catch(() => setQuota(null));
+  }, []);
+  const handleQuotaError = (error: unknown) => {
+    const candidate = error as { response?: { data?: { code?: string } }; data?: { code?: string } };
+    if (candidate.response?.data?.code === "PAYMENT_REQUIRED" || candidate.data?.code === "PAYMENT_REQUIRED") {
+      toast({ title: "FREE TEST QUOTA REACHED", description: "Open Billing to continue with SOC OS Pro.", variant: "destructive" });
+      setLocation("/billing");
+      return true;
+    }
+    return false;
+  };
 
   const handleSimulate = () => {
     setIsRunning(true);
@@ -86,8 +101,9 @@ export default function Simulation() {
           toast({ title: "SIMULATION SUCCESS", description: "Self-healing cycle completed successfully." });
         }, stepDelay);
       },
-      onError: () => {
+      onError: (error) => {
         setIsRunning(false);
+        if (handleQuotaError(error)) return;
         setSteps(prev => [...prev, { id: 'error', title: 'SIMULATION FAILED', description: 'An error occurred during cycle.', type: 'attack' }]);
         toast({ title: "SIMULATION FAILED", variant: "destructive" });
       }
@@ -103,8 +119,9 @@ export default function Simulation() {
         setSelfTestResult(res);
         toast({ title: "SELF-TEST COMPLETE", description: `Found ${res.vulnerabilities.length} vectors.` });
       },
-      onError: () => {
+      onError: (error) => {
         setIsSelfTestRunning(false);
+        if (handleQuotaError(error)) return;
         toast({ title: "SELF-TEST FAILED", variant: "destructive" });
       }
     });
@@ -121,6 +138,10 @@ export default function Simulation() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-mono">
+        <span className="text-muted-foreground">SECURITY TEST QUOTA</span>
+        <span className={quota?.paidAccess ? "text-safe" : "text-primary"}>{quota?.paidAccess ? "PRO ACCESS ACTIVE" : `${quota?.freeRemaining ?? "—"} / ${quota?.freeLimit ?? 3} FREE TESTS REMAINING`}</span>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-card/50 backdrop-blur border-primary/20 overflow-hidden relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary/50"></div>

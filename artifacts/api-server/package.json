@@ -18,6 +18,7 @@
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "@clerk/express": "^1.7.24",
     "@clerk/shared": "^3.35.1",
+    "@whop/sdk": "^0.0.22",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

@@ -12,3 +12,4 @@
 - [Traffic analysis boundary](traffic-analysis-boundary.md) — gateway metadata only; signals stay advisory until authenticated tenant scope and temporal baselines exist.
 - [React live-list ownership](react-live-list-ownership.md) — keep list removal under React ownership; avoid deferred exit orchestration for live tables and HMR-sensitive feeds.
 - [GitHub connector and local Git](github-connector-git-cli.md) — OAuth connector access does not authenticate local git fetch/push.
+- [Billing authorization boundary](billing-authorization-boundary.md) — Whop proves paid access; billing never grants tenant roles, and each user/tenant gets three free security tests.

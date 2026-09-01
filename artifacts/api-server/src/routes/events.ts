@@ -25,6 +25,7 @@ import {
 } from "@workspace/api-zod";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import { appendAudit } from "../lib/audit";
+import { requireSecurityTestAccess } from "../lib/security-test-access";
 
 const router = Router();
 
@@ -383,6 +384,8 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
     res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
     return;
   }
+  const quota = await requireSecurityTestAccess(req, res, "SELF_TEST");
+  if (!quota) return;
   const last = await db
     .select({ hash: securityEventsTable.hash })
     .from(securityEventsTable)
@@ -452,6 +455,7 @@ router.post("/self-test", requireCapability("testing:run", singleTenantScope), a
   const maxScore = Math.max(...vulnerabilities.map((v) => v.score), 0);
   const systemStatus = maxScore >= 15 ? "CRITICAL" : maxScore >= 7 ? "ALERT" : "MONITORING";
 
+  await quota.complete();
   res.json({ vulnerabilities, patchesApplied, systemStatus });
 });
 
@@ -462,6 +466,8 @@ router.post("/simulate", requireCapability("testing:run", singleTenantScope), as
     res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
     return;
   }
+  const quota = await requireSecurityTestAccess(req, res, "SIMULATION");
+  if (!quota) return;
   const last = await db
     .select({ hash: securityEventsTable.hash })
     .from(securityEventsTable)
@@ -526,6 +532,7 @@ router.post("/simulate", requireCapability("testing:run", singleTenantScope), as
   return { baseEvent, selfHealingEvents, patchesApplied, totalProcessed: redTeamResults.length + 1 };
   });
 
+  await quota.complete();
   res.json({
     baseEvent: formatEvent(simulation.baseEvent),
     selfHealingEvents: simulation.selfHealingEvents,

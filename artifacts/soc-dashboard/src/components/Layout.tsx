@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network, LogOut } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network, LogOut, CreditCard } from "lucide-react";
 import { useGetCurrentPrincipal, getGetCurrentPrincipalQueryKey, useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 import { useClerk } from "@clerk/react";
@@ -64,6 +64,7 @@ export function Layout({ children }: { children: ReactNode }) {
         { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
         ...(canReadAudit ? [{ href: "/audit-trail", label: "Audit Trail", icon: Activity }] : []),
         { href: "/tenants", label: "Tenants", icon: Building2 },
+        { href: "/billing", label: "Billing", icon: CreditCard },
       ],
     },
   ];

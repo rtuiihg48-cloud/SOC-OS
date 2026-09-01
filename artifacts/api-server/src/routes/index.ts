@@ -16,13 +16,16 @@ import trafficRouter from "./traffic";
 import { runSecurityAudit } from "../lib/lockfile-analyzer";
 import authRouter from "./auth";
 import auditRouter from "./audit";
+import billingRouter from "./billing";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import { requireSecurityTestAccess } from "../lib/security-test-access";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
 router.use(auditRouter);
+router.use(billingRouter);
 router.use(eventsRouter);
 router.use(dashboardRouter);
 router.use(tenantsRouter);
@@ -47,17 +50,21 @@ router.post("/scan/lockfile", requireCapability("testing:run", singleTenantScope
   ) {
     return res.status(400).json({ error: "Некоректний формат файлів" });
   }
+  const quota = await requireSecurityTestAccess(req, res, "LOCKFILE_SCAN");
+  if (!quota) return;
 
   try {
     const auditResult = await runSecurityAudit({
       lockfileContent,
       packageJsonContent,
     });
+    await quota.complete();
     return res.status(200).json({
       success: true,
       threatLevel: auditResult.threatLevel,
     });
   } catch {
+    await quota.release();
     return res.status(500).json({ error: "Помилка сервера при скануванні" });
   }
 });

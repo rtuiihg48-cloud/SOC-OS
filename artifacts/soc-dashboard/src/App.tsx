@@ -28,6 +28,7 @@ import SelfHealing from "@/pages/SelfHealing";
 import VirusDatabase from "@/pages/VirusDatabase";
 import TrafficAnalysis from "@/pages/TrafficAnalysis";
 import AuditTrail from "@/pages/AuditTrail";
+import Billing from "@/pages/Billing";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = publishableKeyFromHost(
@@ -257,6 +258,7 @@ function App() {
                       <Route path="/virus-database" component={VirusDatabase} />
                       <Route path="/traffic-analysis" component={TrafficAnalysis} />
                       <Route path="/audit-trail" component={AuditTrail} />
+                       <Route path="/billing" component={Billing} />
                       <Route component={NotFound} />
                     </Switch>
                   </ProtectedLayout>

@@ -34,6 +34,47 @@ export const tenantMembershipsTable = pgTable("tenant_memberships", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [uniqueIndex("tenant_memberships_user_tenant_uidx").on(table.userId, table.tenantId), index("tenant_memberships_tenant_status_idx").on(table.tenantId, table.status), check("tenant_memberships_role_check", sql`${table.role} IN ('SOC_ADMIN','ANALYST','VIEWER')`), check("tenant_memberships_status_check", sql`${table.status} IN ('ACTIVE','DISABLED')`)]);
 
+// These records only correlate an authenticated SOC principal with a hosted
+// Whop checkout. They are not an authorization source: Whop is re-checked by
+// the API before paid access is allowed.
+export const whopCheckoutSessionsTable = pgTable("whop_checkout_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => controlPlaneUsersTable.id, { onDelete: "restrict" }),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  checkoutCorrelationId: text("checkout_correlation_id").notNull(),
+  providerPlanId: text("provider_plan_id").notNull(),
+  providerCheckoutId: text("provider_checkout_id").notNull(),
+  providerPaymentId: text("provider_payment_id"),
+  purchaseUrl: text("purchase_url").notNull(),
+  status: text("status").notNull().default("CREATED"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("whop_checkout_sessions_correlation_uidx").on(table.checkoutCorrelationId),
+  uniqueIndex("whop_checkout_sessions_checkout_uidx").on(table.providerCheckoutId),
+  uniqueIndex("whop_checkout_sessions_payment_uidx").on(table.providerPaymentId),
+  index("whop_checkout_sessions_user_tenant_idx").on(table.userId, table.tenantId),
+  check("whop_checkout_sessions_status_check", sql`${table.status} IN ('CREATED','VERIFIED','EXPIRED','FAILED')`),
+]);
+
+// A reservation is created before a free test starts. The reservation is
+// released when the test fails, so failures do not consume a free test.
+export const securityTestUsageTable = pgTable("security_test_usage", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => controlPlaneUsersTable.id, { onDelete: "restrict" }),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  testType: text("test_type").notNull(),
+  status: text("status").notNull().default("RESERVED"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+}, (table) => [
+  index("security_test_usage_user_tenant_status_idx").on(table.userId, table.tenantId, table.status),
+  index("security_test_usage_reservation_idx").on(table.status, table.startedAt),
+  check("security_test_usage_type_check", sql`${table.testType} IN ('SELF_TEST','SIMULATION','LOCKFILE_SCAN','VOICE_VIRUS_TEST','VOICE_DEFENSE_TEST')`),
+  check("security_test_usage_status_check", sql`${table.status} IN ('RESERVED','COMPLETED','RELEASED')`),
+]);
+
 export const serviceCredentialsTable = pgTable("service_credentials", {
   id: serial("id").primaryKey(),
   credentialId: text("credential_id").notNull(),

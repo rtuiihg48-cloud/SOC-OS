@@ -172,6 +172,9 @@ importers:
       '@clerk/shared':
         specifier: ^3.35.1
         version: 3.47.8(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@whop/sdk':
+        specifier: ^0.0.22
+        version: 0.0.22
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -1865,6 +1868,9 @@ packages:
   '@vitest/utils@3.2.7':
     resolution: {integrity: sha512-x6BDOd7dyo3PFLY3I9/HJ25X/6OurhGXk2/B9gOZNPF7XDVjeBK4k01lQE5uvDpbuheErh91qYuE1E2OEjK3Rw==}
 
+  '@whop/sdk@0.0.22':
+    resolution: {integrity: sha512-p+4Xv/FAbEGqaXvhJMP0mFab5fiZ0brtIC38VXPh1zXMgjO/g6us6fMMo32sw2UJ/HQvMZ9WQ5SGI9T2GXuPdw==}
+
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
     engines: {node: '>= 0.6'}
@@ -2576,6 +2582,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@6.2.10:
+    resolution: {integrity: sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g==}
 
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
@@ -4884,6 +4893,11 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
+  '@whop/sdk@0.0.22':
+    dependencies:
+      jose: 6.2.10
+      standardwebhooks: 1.1.1
+
   accepts@2.0.0:
     dependencies:
       mime-types: 3.0.2
@@ -5467,6 +5481,8 @@ snapshots:
   isexe@2.0.0: {}
 
   jiti@2.7.0: {}
+
+  jose@6.2.10: {}
 
   joycon@3.1.1: {}
 

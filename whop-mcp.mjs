@@ -14,8 +14,10 @@ async function mcpCall(method, params = {}) {
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
   const text = await resp.text();
-  const lines = text.split("\n").filter((line) => line.startsWith("data:"));
-  const envelope = JSON.parse(lines.at(-1).replace(/^data:\s*/, ""));
+  const contentType = resp.headers.get("content-type") ?? "";
+  const envelope = contentType.includes("application/json")
+    ? JSON.parse(text)
+    : JSON.parse(text.split("\n").filter((line) => line.startsWith("data:")).at(-1).replace(/^data:\s*/, ""));
   const result = envelope.result;
   const textContent = result?.content?.[0]?.text;
   return textContent ? JSON.parse(textContent) : result;

@@ -20,6 +20,7 @@ import { ExecuteVoiceCommandBody, PreviewVoiceCommandBody } from "@workspace/api
 import { and, count, eq, ilike } from "drizzle-orm";
 import { autoFix, buildEventResult } from "../lib/soc-engine";
 import { appendAudit } from "../lib/audit";
+import { requireSecurityTestAccess } from "../lib/security-test-access";
 
 const router = Router();
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -263,6 +264,8 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
     res.status(400).json({ error: "Unsupported voice command" });
     return;
   }
+  const quota = await requireSecurityTestAccess(req, res, plan.intent === "TEST_VIRUS" ? "VOICE_VIRUS_TEST" : "VOICE_DEFENSE_TEST");
+  if (!quota) return;
 
   if (plan.intent === "TEST_VIRUS") {
     const criteriaResults = await Promise.all(plan.criteria.map(runCriterion));
@@ -283,6 +286,7 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
     }).returning();
     await appendAudit(tx, { tenantId: req.principal!.tenantIds[0]!, principal: req.principal!, action: "voice:virus:test", targetType: "voice_command", targetId: String(auditRow.id), decision: "COMMITTED", reasonCode: "VOICE_VIRUS_TEST_RECORDED", correlationId: req.principal!.correlationId, metadata: { mode: plan.mode, recommendedAction, executionAllowed: false } });
     });
+    await quota.complete();
     res.json({
       intent: plan.intent,
       status: "COMPLETED",
@@ -330,6 +334,7 @@ router.post("/voice/commands/execute", requireCapability("testing:run", singleTe
   }).returning();
   await appendAudit(tx, { tenantId: req.principal!.tenantIds[0]!, principal: req.principal!, action: "voice:synthetic:defense", targetType: "voice_command", targetId: String(auditRow.id), decision: "COMMITTED", reasonCode: "VOICE_SYNTHETIC_DEFENSE_RECORDED", correlationId: req.principal!.correlationId, metadata: { scenarioCount: syntheticDefense.length, recommendedAction, executionAllowed: false, persistedToLiveEvents: false } });
   });
+  await quota.complete();
   res.json({
     intent: plan.intent,
     status: "COMPLETED",
