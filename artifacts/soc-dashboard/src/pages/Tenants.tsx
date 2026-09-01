@@ -14,11 +14,18 @@ const PLAN_STYLES: Record<string, string> = {
   starter:    "bg-muted text-muted-foreground border-border",
 };
 
+function previewApiKey(value: unknown): string {
+  return typeof value === "string" ? value.slice(0, 14) : "UNAVAILABLE";
+}
+
 export default function Tenants() {
   const qc = useQueryClient();
   const { data: tenants = [], isLoading } = useListTenants();
   const { mutate: createTenant, isPending: isCreating } = useCreateTenant();
   const { mutate: deleteTenant } = useDeleteTenant();
+  const safeTenants = Array.isArray(tenants)
+    ? tenants.filter((tenant): tenant is NonNullable<typeof tenant> => tenant != null)
+    : [];
 
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ name: "", plan: "starter" as "starter" | "pro" | "enterprise" });
@@ -44,7 +51,7 @@ export default function Tenants() {
     deleteTenant({ id }, { onSuccess: invalidate });
   }
 
-  const totalEvents = (tenants as Array<typeof tenants[0] & { eventCount?: number }>)
+  const totalEvents = (safeTenants as Array<typeof safeTenants[0] & { eventCount?: number }>)
     .reduce((a, t) => a + (t.eventCount ?? 0), 0);
 
   return (
@@ -52,9 +59,9 @@ export default function Tenants() {
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "TOTAL TENANTS", value: tenants.length, color: "text-primary" },
+          { label: "TOTAL TENANTS", value: safeTenants.length, color: "text-primary" },
           { label: "TOTAL EVENTS", value: totalEvents, color: "text-warn" },
-          { label: "ENTERPRISE", value: tenants.filter((t) => t.plan === "enterprise").length, color: "text-safe" },
+          { label: "ENTERPRISE", value: safeTenants.filter((t) => t.plan === "enterprise").length, color: "text-safe" },
         ].map((kpi) => (
           <div key={kpi.label} className="bg-card border border-border rounded-lg p-4 font-mono">
             <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">{kpi.label}</div>
@@ -131,11 +138,11 @@ export default function Tenants() {
       {/* Tenants list */}
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground font-mono">LOADING TENANTS...</div>
-      ) : tenants.length === 0 ? (
+      ) : safeTenants.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground font-mono">NO TENANTS</div>
       ) : (
         <div className="space-y-3">
-          {tenants.map((tenant) => (
+          {safeTenants.map((tenant) => (
             <div key={tenant.id} className="bg-card border border-border rounded-lg p-5 flex items-center gap-6">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Building2 className="w-5 h-5 text-primary" />
@@ -163,7 +170,7 @@ export default function Tenants() {
                 <div className="text-right">
                   <div className="text-xs font-mono text-muted-foreground mb-1">API KEY</div>
                   <div className="text-xs font-mono text-primary/60 font-semibold">
-                    {tenant.apiKey.slice(0, 14)}...
+                    {previewApiKey((tenant as { apiKey?: unknown }).apiKey)}...
                   </div>
                 </div>
                 {tenant.id !== 1 && (
