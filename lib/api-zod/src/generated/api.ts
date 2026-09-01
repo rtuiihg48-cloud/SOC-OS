@@ -976,8 +976,29 @@ export const GetStrategyOverviewResponse = zod.object({
   "mode": zod.enum(['fast', 'balanced', 'deep']),
   "reason": zod.string(),
   "computeBudget": zod.number(),
+  "correlationId": zod.string(),
+  "context": zod.object({
+  "phase": zod.enum(['stability', 'growth', 'collapse', 'mutation']),
+  "objective": zod.enum(['detect', 'explain', 'contain', 'recover']),
+  "evidenceWindowHours": zod.number(),
+  "evidenceFreshness": zod.enum(['fresh', 'aging', 'insufficient']),
+  "triggerSignals": zod.array(zod.string()),
+  "operatorReviewRequired": zod.boolean()
+}),
+  "nodeRun": zod.object({
+  "node": zod.enum(['N2']),
+  "quality": zod.number(),
+  "latencyMs": zod.number(),
+  "costUnits": zod.number()
+}),
+  "simulatedOutcome": zod.object({
+  "verificationStatus": zod.enum(['pending', 'verified', 'rejected', 'inconclusive']),
+  "defenseSucceeded": zod.boolean(),
+  "residualRisk": zod.number()
+}),
   "createdAt": zod.coerce.date()
 }),zod.null()]),
+  "scope": zod.enum(['global_synthetic']),
   "modeCounts": zod.object({
   "fast": zod.number(),
   "balanced": zod.number(),
@@ -992,8 +1013,110 @@ export const GetStrategyOverviewResponse = zod.object({
   "mode": zod.enum(['fast', 'balanced', 'deep']),
   "reason": zod.string(),
   "computeBudget": zod.number(),
+  "correlationId": zod.string(),
+  "context": zod.object({
+  "phase": zod.enum(['stability', 'growth', 'collapse', 'mutation']),
+  "objective": zod.enum(['detect', 'explain', 'contain', 'recover']),
+  "evidenceWindowHours": zod.number(),
+  "evidenceFreshness": zod.enum(['fresh', 'aging', 'insufficient']),
+  "triggerSignals": zod.array(zod.string()),
+  "operatorReviewRequired": zod.boolean()
+}),
+  "nodeRun": zod.object({
+  "node": zod.enum(['N2']),
+  "quality": zod.number(),
+  "latencyMs": zod.number(),
+  "costUnits": zod.number()
+}),
+  "simulatedOutcome": zod.object({
+  "verificationStatus": zod.enum(['pending', 'verified', 'rejected', 'inconclusive']),
+  "defenseSucceeded": zod.boolean(),
+  "residualRisk": zod.number()
+}),
   "createdAt": zod.coerce.date()
 })),
+  "drift": zod.object({
+  "syntheticTrend": zod.enum(['rising', 'stable', 'improving']),
+  "syntheticRiskDelta": zod.number(),
+  "confidenceDelta": zod.number(),
+  "modelQualityEstimate": zod.number(),
+  "evidenceAgeMinutes": zod.number(),
+  "windowSize": zod.number(),
+  "comparisonMethod": zod.enum(['recent_half_vs_prior_half']),
+  "operatorReviewRequired": zod.boolean()
+}),
+  "sandboxLimits": zod.object({
+  "maxDepth": zod.number(),
+  "maxScenarios": zod.number(),
+  "maxRuntimeMs": zod.number()
+}),
+  "policy": zod.string(),
+  "interpretation": zod.string()
+})
+
+
+/**
+ * @summary Compare bounded strategy candidates without changing state
+ */
+export const previewStrategySandboxBodyRiskScoreMin = 0;
+export const previewStrategySandboxBodyRiskScoreMax = 100;
+
+export const previewStrategySandboxBodyResidualRiskMin = 0;
+export const previewStrategySandboxBodyResidualRiskMax = 100;
+
+export const previewStrategySandboxBodyConfidenceMin = 0;
+export const previewStrategySandboxBodyConfidenceMax = 1;
+
+export const previewStrategySandboxBodySampleCountMin = 0;
+export const previewStrategySandboxBodySampleCountMax = 10000;
+export const previewStrategySandboxBodySampleCountMultipleOf = 1;
+
+export const previewStrategySandboxBodyDefenseSuccessRateMin = 0;
+export const previewStrategySandboxBodyDefenseSuccessRateMax = 1;
+
+export const previewStrategySandboxBodyMarkovConfidenceMin = 0;
+export const previewStrategySandboxBodyMarkovConfidenceMax = 1;
+
+
+
+export const PreviewStrategySandboxBody = zod.object({
+  "riskScore": zod.number().min(previewStrategySandboxBodyRiskScoreMin).max(previewStrategySandboxBodyRiskScoreMax),
+  "residualRisk": zod.number().min(previewStrategySandboxBodyResidualRiskMin).max(previewStrategySandboxBodyResidualRiskMax),
+  "confidence": zod.number().min(previewStrategySandboxBodyConfidenceMin).max(previewStrategySandboxBodyConfidenceMax),
+  "sampleCount": zod.number().min(previewStrategySandboxBodySampleCountMin).max(previewStrategySandboxBodySampleCountMax).multipleOf(previewStrategySandboxBodySampleCountMultipleOf),
+  "defenseSuccessRate": zod.number().min(previewStrategySandboxBodyDefenseSuccessRateMin).max(previewStrategySandboxBodyDefenseSuccessRateMax),
+  "markovConfidence": zod.number().min(previewStrategySandboxBodyMarkovConfidenceMin).max(previewStrategySandboxBodyMarkovConfidenceMax)
+})
+
+export const PreviewStrategySandboxResponse = zod.object({
+  "correlationId": zod.string(),
+  "context": zod.object({
+  "phase": zod.enum(['stability', 'growth', 'collapse', 'mutation']),
+  "objective": zod.enum(['detect', 'explain', 'contain', 'recover']),
+  "evidenceWindowHours": zod.number(),
+  "evidenceFreshness": zod.enum(['fresh', 'aging', 'insufficient']),
+  "triggerSignals": zod.array(zod.string()),
+  "operatorReviewRequired": zod.boolean()
+}),
+  "selected": zod.enum(['fast', 'balanced', 'deep']),
+  "candidates": zod.array(zod.object({
+  "mode": zod.enum(['fast', 'balanced', 'deep']),
+  "computeBudget": zod.number(),
+  "expectedQuality": zod.number(),
+  "expectedCost": zod.number(),
+  "selected": zod.boolean()
+})),
+  "execution": zod.object({
+  "scenariosEvaluated": zod.number(),
+  "depthUsed": zod.number(),
+  "runtimeMs": zod.number(),
+  "deadlineEnforced": zod.literal(true)
+}),
+  "limits": zod.object({
+  "maxDepth": zod.number(),
+  "maxScenarios": zod.number(),
+  "maxRuntimeMs": zod.number()
+}),
   "policy": zod.string()
 })
 

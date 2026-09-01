@@ -3,7 +3,7 @@ export const CAPABILITIES = [
   "execution:read", "execution:submit", "execution:retry", "execution:recover", "execution:dlq:operate",
   "quarantine:read", "quarantine:approve", "self_healing:preview", "self_healing:apply", "audit:read", "audit:verify",
   "rules:read", "rules:write", "tenants:read", "tenants:write", "dashboard:read",
-  "virus:read", "virus:write", "testing:run", "voice:use",
+  "virus:read", "virus:write", "testing:run", "voice:use", "strategy:global:read",
 ] as const;
 export type Capability = typeof CAPABILITIES[number];
 export type PrincipalType = "USER" | "SERVICE" | "GATEWAY";

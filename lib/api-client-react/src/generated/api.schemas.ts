@@ -952,6 +952,74 @@ export const StrategyCycleMode = {
   deep: 'deep',
 } as const;
 
+export type StrategyScenarioContextPhase = typeof StrategyScenarioContextPhase[keyof typeof StrategyScenarioContextPhase];
+
+
+export const StrategyScenarioContextPhase = {
+  stability: 'stability',
+  growth: 'growth',
+  collapse: 'collapse',
+  mutation: 'mutation',
+} as const;
+
+export type StrategyScenarioContextObjective = typeof StrategyScenarioContextObjective[keyof typeof StrategyScenarioContextObjective];
+
+
+export const StrategyScenarioContextObjective = {
+  detect: 'detect',
+  explain: 'explain',
+  contain: 'contain',
+  recover: 'recover',
+} as const;
+
+export type StrategyScenarioContextEvidenceFreshness = typeof StrategyScenarioContextEvidenceFreshness[keyof typeof StrategyScenarioContextEvidenceFreshness];
+
+
+export const StrategyScenarioContextEvidenceFreshness = {
+  fresh: 'fresh',
+  aging: 'aging',
+  insufficient: 'insufficient',
+} as const;
+
+export interface StrategyScenarioContext {
+  phase: StrategyScenarioContextPhase;
+  objective: StrategyScenarioContextObjective;
+  evidenceWindowHours: number;
+  evidenceFreshness: StrategyScenarioContextEvidenceFreshness;
+  triggerSignals: string[];
+  operatorReviewRequired: boolean;
+}
+
+export type StrategyNodeRunNode = typeof StrategyNodeRunNode[keyof typeof StrategyNodeRunNode];
+
+
+export const StrategyNodeRunNode = {
+  N2: 'N2',
+} as const;
+
+export interface StrategyNodeRun {
+  node: StrategyNodeRunNode;
+  quality: number;
+  latencyMs: number;
+  costUnits: number;
+}
+
+export type StrategyOutcomeVerificationStatus = typeof StrategyOutcomeVerificationStatus[keyof typeof StrategyOutcomeVerificationStatus];
+
+
+export const StrategyOutcomeVerificationStatus = {
+  pending: 'pending',
+  verified: 'verified',
+  rejected: 'rejected',
+  inconclusive: 'inconclusive',
+} as const;
+
+export interface StrategyOutcome {
+  verificationStatus: StrategyOutcomeVerificationStatus;
+  defenseSucceeded: boolean;
+  residualRisk: number;
+}
+
 export interface StrategyCycle {
   id: number;
   cycleId: string;
@@ -961,8 +1029,52 @@ export interface StrategyCycle {
   mode: StrategyCycleMode;
   reason: string;
   computeBudget: number;
+  correlationId: string;
+  context: StrategyScenarioContext;
+  nodeRun: StrategyNodeRun;
+  simulatedOutcome: StrategyOutcome;
   createdAt: string;
 }
+
+export type StrategyDriftSyntheticTrend = typeof StrategyDriftSyntheticTrend[keyof typeof StrategyDriftSyntheticTrend];
+
+
+export const StrategyDriftSyntheticTrend = {
+  rising: 'rising',
+  stable: 'stable',
+  improving: 'improving',
+} as const;
+
+export type StrategyDriftComparisonMethod = typeof StrategyDriftComparisonMethod[keyof typeof StrategyDriftComparisonMethod];
+
+
+export const StrategyDriftComparisonMethod = {
+  recent_half_vs_prior_half: 'recent_half_vs_prior_half',
+} as const;
+
+export interface StrategyDrift {
+  syntheticTrend: StrategyDriftSyntheticTrend;
+  syntheticRiskDelta: number;
+  confidenceDelta: number;
+  modelQualityEstimate: number;
+  evidenceAgeMinutes: number;
+  windowSize: number;
+  comparisonMethod: StrategyDriftComparisonMethod;
+  operatorReviewRequired: boolean;
+}
+
+export interface StrategySandboxLimits {
+  maxDepth: number;
+  maxScenarios: number;
+  maxRuntimeMs: number;
+}
+
+export type StrategyOverviewScope = typeof StrategyOverviewScope[keyof typeof StrategyOverviewScope];
+
+
+export const StrategyOverviewScope = {
+  global_synthetic: 'global_synthetic',
+} as const;
 
 export type StrategyOverviewModeCounts = {
   fast: number;
@@ -972,8 +1084,88 @@ export type StrategyOverviewModeCounts = {
 
 export interface StrategyOverview {
   latest: StrategyCycle | null;
+  scope: StrategyOverviewScope;
   modeCounts: StrategyOverviewModeCounts;
   recent: StrategyCycle[];
+  drift: StrategyDrift;
+  sandboxLimits: StrategySandboxLimits;
+  policy: string;
+  interpretation: string;
+}
+
+export interface StrategySandboxPreviewBody {
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  riskScore: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  residualRisk: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  confidence: number;
+  /**
+     * @minimum 0
+     * @maximum 10000
+     */
+  sampleCount: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  defenseSuccessRate: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  markovConfidence: number;
+}
+
+export type StrategySandboxCandidateMode = typeof StrategySandboxCandidateMode[keyof typeof StrategySandboxCandidateMode];
+
+
+export const StrategySandboxCandidateMode = {
+  fast: 'fast',
+  balanced: 'balanced',
+  deep: 'deep',
+} as const;
+
+export interface StrategySandboxCandidate {
+  mode: StrategySandboxCandidateMode;
+  computeBudget: number;
+  expectedQuality: number;
+  expectedCost: number;
+  selected: boolean;
+}
+
+export type StrategySandboxPreviewSelected = typeof StrategySandboxPreviewSelected[keyof typeof StrategySandboxPreviewSelected];
+
+
+export const StrategySandboxPreviewSelected = {
+  fast: 'fast',
+  balanced: 'balanced',
+  deep: 'deep',
+} as const;
+
+export interface StrategySandboxExecution {
+  scenariosEvaluated: number;
+  depthUsed: number;
+  runtimeMs: number;
+  deadlineEnforced: true;
+}
+
+export interface StrategySandboxPreview {
+  correlationId: string;
+  context: StrategyScenarioContext;
+  selected: StrategySandboxPreviewSelected;
+  candidates: StrategySandboxCandidate[];
+  execution: StrategySandboxExecution;
+  limits: StrategySandboxLimits;
   policy: string;
 }
 

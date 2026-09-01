@@ -16,6 +16,8 @@ import { motion } from "framer-motion";
 import { Shield, AlertTriangle, Activity, Cpu, Database, Server, Crosshair, TrendingUp, BellRing, BrainCircuit, Gauge } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { AdaptiveStrategy } from "@/components/dashboard/AdaptiveStrategy";
+
 export default function Dashboard() {
   const { data: dashboard, isLoading: loadDash } = useGetDashboard({ query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() } });
   const { data: metrics, isLoading: loadMetrics } = useGetSystemMetrics({ query: { refetchInterval: 3000, queryKey: getGetSystemMetricsQueryKey() } });
@@ -145,49 +147,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <Card className="bg-card/50 backdrop-blur border-primary/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-mono text-muted-foreground uppercase tracking-widest flex items-center justify-between gap-4">
-            <span className="flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-primary" /> M0 Adaptive Strategy</span>
-            <span className="text-[10px] text-safe">OBSERVER ONLY</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {strategy?.latest ? (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[160px_1fr_220px] lg:items-center">
-              <div className="rounded border border-primary/30 bg-primary/5 p-4">
-                <div className="text-[10px] font-mono text-muted-foreground">SELECTED MODE</div>
-                <div className={`mt-1 text-2xl font-mono font-bold uppercase ${
-                  strategy.latest.mode === "deep" ? "text-critical" :
-                  strategy.latest.mode === "fast" ? "text-safe" : "text-primary"
-                }`}>{strategy.latest.mode}</div>
-                <div className="mt-1 text-xs font-mono text-muted-foreground">{Math.round(strategy.latest.confidence * 100)}% confidence</div>
-              </div>
-              <div className="space-y-2">
-                <div className="font-mono text-xs text-primary">{strategy.latest.attackFamily.replaceAll("_", " ").toUpperCase()}</div>
-                <p className="text-sm text-foreground/80">{strategy.latest.reason}</p>
-                <p className="text-[11px] font-mono text-muted-foreground">N7 allocate → N2 compute → N3 learn • no production mutation</p>
-              </div>
-              <div className="rounded border border-border bg-secondary/30 p-4">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="flex items-center gap-2 text-muted-foreground"><Gauge className="h-3.5 w-3.5" /> COMPUTE BUDGET</span>
-                  <span className="text-primary">{strategy.latest.computeBudget} units</span>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded bg-secondary">
-                  <div className="h-full bg-primary" style={{ width: `${strategy.latest.computeBudget}%` }} />
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-center font-mono text-[10px] text-muted-foreground">
-                  <span>FAST {strategy.modeCounts.fast}</span>
-                  <span>BAL {strategy.modeCounts.balanced}</span>
-                  <span>DEEP {strategy.modeCounts.deep}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-6 text-center font-mono text-xs text-muted-foreground">AWAITING STRATEGY CYCLE...</div>
-          )}
-        </CardContent>
-      </Card>
+      <AdaptiveStrategy strategy={strategy} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Risk Timeline */}

@@ -6,7 +6,14 @@ import { logger } from "./logger";
 import { buildAttackLinkCandidates, type PriorAttackPrediction } from "./attack-memory-graph";
 import { analyzeMarkovLayer, type MarkovAnalysis } from "./markov-layer";
 import { analyzeQuantumLayer } from "./quantum-layer";
-import { chooseStrategy, strategyCost, type StrategyDecision } from "./strategy-engine";
+import {
+  chooseStrategy,
+  deriveScenarioContext,
+  SANDBOX_LIMITS,
+  strategyCost,
+  type ScenarioContext,
+  type StrategyDecision,
+} from "./strategy-engine";
 
 const MODEL_VERSION = "cpu-history-v2";
 const STRATEGY_ISOLATION_VERSION = "global-synthetic-v2";
@@ -43,6 +50,7 @@ export interface CpuSimulationResult {
   linkCount: number;
   layerObservationCount: number;
   strategy: StrategyDecision;
+  scenarioContext: ScenarioContext;
   nodeRun: {
     node: "N2";
     status: "completed";
@@ -546,6 +554,13 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       logger.warn({ error, attackFamily: scenario.family }, "Markov layer analysis failed");
     }
     const prediction = predictScenario(scenario, feature, markovAnalysis);
+    const scenarioContext = deriveScenarioContext({
+      riskScore: prediction.riskScore,
+      residualRisk: prediction.predictedResidualRisk,
+      confidence: prediction.confidence,
+      sampleCount: feature?.sampleCount ?? 0,
+      defenseSuccessRate: feature?.defenseSuccessRate ?? 0,
+    });
     const cycleId = crypto.randomUUID();
     const startedAt = Date.now();
 
@@ -584,17 +599,26 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
         memoryUsage: prediction.memoryUsage,
         synthetic: true,
         source: "cpu_idle_simulator",
-         strategyMode: strategy.mode,
-         strategyReason: strategy.reason,
-         strategyConfidence: strategy.confidence,
-         computeBudget: strategy.computeBudget,
-         allocationNode: strategy.allocationNode,
-         computeNode: strategy.computeNode,
-         learningNode: strategy.learningNode,
-         strategyIsolationVersion: STRATEGY_ISOLATION_VERSION,
+        strategyMode: strategy.mode,
+        strategyReason: strategy.reason,
+        strategyConfidence: strategy.confidence,
+        computeBudget: strategy.computeBudget,
+        allocationNode: strategy.allocationNode,
+        computeNode: strategy.computeNode,
+        learningNode: strategy.learningNode,
+        strategyIsolationVersion: STRATEGY_ISOLATION_VERSION,
+        scenarioPhase: scenarioContext.phase,
+        scenarioObjective: scenarioContext.objective,
+        evidenceWindowHours: scenarioContext.evidenceWindowHours,
+        evidenceFreshness: scenarioContext.evidenceFreshness,
+        strategyTriggerSignals: scenarioContext.triggerSignals.join("|"),
+        operatorReviewRequired: scenarioContext.operatorReviewRequired,
+        sandboxMaxDepth: SANDBOX_LIMITS.maxDepth,
+        sandboxMaxScenarios: SANDBOX_LIMITS.maxScenarios,
+        sandboxMaxRuntimeMs: SANDBOX_LIMITS.maxRuntimeMs,
       }),
       JSON.stringify(prediction.historyFeatures),
-       `Observer recorded a synthetic ${scenario.family} forecast using ${strategy.mode} strategy: ${strategy.reason} Production systems were not changed.`,
+      `Observer recorded a synthetic ${scenario.family} forecast using ${strategy.mode} strategy: ${strategy.reason} Production systems were not changed.`,
       MODEL_VERSION,
     ]);
     await commit(client);
@@ -684,6 +708,29 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       0,
       1,
     );
+    const costUnits = strategyCost(strategy.mode);
+    try {
+      await client.query(`
+        UPDATE dna_predictions
+        SET telemetry_snapshot = telemetry_snapshot || $2::jsonb
+        WHERE id = $1
+          AND tenant_id IS NULL
+          AND telemetry_snapshot->>'strategyIsolationVersion' = $3
+      `, [
+        predictionId,
+        JSON.stringify({
+          nodeQuality: quality,
+          nodeLatencyMs: latencyMs,
+          nodeCostUnits: costUnits,
+          actualDefenseSucceeded: outcome.defenseSucceeded,
+          actualResidualRisk: outcome.residualRisk,
+          verificationStatus: outcome.verificationStatus,
+        }),
+        STRATEGY_ISOLATION_VERSION,
+      ]);
+    } catch (error) {
+      logger.warn({ error, predictionId }, "Failed to append strategy node metrics");
+    }
     return {
       cycleId,
       predictionId,
@@ -697,12 +744,13 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       linkCount,
       layerObservationCount,
       strategy,
+      scenarioContext,
       nodeRun: {
         node: "N2",
         status: "completed",
         quality,
         latencyMs,
-        costUnits: strategyCost(strategy.mode),
+        costUnits,
       },
     };
   } catch (error) {

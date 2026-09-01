@@ -75,6 +75,8 @@ import type {
   SelfTestResult,
   SimulationResult,
   StrategyOverview,
+  StrategySandboxPreview,
+  StrategySandboxPreviewBody,
   SystemMetrics,
   Tenant,
   ThreatGraph,
@@ -2695,6 +2697,77 @@ export function useGetStrategyOverview<TData = Awaited<ReturnType<typeof getStra
 
 
 
+
+export const getPreviewStrategySandboxUrl = () => {
+
+
+
+
+  return `/api/strategy/sandbox-preview`
+}
+
+/**
+ * @summary Compare bounded strategy candidates without changing state
+ */
+export const previewStrategySandbox = async (strategySandboxPreviewBody: StrategySandboxPreviewBody, options?: RequestInit): Promise<StrategySandboxPreview> => {
+
+  return customFetch<StrategySandboxPreview>(getPreviewStrategySandboxUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      strategySandboxPreviewBody,)
+  }
+);}
+
+
+
+
+export const getPreviewStrategySandboxMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewStrategySandbox>>, TError,{data: BodyType<StrategySandboxPreviewBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof previewStrategySandbox>>, TError,{data: BodyType<StrategySandboxPreviewBody>}, TContext> => {
+
+const mutationKey = ['previewStrategySandbox'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof previewStrategySandbox>>, {data: BodyType<StrategySandboxPreviewBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  previewStrategySandbox(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PreviewStrategySandboxMutationResult = NonNullable<Awaited<ReturnType<typeof previewStrategySandbox>>>
+    export type PreviewStrategySandboxMutationBody = BodyType<StrategySandboxPreviewBody>
+    export type PreviewStrategySandboxMutationError = ErrorType<void>
+
+    /**
+ * @summary Compare bounded strategy candidates without changing state
+ */
+export const usePreviewStrategySandbox = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof previewStrategySandbox>>, TError,{data: BodyType<StrategySandboxPreviewBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof previewStrategySandbox>>,
+        TError,
+        {data: BodyType<StrategySandboxPreviewBody>},
+        TContext
+      > => {
+      return useMutation(getPreviewStrategySandboxMutationOptions(options));
+    }
 
 export const getGetQueueStatsUrl = () => {
 

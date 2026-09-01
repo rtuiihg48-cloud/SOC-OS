@@ -1,10 +1,96 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { db, securityEventsTable, patchesTable, correlationsTable, dnaPredictionsTable } from "@workspace/db";
 import { and, desc, eq, isNull, sql, count } from "drizzle-orm";
 import { getSystemMetrics } from "../lib/system-metrics";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
+import {
+  compareStrategies,
+  deriveScenarioContext,
+  SANDBOX_LIMITS,
+  type ScenarioPhase,
+  type ScenarioObjective,
+} from "../lib/strategy-engine";
 
 const router = Router();
+interface StrategySandboxPreviewInput {
+  riskScore: number;
+  residualRisk: number;
+  confidence: number;
+  sampleCount: number;
+  defenseSuccessRate: number;
+  markovConfidence: number;
+}
+
+function parseStrategySandboxPreviewBody(body: unknown): StrategySandboxPreviewInput | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const record = body as Record<string, unknown>;
+  const allowedKeys = new Set([
+    "riskScore",
+    "residualRisk",
+    "confidence",
+    "sampleCount",
+    "defenseSuccessRate",
+    "markovConfidence",
+  ]);
+  if (Object.keys(record).some((key) => !allowedKeys.has(key))) return null;
+  const values = Object.fromEntries(
+    [...allowedKeys].map((key) => [key, record[key]]),
+  ) as Record<keyof StrategySandboxPreviewInput, unknown>;
+  if (
+    typeof values.riskScore !== "number" ||
+    typeof values.residualRisk !== "number" ||
+    typeof values.confidence !== "number" ||
+    typeof values.sampleCount !== "number" ||
+    typeof values.defenseSuccessRate !== "number" ||
+    typeof values.markovConfidence !== "number"
+  ) return null;
+  if (
+    !Number.isFinite(values.riskScore) ||
+    !Number.isFinite(values.residualRisk) ||
+    !Number.isFinite(values.confidence) ||
+    !Number.isInteger(values.sampleCount) ||
+    !Number.isFinite(values.defenseSuccessRate) ||
+    !Number.isFinite(values.markovConfidence) ||
+    values.riskScore < 0 || values.riskScore > 100 ||
+    values.residualRisk < 0 || values.residualRisk > 100 ||
+    values.confidence < 0 || values.confidence > 1 ||
+    values.sampleCount < 0 || values.sampleCount > 10_000 ||
+    values.defenseSuccessRate < 0 || values.defenseSuccessRate > 1 ||
+    values.markovConfidence < 0 || values.markovConfidence > 1
+  ) return null;
+  return values as StrategySandboxPreviewInput;
+}
+
+function telemetryNumber(telemetry: Record<string, number | string | boolean>, key: string, fallback = 0): number {
+  const value = telemetry[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function telemetryBoolean(telemetry: Record<string, number | string | boolean>, key: string, fallback = false): boolean {
+  const value = telemetry[key];
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function telemetryString(telemetry: Record<string, number | string | boolean>, key: string): string | null {
+  const value = telemetry[key];
+  return typeof value === "string" ? value : null;
+}
+
+function evidenceFreshness(
+  telemetry: Record<string, number | string | boolean>,
+  fallback: "fresh" | "aging" | "insufficient",
+): "fresh" | "aging" | "insufficient" {
+  const value = telemetryString(telemetry, "evidenceFreshness");
+  return value === "fresh" || value === "aging" || value === "insufficient" ? value : fallback;
+}
+
+function verificationStatus(
+  telemetry: Record<string, number | string | boolean>,
+): "pending" | "verified" | "rejected" | "inconclusive" {
+  const value = telemetryString(telemetry, "verificationStatus");
+  return value === "verified" || value === "rejected" || value === "inconclusive" ? value : "pending";
+}
 
 // ─── Patches ──────────────────────────────────────────────────────────────────
 router.get("/patches", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
@@ -195,13 +281,7 @@ router.get("/risk-timeline", requireCapability("dashboard:read", singleTenantSco
 // ─── Adaptive Strategy Overview ───────────────────────────────────────────────
 // Strategy cycles are synthetic observer records. They expose decision quality
 // and compute economics without granting the strategy engine production control.
-router.get("/strategy/overview", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
-  const tenantId = singleTenantScope(req);
-  if (tenantId === null) {
-    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
-    return;
-  }
-
+router.get("/strategy/overview", requireCapability("strategy:global:read", () => null), async (_req, res) => {
   const predictions = await db
     .select({
       id: dnaPredictionsTable.id,
@@ -227,6 +307,26 @@ router.get("/strategy/overview", requireCapability("dashboard:read", singleTenan
       const telemetry = prediction.telemetrySnapshot;
       const mode = telemetry.strategyMode;
       if (mode !== "fast" && mode !== "balanced" && mode !== "deep") return null;
+      const fallbackContext = deriveScenarioContext({
+        riskScore: prediction.riskScore,
+        residualRisk: telemetryNumber(telemetry, "actualResidualRisk", 0),
+        confidence: prediction.confidence,
+        sampleCount: 0,
+        defenseSuccessRate: telemetryBoolean(telemetry, "actualDefenseSucceeded") ? 1 : 0,
+      });
+      const phaseValue = telemetryString(telemetry, "scenarioPhase");
+      const objectiveValue = telemetryString(telemetry, "scenarioObjective");
+      const phase: ScenarioPhase = phaseValue === "stability" || phaseValue === "growth" ||
+        phaseValue === "collapse" || phaseValue === "mutation"
+        ? phaseValue
+        : fallbackContext.phase;
+      const objective: ScenarioObjective = objectiveValue === "detect" || objectiveValue === "explain" ||
+        objectiveValue === "contain" || objectiveValue === "recover"
+        ? objectiveValue
+        : fallbackContext.objective;
+      const triggerSignals = (telemetryString(telemetry, "strategyTriggerSignals") ?? "")
+        .split("|")
+        .filter(Boolean);
       return {
         id: prediction.id,
         cycleId: prediction.cycleId,
@@ -236,6 +336,30 @@ router.get("/strategy/overview", requireCapability("dashboard:read", singleTenan
         mode,
         reason: typeof telemetry.strategyReason === "string" ? telemetry.strategyReason : prediction.observerNote,
         computeBudget: typeof telemetry.computeBudget === "number" ? telemetry.computeBudget : 0,
+        correlationId: prediction.cycleId,
+        context: {
+          phase,
+          objective,
+          evidenceWindowHours: telemetryNumber(telemetry, "evidenceWindowHours", 24),
+          evidenceFreshness: evidenceFreshness(telemetry, fallbackContext.evidenceFreshness),
+          triggerSignals: triggerSignals.length > 0 ? triggerSignals : fallbackContext.triggerSignals,
+          operatorReviewRequired: telemetryBoolean(
+            telemetry,
+            "operatorReviewRequired",
+            fallbackContext.operatorReviewRequired,
+          ),
+        },
+        nodeRun: {
+          node: "N2" as const,
+          quality: telemetryNumber(telemetry, "nodeQuality", prediction.confidence),
+          latencyMs: telemetryNumber(telemetry, "nodeLatencyMs", 0),
+          costUnits: telemetryNumber(telemetry, "nodeCostUnits", mode === "fast" ? 8 : mode === "deep" ? 26 : 16),
+        },
+        simulatedOutcome: {
+          verificationStatus: verificationStatus(telemetry),
+          defenseSucceeded: telemetryBoolean(telemetry, "actualDefenseSucceeded"),
+          residualRisk: telemetryNumber(telemetry, "actualResidualRisk", 0),
+        },
         createdAt: prediction.createdAt.toISOString(),
       };
     })
@@ -246,16 +370,78 @@ router.get("/strategy/overview", requireCapability("dashboard:read", singleTenan
     counts[cycle.mode] = (counts[cycle.mode] ?? 0) + 1;
     return counts;
   }, {});
+  const midpoint = Math.floor(cycles.length / 2);
+  const recentCohort = cycles.slice(0, midpoint);
+  const priorCohort = cycles.slice(midpoint, midpoint * 2);
+  const cohortAverage = (values: number[]): number =>
+    values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
+  const syntheticRiskDelta = cycles.length >= 4
+    ? cohortAverage(recentCohort.map((cycle) => cycle.riskScore)) -
+      cohortAverage(priorCohort.map((cycle) => cycle.riskScore))
+    : 0;
+  const confidenceDelta = cycles.length >= 4
+    ? cohortAverage(recentCohort.map((cycle) => cycle.confidence)) -
+      cohortAverage(priorCohort.map((cycle) => cycle.confidence))
+    : 0;
+  const modelQualityEstimate = cycles.length === 0
+    ? 0
+    : cycles.reduce((sum, cycle) => sum + cycle.nodeRun.quality, 0) / cycles.length;
+  const evidenceAgeMinutes = latest
+    ? Math.max(0, Math.round((Date.now() - Date.parse(latest.createdAt)) / 60_000))
+    : 0;
 
   res.json({
     latest,
+    scope: "global_synthetic",
     modeCounts: {
       fast: modeCounts.fast ?? 0,
       balanced: modeCounts.balanced ?? 0,
       deep: modeCounts.deep ?? 0,
     },
-    recent: cycles.slice(0, 6),
+    recent: cycles.slice(0, 8),
+    drift: {
+      syntheticTrend: syntheticRiskDelta >= 5 ? "rising" : syntheticRiskDelta <= -5 ? "improving" : "stable",
+      syntheticRiskDelta,
+      confidenceDelta,
+      modelQualityEstimate,
+      evidenceAgeMinutes,
+      windowSize: cycles.length,
+      comparisonMethod: "recent_half_vs_prior_half",
+      operatorReviewRequired: latest?.context.operatorReviewRequired === true || syntheticRiskDelta >= 5,
+    },
+    sandboxLimits: SANDBOX_LIMITS,
     policy: "observer-only; production systems are never changed by strategy decisions",
+    interpretation: "All cycles, outcomes, quality, and drift values are synthetic model estimates, not measured tenant defense effectiveness.",
+  });
+});
+
+router.post("/strategy/sandbox-preview", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
+  const input = parseStrategySandboxPreviewBody(req.body);
+  if (!input) {
+    res.status(400).json({ error: "INVALID_STRATEGY_INPUT", code: "INVALID_STRATEGY_INPUT" });
+    return;
+  }
+
+  const comparison = compareStrategies({
+    totalSamples: input.sampleCount,
+    lowestDefenseSuccessRate: input.defenseSuccessRate,
+    highestResidualRisk: input.residualRisk,
+    ...input,
+  });
+
+  res.json({
+    correlationId: crypto.randomUUID(),
+    context: deriveScenarioContext(input),
+    selected: comparison.selected.mode,
+    candidates: comparison.candidates,
+    execution: comparison.execution,
+    limits: SANDBOX_LIMITS,
+    policy: "dry-run only; no state, policy, role, or production system was changed",
   });
 });
 

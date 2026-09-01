@@ -788,6 +788,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/StrategyOverview"
 
+  /strategy/sandbox-preview:
+    post:
+      operationId: previewStrategySandbox
+      tags: [dashboard]
+      summary: Compare bounded strategy candidates without changing state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategySandboxPreviewBody"
+      responses:
+        "200":
+          description: Deterministic dry-run comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategySandboxPreview"
+        "400":
+          description: Invalid strategy preview input
+
   /queue-stats:
     get:
       operationId: getQueueStats
@@ -2526,10 +2547,100 @@ components:
           type: string
         computeBudget:
           type: integer
+        correlationId:
+          type: string
+        context:
+          $ref: "#/components/schemas/StrategyScenarioContext"
+        nodeRun:
+          $ref: "#/components/schemas/StrategyNodeRun"
+        simulatedOutcome:
+          $ref: "#/components/schemas/StrategyOutcome"
         createdAt:
           type: string
           format: date-time
-      required: [id, cycleId, attackFamily, riskScore, confidence, mode, reason, computeBudget, createdAt]
+      required: [id, cycleId, attackFamily, riskScore, confidence, mode, reason, computeBudget, correlationId, context, nodeRun, simulatedOutcome, createdAt]
+
+    StrategyScenarioContext:
+      type: object
+      properties:
+        phase:
+          type: string
+          enum: [stability, growth, collapse, mutation]
+        objective:
+          type: string
+          enum: [detect, explain, contain, recover]
+        evidenceWindowHours:
+          type: integer
+        evidenceFreshness:
+          type: string
+          enum: [fresh, aging, insufficient]
+        triggerSignals:
+          type: array
+          items:
+            type: string
+        operatorReviewRequired:
+          type: boolean
+      required: [phase, objective, evidenceWindowHours, evidenceFreshness, triggerSignals, operatorReviewRequired]
+
+    StrategyNodeRun:
+      type: object
+      properties:
+        node:
+          type: string
+          enum: [N2]
+        quality:
+          type: number
+        latencyMs:
+          type: number
+        costUnits:
+          type: number
+      required: [node, quality, latencyMs, costUnits]
+
+    StrategyOutcome:
+      type: object
+      properties:
+        verificationStatus:
+          type: string
+          enum: [pending, verified, rejected, inconclusive]
+        defenseSucceeded:
+          type: boolean
+        residualRisk:
+          type: number
+      required: [verificationStatus, defenseSucceeded, residualRisk]
+
+    StrategyDrift:
+      type: object
+      properties:
+        syntheticTrend:
+          type: string
+          enum: [rising, stable, improving]
+        syntheticRiskDelta:
+          type: number
+        confidenceDelta:
+          type: number
+        modelQualityEstimate:
+          type: number
+        evidenceAgeMinutes:
+          type: integer
+        windowSize:
+          type: integer
+        comparisonMethod:
+          type: string
+          enum: [recent_half_vs_prior_half]
+        operatorReviewRequired:
+          type: boolean
+      required: [syntheticTrend, syntheticRiskDelta, confidenceDelta, modelQualityEstimate, evidenceAgeMinutes, windowSize, comparisonMethod, operatorReviewRequired]
+
+    StrategySandboxLimits:
+      type: object
+      properties:
+        maxDepth:
+          type: integer
+        maxScenarios:
+          type: integer
+        maxRuntimeMs:
+          type: integer
+      required: [maxDepth, maxScenarios, maxRuntimeMs]
 
     StrategyOverview:
       type: object
@@ -2538,6 +2649,9 @@ components:
           anyOf:
             - $ref: "#/components/schemas/StrategyCycle"
             - type: "null"
+        scope:
+          type: string
+          enum: [global_synthetic]
         modeCounts:
           type: object
           properties:
@@ -2552,9 +2666,97 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/StrategyCycle"
+        drift:
+          $ref: "#/components/schemas/StrategyDrift"
+        sandboxLimits:
+          $ref: "#/components/schemas/StrategySandboxLimits"
         policy:
           type: string
-      required: [latest, modeCounts, recent, policy]
+        interpretation:
+          type: string
+      required: [latest, scope, modeCounts, recent, drift, sandboxLimits, policy, interpretation]
+
+    StrategySandboxPreviewBody:
+      type: object
+      properties:
+        riskScore:
+          type: number
+          minimum: 0
+          maximum: 100
+        residualRisk:
+          type: number
+          minimum: 0
+          maximum: 100
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        sampleCount:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          multipleOf: 1
+        defenseSuccessRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        markovConfidence:
+          type: number
+          minimum: 0
+          maximum: 1
+      required: [riskScore, residualRisk, confidence, sampleCount, defenseSuccessRate, markovConfidence]
+
+    StrategySandboxCandidate:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [fast, balanced, deep]
+        computeBudget:
+          type: integer
+        expectedQuality:
+          type: number
+        expectedCost:
+          type: number
+        selected:
+          type: boolean
+      required: [mode, computeBudget, expectedQuality, expectedCost, selected]
+
+    StrategySandboxPreview:
+      type: object
+      properties:
+        correlationId:
+          type: string
+        context:
+          $ref: "#/components/schemas/StrategyScenarioContext"
+        selected:
+          type: string
+          enum: [fast, balanced, deep]
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrategySandboxCandidate"
+        execution:
+          $ref: "#/components/schemas/StrategySandboxExecution"
+        limits:
+          $ref: "#/components/schemas/StrategySandboxLimits"
+        policy:
+          type: string
+      required: [correlationId, context, selected, candidates, execution, limits, policy]
+
+    StrategySandboxExecution:
+      type: object
+      properties:
+        scenariosEvaluated:
+          type: integer
+        depthUsed:
+          type: integer
+        runtimeMs:
+          type: number
+        deadlineEnforced:
+          type: boolean
+          enum: [true]
+      required: [scenariosEvaluated, depthUsed, runtimeMs, deadlineEnforced]
 
     QueueStats:
       type: object
