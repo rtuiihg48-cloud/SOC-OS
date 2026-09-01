@@ -34,6 +34,7 @@ import type {
   ExecuteVoiceCommandBody,
   HckBiosStatus,
   HealthStatus,
+  IncidentCenter,
   ListAuditRecordsParams,
   ListCorrelationsParams,
   ListEventsParams,
@@ -738,6 +739,83 @@ export const useProcessEvent = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getProcessEventMutationOptions(options));
     }
+
+export const getGetIncidentCenterUrl = () => {
+
+
+
+
+  return `/api/incidents`
+}
+
+/**
+ * @summary Get a tenant-scoped incident center summary
+ */
+export const getIncidentCenter = async ( options?: RequestInit): Promise<IncidentCenter> => {
+
+  return customFetch<IncidentCenter>(getGetIncidentCenterUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIncidentCenterQueryKey = () => {
+    return [
+    `/api/incidents`
+    ] as const;
+    }
+
+
+export const getGetIncidentCenterQueryOptions = <TData = Awaited<ReturnType<typeof getIncidentCenter>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIncidentCenter>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIncidentCenterQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIncidentCenter>>> = ({ signal }) => getIncidentCenter({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIncidentCenter>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIncidentCenterQueryResult = NonNullable<Awaited<ReturnType<typeof getIncidentCenter>>>
+export type GetIncidentCenterQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a tenant-scoped incident center summary
+ */
+
+export function useGetIncidentCenter<TData = Awaited<ReturnType<typeof getIncidentCenter>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIncidentCenter>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIncidentCenterQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListQuarantineCapturesUrl = (params?: ListQuarantineCapturesParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network, LogOut, CreditCard } from "lucide-react";
+import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Database, Bell, Zap, Link2, Building2, TerminalSquare, Box, BugOff, PanelLeftClose, PanelLeftOpen, Radio, Network, LogOut, CreditCard, Search, ClipboardCheck, Siren, Workflow } from "lucide-react";
 import { useGetCurrentPrincipal, getGetCurrentPrincipalQueryKey, useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 import { useClerk } from "@clerk/react";
@@ -10,6 +10,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 1024px)").matches
   );
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
   const { data: dashboard } = useGetDashboard({
     query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() }
   });
@@ -30,11 +32,24 @@ export function Layout({ children }: { children: ReactNode }) {
     return () => compactQuery.removeEventListener("change", handleViewportChange);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandOpen(true);
+      }
+      if (event.key === "Escape") setIsCommandOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const navSections = [
     {
       label: "Operations",
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/incidents", label: "Incident Center", icon: Siren },
         { href: "/alerts", label: "Alerts", icon: Bell },
         { href: "/events", label: "Event Log", icon: Database },
         { href: "/simulate", label: "Simulation", icon: Cpu },
@@ -55,12 +70,14 @@ export function Layout({ children }: { children: ReactNode }) {
         { href: "/quarantine", label: "Quarantine", icon: Box },
         { href: "/self-healing", label: "Self-Healing", icon: Shield },
         { href: "/patches", label: "Patches", icon: GitCommit },
+        { href: "/playbooks", label: "Playbooks", icon: Workflow },
       ],
     },
     {
       label: "Platform",
       items: [
         { href: "/runtime", label: "Runtime", icon: TerminalSquare },
+        { href: "/approvals", label: "Readiness Review", icon: ClipboardCheck },
         { href: "/node-exchange", label: "Node Exchange", icon: Radio },
         { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
         ...(canReadAudit ? [{ href: "/audit-trail", label: "Audit Trail", icon: Activity }] : []),
@@ -189,7 +206,15 @@ export function Layout({ children }: { children: ReactNode }) {
           <h1 className="text-xl font-semibold tracking-wide capitalize">
             {navItems.find(n => n.href === location)?.label || "Dashboard"}
           </h1>
-          <div className="flex items-center gap-4 text-sm font-mono">
+          <div className="flex items-center gap-3 text-sm font-mono">
+            <button
+              type="button"
+              onClick={() => setIsCommandOpen(true)}
+              className="hidden items-center gap-2 rounded border border-border px-2 py-1.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary md:flex"
+              aria-label="Open global search"
+            >
+              <Search className="h-3.5 w-3.5" /> SEARCH <span className="text-[9px] opacity-70">CTRL K</span>
+            </button>
             <span className="text-muted-foreground">THREAT_LEVEL:</span>
             <span className={`font-bold ${dashboard?.threatLevel && dashboard.threatLevel > 75 ? 'text-critical' : dashboard?.threatLevel && dashboard.threatLevel > 50 ? 'text-warn' : 'text-safe'}`}>
               {dashboard?.threatLevel ?? 0}%
@@ -197,6 +222,34 @@ export function Layout({ children }: { children: ReactNode }) {
             <VoiceCommandPanel />
           </div>
         </header>
+
+        {isCommandOpen && (
+          <div className="absolute inset-0 z-50 flex items-start justify-center bg-background/70 p-4 pt-20 backdrop-blur-sm" onMouseDown={() => setIsCommandOpen(false)}>
+            <div className="w-full max-w-xl rounded-md border border-primary/30 bg-card shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="flex items-center gap-2 border-b border-border px-4">
+                <Search className="h-4 w-4 text-primary" />
+                <input
+                  autoFocus
+                  value={commandQuery}
+                  onChange={(event) => setCommandQuery(event.target.value)}
+                  placeholder="Search control surfaces..."
+                  className="h-12 flex-1 bg-transparent text-sm font-mono outline-none placeholder:text-muted-foreground"
+                />
+                <button type="button" onClick={() => setIsCommandOpen(false)} className="text-[10px] font-mono text-muted-foreground">ESC</button>
+              </div>
+              <div className="max-h-80 overflow-y-auto p-2">
+                {navItems.filter((item) => item.label.toLowerCase().includes(commandQuery.toLowerCase())).slice(0, 12).map((item) => (
+                  <Link key={item.href} href={item.href} onClick={() => { setIsCommandOpen(false); setCommandQuery(""); }} className="flex items-center gap-3 rounded px-3 py-2.5 text-sm text-muted-foreground hover:bg-primary/10 hover:text-primary">
+                    <item.icon className="h-4 w-4" /> <span className="font-mono">{item.label}</span><span className="ml-auto text-[10px] text-muted-foreground/60">{item.href}</span>
+                  </Link>
+                ))}
+                {navItems.filter((item) => item.label.toLowerCase().includes(commandQuery.toLowerCase())).length === 0 && (
+                  <div className="p-6 text-center text-xs font-mono text-muted-foreground">NO CONTROL SURFACE MATCHES</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-8 z-10 relative">
           {children}

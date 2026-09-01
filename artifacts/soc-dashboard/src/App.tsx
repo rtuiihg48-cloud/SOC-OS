@@ -31,6 +31,9 @@ import TrafficAnalysis from "@/pages/TrafficAnalysis";
 import AuditTrail from "@/pages/AuditTrail";
 import Billing from "@/pages/Billing";
 import NotFound from "@/pages/not-found";
+import Incidents from "@/pages/Incidents";
+import Playbooks from "@/pages/Playbooks";
+import Approvals from "@/pages/Approvals";
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -120,10 +123,11 @@ function ClerkQueryClientCacheInvalidator() {
 }
 
 function RequireMembership({ children }: { children: React.ReactNode }) {
-  const { data: principal, isLoading, error } = useGetCurrentPrincipal({
+  const { data: principal, isLoading, error, refetch } = useGetCurrentPrincipal({
     query: {
       queryKey: getGetCurrentPrincipalQueryKey(),
-      retry: false
+      retry: false,
+      refetchOnWindowFocus: true,
     }
   });
   const { signOut } = useClerk();
@@ -168,6 +172,12 @@ function RequireMembership({ children }: { children: React.ReactNode }) {
           className="z-10 text-sm font-mono bg-secondary hover:bg-secondary/80 px-8 py-3 rounded-sm text-foreground transition-colors tracking-widest uppercase border border-border"
         >
           Terminate Session
+        </button>
+        <button
+          onClick={() => void refetch()}
+          className="z-10 text-xs font-mono text-primary hover:text-primary/80 transition-colors tracking-widest uppercase"
+        >
+          Refresh access status
         </button>
       </div>
     );
@@ -245,6 +255,9 @@ function App() {
                   <ProtectedLayout>
                     <Switch>
                       <Route path="/dashboard" component={Dashboard} />
+                      <Route path="/incidents" component={Incidents} />
+                      <Route path="/playbooks" component={Playbooks} />
+                      <Route path="/approvals" component={Approvals} />
                       <Route path="/events" component={Events} />
                       <Route path="/simulate" component={Simulation} />
                       <Route path="/patches" component={Patches} />

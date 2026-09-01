@@ -18,6 +18,7 @@ import authRouter from "./auth";
 import auditRouter from "./audit";
 import billingRouter from "./billing";
 import nodeExchangeRouter from "./node-exchange";
+import incidentsRouter from "./incidents";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
 import { requireSecurityTestAccess } from "../lib/security-test-access";
 
@@ -41,6 +42,7 @@ router.use(selfHealingRouter);
 router.use(virusDatabaseRouter);
 router.use(trafficRouter);
 router.use(nodeExchangeRouter);
+router.use(incidentsRouter);
 router.post("/scan/lockfile", requireCapability("testing:run", singleTenantScope), async (req, res) => {
   const { apiKey, lockfileContent, packageJsonContent } = req.body;
   if (!apiKey || !lockfileContent || !packageJsonContent) {

@@ -16,3 +16,13 @@ where to restore.
 separate atomic transaction. If the resource, restore point, hash, or location
 cannot be verified, record the failure and leave the resource quarantined.
 Never use event payloads as shell, eval, or subprocess input.
+
+Preview readiness is evidence that bounded validation completed; it is not a
+human approval or authorization grant.
+
+**Why:** Treating a `READY` preview as approval misleads operators and can hide
+the fact that apply authority still comes from the caller's capability.
+
+**How to apply:** Label preview queues as readiness review. If human approval is
+required, persist an explicit approval decision and enforce it atomically in the
+apply path rather than inferring approval from preview status.

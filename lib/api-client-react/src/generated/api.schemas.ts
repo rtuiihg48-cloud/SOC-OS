@@ -5,6 +5,45 @@
  * SOC OS - SaaS Security Platform API (V30/V50)
  * OpenAPI spec version: 0.3.0
  */
+export type IncidentCenterItemKind = typeof IncidentCenterItemKind[keyof typeof IncidentCenterItemKind];
+
+
+export const IncidentCenterItemKind = {
+  ALERT: 'ALERT',
+  CORRELATION: 'CORRELATION',
+  QUARANTINE: 'QUARANTINE',
+} as const;
+
+export type IncidentCenterItemSeverity = typeof IncidentCenterItemSeverity[keyof typeof IncidentCenterItemSeverity];
+
+
+export const IncidentCenterItemSeverity = {
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL',
+} as const;
+
+export interface IncidentCenterItem {
+  id: string;
+  kind: IncidentCenterItemKind;
+  severity: IncidentCenterItemSeverity;
+  status: string;
+  title: string;
+  summary: string;
+  sourceId: number;
+  createdAt: string;
+  targetPath: string;
+}
+
+export interface IncidentCenter {
+  generatedAt: string;
+  openIncidents: number;
+  criticalIncidents: number;
+  /** @maxItems 60 */
+  items: IncidentCenterItem[];
+}
+
 export interface ApiError {
   error: string;
   code: string;

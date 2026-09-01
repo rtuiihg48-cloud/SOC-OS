@@ -241,6 +241,31 @@ export const ProcessEventResponse = zod.object({
 
 
 /**
+ * @summary Get a tenant-scoped incident center summary
+ */
+export const getIncidentCenterResponseItemsMax = 60;
+
+
+
+export const GetIncidentCenterResponse = zod.object({
+  "generatedAt": zod.coerce.date(),
+  "openIncidents": zod.number(),
+  "criticalIncidents": zod.number(),
+  "items": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['ALERT', 'CORRELATION', 'QUARANTINE']),
+  "severity": zod.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+  "status": zod.string(),
+  "title": zod.string(),
+  "summary": zod.string(),
+  "sourceId": zod.number(),
+  "createdAt": zod.coerce.date(),
+  "targetPath": zod.string()
+})).max(getIncidentCenterResponseItemsMax)
+})
+
+
+/**
  * @summary List logical sandbox quarantine captures
  */
 export const listQuarantineCapturesQueryLimitMax = 100;
