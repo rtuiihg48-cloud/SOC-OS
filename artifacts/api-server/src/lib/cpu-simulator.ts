@@ -6,8 +6,10 @@ import { logger } from "./logger";
 import { buildAttackLinkCandidates, type PriorAttackPrediction } from "./attack-memory-graph";
 import { analyzeMarkovLayer, type MarkovAnalysis } from "./markov-layer";
 import { analyzeQuantumLayer } from "./quantum-layer";
+import { chooseStrategy, strategyCost, type StrategyDecision } from "./strategy-engine";
 
-const MODEL_VERSION = "cpu-history-v1";
+const MODEL_VERSION = "cpu-history-v2";
+const STRATEGY_ISOLATION_VERSION = "global-synthetic-v2";
 const LOCK_NAME = "soc-os:cpu-simulator";
 const DEFAULT_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_INITIAL_DELAY_MS = 15_000;
@@ -40,6 +42,14 @@ export interface CpuSimulationResult {
   vulnerabilityPattern: string | null;
   linkCount: number;
   layerObservationCount: number;
+  strategy: StrategyDecision;
+  nodeRun: {
+    node: "N2";
+    status: "completed";
+    quality: number;
+    latencyMs: number;
+    costUnits: number;
+  };
 }
 
 const SCENARIOS: ScenarioTemplate[] = [
@@ -132,8 +142,10 @@ async function loadHistory(client: PoolClient): Promise<Map<string, HistoryFeatu
       LIMIT 1
     ) AS outcome ON TRUE
     WHERE prediction.created_at >= NOW() - INTERVAL '90 days'
+      AND prediction.tenant_id IS NULL
+      AND prediction.telemetry_snapshot->>'strategyIsolationVersion' = $1
     GROUP BY prediction.attack_family
-  `);
+  `, [STRATEGY_ISOLATION_VERSION]);
 
   return new Map(
     result.rows.map((row) => [
@@ -154,8 +166,10 @@ async function loadAttackSequence(client: PoolClient): Promise<string[]> {
     SELECT attack_family
     FROM dna_predictions
     WHERE created_at >= NOW() - INTERVAL '90 days'
+      AND tenant_id IS NULL
+      AND telemetry_snapshot->>'strategyIsolationVersion' = $1
     ORDER BY created_at ASC, id ASC
-  `);
+  `, [STRATEGY_ISOLATION_VERSION]);
   return result.rows.map((row) => row.attack_family);
 }
 
@@ -185,10 +199,12 @@ async function reconcilePendingOutcomes(client: PoolClient): Promise<number> {
       FROM dna_outcomes AS outcome
       WHERE outcome.prediction_id = prediction.id
     )
+      AND prediction.tenant_id IS NULL
+      AND prediction.telemetry_snapshot->>'strategyIsolationVersion' = $1
     ORDER BY prediction.created_at
     LIMIT 25
     FOR UPDATE SKIP LOCKED
-  `);
+  `, [STRATEGY_ISOLATION_VERSION]);
 
   for (const prediction of pending.rows) {
     const recoveryCoverage = clamp(
@@ -257,10 +273,12 @@ async function linkPrediction(
     SELECT id, attack_family, tactic, technique_id, predicted_vulnerability, created_at
     FROM dna_predictions
     WHERE id <> $1
+      AND tenant_id IS NULL
+      AND telemetry_snapshot->>'strategyIsolationVersion' = $2
       AND created_at >= NOW() - INTERVAL '24 hours'
     ORDER BY created_at DESC
     LIMIT 50
-  `, [predictionId]);
+  `, [predictionId, STRATEGY_ISOLATION_VERSION]);
 
   const priorPredictions: PriorAttackPrediction[] = previous.rows.map((row) => ({
     id: row.id,
@@ -304,7 +322,11 @@ async function linkPrediction(
   return selected.length;
 }
 
-function selectScenario(history: Map<string, HistoryFeature>, markovRecommendation: string | null): ScenarioTemplate {
+function selectScenario(
+  history: Map<string, HistoryFeature>,
+  markovRecommendation: string | null,
+  strategy: StrategyDecision,
+): ScenarioTemplate {
   const totalSamples = [...history.values()].reduce((sum, feature) => sum + feature.sampleCount, 0);
   const rotationIndex = totalSamples % SCENARIOS.length;
 
@@ -312,9 +334,9 @@ function selectScenario(history: Map<string, HistoryFeature>, markovRecommendati
     .map((scenario, index) => {
       const feature = history.get(scenario.family);
       const sampleCount = feature?.sampleCount ?? 0;
-      const explorationWeight = 2 / (sampleCount + 1);
-      const vulnerabilityWeight = (1 - (feature?.defenseSuccessRate ?? 0.5)) * 3;
-      const residualWeight = (feature?.averageResidualRisk ?? 0) / 10;
+       const explorationWeight = 2 / (sampleCount + 1) * (strategy.mode === "fast" ? 1.5 : 1);
+       const vulnerabilityWeight = (1 - (feature?.defenseSuccessRate ?? 0.5)) * (strategy.mode === "deep" ? 4.2 : 3);
+       const residualWeight = (feature?.averageResidualRisk ?? 0) / (strategy.mode === "deep" ? 7 : 10);
       const rotationWeight = index === rotationIndex ? 0.75 : 0;
       const markovWeight = scenario.family === markovRecommendation ? 1.2 : 0;
       return {
@@ -479,19 +501,39 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     const history = await loadHistory(client);
     const attackSequence = await loadAttackSequence(client);
     let markovRecommendation: string | null = null;
+    let markovConfidence = 0;
     try {
-      markovRecommendation = attackSequence.length === 0
+      const markov = attackSequence.length === 0
         ? null
         : analyzeMarkovLayer(
           attackSequence,
           attackSequence.at(-1)!,
           SCENARIOS.map((candidate) => candidate.family),
         ).predictedNextFamily;
+      markovRecommendation = markov;
+      if (attackSequence.length > 0) {
+        markovConfidence = analyzeMarkovLayer(
+          attackSequence,
+          attackSequence.at(-1)!,
+          SCENARIOS.map((candidate) => candidate.family),
+        ).confidence;
+      }
     } catch (error) {
       logger.warn({ error }, "Markov layer recommendation failed; using history selector");
     }
 
-    const scenario = selectScenario(history, markovRecommendation);
+    const historyFeatures = [...history.values()];
+    const strategy = chooseStrategy({
+      totalSamples: historyFeatures.reduce((sum, feature) => sum + feature.sampleCount, 0),
+      lowestDefenseSuccessRate: historyFeatures.length > 0
+        ? Math.min(...historyFeatures.map((feature) => feature.defenseSuccessRate))
+        : 0,
+      highestResidualRisk: historyFeatures.length > 0
+        ? Math.max(...historyFeatures.map((feature) => feature.averageResidualRisk))
+        : 0,
+      markovConfidence,
+    });
+    const scenario = selectScenario(history, markovRecommendation, strategy);
     const feature = history.get(scenario.family);
     let markovAnalysis: MarkovAnalysis | undefined;
     try {
@@ -505,6 +547,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     }
     const prediction = predictScenario(scenario, feature, markovAnalysis);
     const cycleId = crypto.randomUUID();
+    const startedAt = Date.now();
 
     await begin(client);
     transactionOpen = true;
@@ -541,9 +584,17 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
         memoryUsage: prediction.memoryUsage,
         synthetic: true,
         source: "cpu_idle_simulator",
+         strategyMode: strategy.mode,
+         strategyReason: strategy.reason,
+         strategyConfidence: strategy.confidence,
+         computeBudget: strategy.computeBudget,
+         allocationNode: strategy.allocationNode,
+         computeNode: strategy.computeNode,
+         learningNode: strategy.learningNode,
+         strategyIsolationVersion: STRATEGY_ISOLATION_VERSION,
       }),
       JSON.stringify(prediction.historyFeatures),
-      `Observer recorded a synthetic ${scenario.family} forecast without changing production systems.`,
+       `Observer recorded a synthetic ${scenario.family} forecast using ${strategy.mode} strategy: ${strategy.reason} Production systems were not changed.`,
       MODEL_VERSION,
     ]);
     await commit(client);
@@ -627,6 +678,12 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       logger.warn({ error, predictionId }, "Failed to extend DNA attack graph");
     }
 
+    const latencyMs = Math.max(1, Date.now() - startedAt);
+    const quality = clamp(
+      prediction.confidence * 0.65 + (outcome.defenseSucceeded ? 0.35 : 0),
+      0,
+      1,
+    );
     return {
       cycleId,
       predictionId,
@@ -639,6 +696,14 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       vulnerabilityPattern: outcome.vulnerabilityPattern,
       linkCount,
       layerObservationCount,
+      strategy,
+      nodeRun: {
+        node: "N2",
+        status: "completed",
+        quality,
+        latencyMs,
+        costUnits: strategyCost(strategy.mode),
+      },
     };
   } catch (error) {
     if (transactionOpen) await rollback(client);

@@ -964,6 +964,41 @@ export const GetRiskTimelineResponse = zod.array(GetRiskTimelineResponseItem)
 
 
 /**
+ * @summary Get adaptive strategy and compute-cycle metrics
+ */
+export const GetStrategyOverviewResponse = zod.object({
+  "latest": zod.union([zod.object({
+  "id": zod.number(),
+  "cycleId": zod.string(),
+  "attackFamily": zod.string(),
+  "riskScore": zod.number(),
+  "confidence": zod.number(),
+  "mode": zod.enum(['fast', 'balanced', 'deep']),
+  "reason": zod.string(),
+  "computeBudget": zod.number(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "modeCounts": zod.object({
+  "fast": zod.number(),
+  "balanced": zod.number(),
+  "deep": zod.number()
+}),
+  "recent": zod.array(zod.object({
+  "id": zod.number(),
+  "cycleId": zod.string(),
+  "attackFamily": zod.string(),
+  "riskScore": zod.number(),
+  "confidence": zod.number(),
+  "mode": zod.enum(['fast', 'balanced', 'deep']),
+  "reason": zod.string(),
+  "computeBudget": zod.number(),
+  "createdAt": zod.coerce.date()
+})),
+  "policy": zod.string()
+})
+
+
+/**
  * @summary Get ingest queue statistics
  */
 export const GetQueueStatsResponse = zod.object({

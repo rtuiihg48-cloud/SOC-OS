@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, securityEventsTable, patchesTable, correlationsTable } from "@workspace/db";
-import { and, desc, eq, sql, count } from "drizzle-orm";
+import { db, securityEventsTable, patchesTable, correlationsTable, dnaPredictionsTable } from "@workspace/db";
+import { and, desc, eq, isNull, sql, count } from "drizzle-orm";
 import { getSystemMetrics } from "../lib/system-metrics";
 import { requireCapability, singleTenantScope } from "../middlewares/principal";
 
@@ -190,6 +190,73 @@ router.get("/risk-timeline", requireCapability("dashboard:read", singleTenantSco
   }));
 
   res.json(timeline);
+});
+
+// ─── Adaptive Strategy Overview ───────────────────────────────────────────────
+// Strategy cycles are synthetic observer records. They expose decision quality
+// and compute economics without granting the strategy engine production control.
+router.get("/strategy/overview", requireCapability("dashboard:read", singleTenantScope), async (req, res) => {
+  const tenantId = singleTenantScope(req);
+  if (tenantId === null) {
+    res.status(403).json({ error: "TENANT_SCOPE_MISMATCH", code: "TENANT_SCOPE_MISMATCH" });
+    return;
+  }
+
+  const predictions = await db
+    .select({
+      id: dnaPredictionsTable.id,
+      cycleId: dnaPredictionsTable.cycleId,
+      attackFamily: dnaPredictionsTable.attackFamily,
+      riskScore: dnaPredictionsTable.riskScore,
+      confidence: dnaPredictionsTable.confidence,
+      telemetrySnapshot: dnaPredictionsTable.telemetrySnapshot,
+      observerNote: dnaPredictionsTable.observerNote,
+      createdAt: dnaPredictionsTable.createdAt,
+    })
+    .from(dnaPredictionsTable)
+    .where(and(
+      isNull(dnaPredictionsTable.tenantId),
+      sql`${dnaPredictionsTable.telemetrySnapshot}->>'strategyIsolationVersion' = 'global-synthetic-v2'`,
+      sql`${dnaPredictionsTable.telemetrySnapshot}->>'strategyMode' IS NOT NULL`,
+    ))
+    .orderBy(desc(dnaPredictionsTable.createdAt))
+    .limit(12);
+
+  const cycles = predictions
+    .map((prediction) => {
+      const telemetry = prediction.telemetrySnapshot;
+      const mode = telemetry.strategyMode;
+      if (mode !== "fast" && mode !== "balanced" && mode !== "deep") return null;
+      return {
+        id: prediction.id,
+        cycleId: prediction.cycleId,
+        attackFamily: prediction.attackFamily,
+        riskScore: prediction.riskScore,
+        confidence: prediction.confidence,
+        mode,
+        reason: typeof telemetry.strategyReason === "string" ? telemetry.strategyReason : prediction.observerNote,
+        computeBudget: typeof telemetry.computeBudget === "number" ? telemetry.computeBudget : 0,
+        createdAt: prediction.createdAt.toISOString(),
+      };
+    })
+    .filter((cycle): cycle is NonNullable<typeof cycle> => cycle !== null);
+
+  const latest = cycles[0] ?? null;
+  const modeCounts = cycles.reduce<Record<string, number>>((counts, cycle) => {
+    counts[cycle.mode] = (counts[cycle.mode] ?? 0) + 1;
+    return counts;
+  }, {});
+
+  res.json({
+    latest,
+    modeCounts: {
+      fast: modeCounts.fast ?? 0,
+      balanced: modeCounts.balanced ?? 0,
+      deep: modeCounts.deep ?? 0,
+    },
+    recent: cycles.slice(0, 6),
+    policy: "observer-only; production systems are never changed by strategy decisions",
+  });
 });
 
 export default router;

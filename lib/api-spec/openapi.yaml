@@ -775,6 +775,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/RiskTimelinePoint"
 
+  /strategy/overview:
+    get:
+      operationId: getStrategyOverview
+      tags: [dashboard]
+      summary: Get adaptive strategy and compute-cycle metrics
+      responses:
+        "200":
+          description: Strategy overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyOverview"
+
   /queue-stats:
     get:
       operationId: getQueueStats
@@ -2492,6 +2505,56 @@ components:
         count:
           type: integer
       required: [hour, avgScore, count]
+
+    StrategyCycle:
+      type: object
+      properties:
+        id:
+          type: integer
+        cycleId:
+          type: string
+        attackFamily:
+          type: string
+        riskScore:
+          type: integer
+        confidence:
+          type: number
+        mode:
+          type: string
+          enum: [fast, balanced, deep]
+        reason:
+          type: string
+        computeBudget:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, cycleId, attackFamily, riskScore, confidence, mode, reason, computeBudget, createdAt]
+
+    StrategyOverview:
+      type: object
+      properties:
+        latest:
+          anyOf:
+            - $ref: "#/components/schemas/StrategyCycle"
+            - type: "null"
+        modeCounts:
+          type: object
+          properties:
+            fast:
+              type: integer
+            balanced:
+              type: integer
+            deep:
+              type: integer
+          required: [fast, balanced, deep]
+        recent:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrategyCycle"
+        policy:
+          type: string
+      required: [latest, modeCounts, recent, policy]
 
     QueueStats:
       type: object

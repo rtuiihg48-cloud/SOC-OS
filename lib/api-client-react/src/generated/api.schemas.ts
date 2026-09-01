@@ -943,6 +943,40 @@ export interface RiskTimelinePoint {
   count: number;
 }
 
+export type StrategyCycleMode = typeof StrategyCycleMode[keyof typeof StrategyCycleMode];
+
+
+export const StrategyCycleMode = {
+  fast: 'fast',
+  balanced: 'balanced',
+  deep: 'deep',
+} as const;
+
+export interface StrategyCycle {
+  id: number;
+  cycleId: string;
+  attackFamily: string;
+  riskScore: number;
+  confidence: number;
+  mode: StrategyCycleMode;
+  reason: string;
+  computeBudget: number;
+  createdAt: string;
+}
+
+export type StrategyOverviewModeCounts = {
+  fast: number;
+  balanced: number;
+  deep: number;
+};
+
+export interface StrategyOverview {
+  latest: StrategyCycle | null;
+  modeCounts: StrategyOverviewModeCounts;
+  recent: StrategyCycle[];
+  policy: string;
+}
+
 export interface QueueStats {
   pending: number;
   maxSize: number;

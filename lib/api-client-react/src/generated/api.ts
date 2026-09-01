@@ -74,6 +74,7 @@ import type {
   SelfHealingRestorePoint,
   SelfTestResult,
   SimulationResult,
+  StrategyOverview,
   SystemMetrics,
   Tenant,
   ThreatGraph,
@@ -2606,6 +2607,83 @@ export function useGetRiskTimeline<TData = Awaited<ReturnType<typeof getRiskTime
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRiskTimelineQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStrategyOverviewUrl = () => {
+
+
+
+
+  return `/api/strategy/overview`
+}
+
+/**
+ * @summary Get adaptive strategy and compute-cycle metrics
+ */
+export const getStrategyOverview = async ( options?: RequestInit): Promise<StrategyOverview> => {
+
+  return customFetch<StrategyOverview>(getGetStrategyOverviewUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStrategyOverviewQueryKey = () => {
+    return [
+    `/api/strategy/overview`
+    ] as const;
+    }
+
+
+export const getGetStrategyOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getStrategyOverview>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStrategyOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStrategyOverviewQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStrategyOverview>>> = ({ signal }) => getStrategyOverview({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStrategyOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStrategyOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getStrategyOverview>>>
+export type GetStrategyOverviewQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get adaptive strategy and compute-cycle metrics
+ */
+
+export function useGetStrategyOverview<TData = Awaited<ReturnType<typeof getStrategyOverview>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStrategyOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStrategyOverviewQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

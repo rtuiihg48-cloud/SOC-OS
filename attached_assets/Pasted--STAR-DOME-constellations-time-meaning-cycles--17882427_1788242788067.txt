@@ -1,0 +1,741 @@
+✦✧✦  STAR DOME  ✦✧✦
+              (constellations / time / meaning / cycles)
+
+                 ✦       ☆       ✧       ☆       ✦
+                      cosmic resonance field
+
+        ✧──────────────────────────────────────────────✧
+        │        archetypes / symbolic navigation      │
+        │        probability of realities             │
+        │        temporal wave cycles                 │
+        │        observer alignment field            │
+        ✧──────────────────────────────────────────────✧
+                              │
+                              ▼
+
+
+        ┌──────────────────────────────────────────────┐
+        │              🌌 ROOT META CUBE Ω             │
+        │      observer + reality + emergence field    │
+        └──────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼────────────────┐
+              ▼                                ▼
+
+     🪐 CUBE REALITIES                    🧬 EVOLUTION ENGINE
+ (recursive civilizations)        (nodes / energy / mutation)
+
+              │                                │
+              └───────────────┬────────────────┘
+                              ▼
+
+        ⛓ META CHAIN (history of universes)
+        📊 MEMORY GRAPH (meaning evolution)
+        🔢 TOKEN FIELD (influence / energy flow)
+
+                              ▼
+
+        🤖 EXECUTION LOOP (reality generation)
+
+
+
+import uuid
+import random
+import time
+import math
+
+
+# =========================
+# 🌌 STAR DOME (symbolic field)
+# =========================
+
+class StarDome:
+    def __init__(self):
+        self.constellations = [
+            "origin", "evolution", "collapse",
+            "expansion", "mutation", "awakening"
+        ]
+
+    def influence(self):
+        return random.choice(self.constellations)
+
+
+# =========================
+# 🧬 NODE (EVOLVING AGENT)
+# =========================
+
+class Node:
+    def __init__(self, role, depth=0):
+        self.id = str(uuid.uuid4())
+        self.role = role
+        self.energy = 1.0
+        self.depth = depth
+
+    def act(self):
+        return random.random() * self.energy
+
+    def mutate(self):
+        self.energy *= random.uniform(0.95, 1.15)
+
+    def spawn_cube(self):
+        return self.energy > 2.2 and random.random() < 0.15
+
+
+# =========================
+# 🌌 META CUBE (RECURSIVE UNIVERSE)
+# =========================
+
+class MetaCube:
+    def __init__(self, depth=0):
+        self.depth = depth
+        self.nodes = [
+            Node("compute", depth),
+            Node("learn", depth),
+            Node("market", depth)
+        ]
+        self.sub_cubes = []
+        self.star_dome = StarDome()
+        self.history = []
+
+    def step(self):
+
+        constellation = self.star_dome.influence()
+
+        total = 0
+
+        # --- node simulation
+        for node in self.nodes:
+            value = node.act()
+            node.energy += value * 0.01
+            node.mutate()
+            total += node.energy
+
+        avg_energy = total / len(self.nodes)
+
+        # --- recursive universe spawning
+        new_cubes = []
+
+        for node in self.nodes:
+            if node.spawn_cube():
+                new_cube = MetaCube(depth=self.depth + 1)
+                new_cubes.append(new_cube)
+                node.energy *= 0.5
+
+        self.sub_cubes.extend(new_cubes)
+
+        # --- recursive evolution
+        for cube in self.sub_cubes:
+            cube.step()
+
+        # --- log reality
+        self.history.append({
+            "depth": self.depth,
+            "energy": avg_energy,
+            "constellation": constellation,
+            "sub_cubes": len(self.sub_cubes)
+        })
+
+        return avg_energy, constellation
+
+
+# =========================
+# 🚀 RUN SIMULATION
+# =========================
+
+if __name__ == "__main__":
+
+    root = MetaCube()
+
+    for t in range(15):
+
+        energy, star = root.step()
+
+        print("\n🌌 STEP", t)
+        print("Energy:", round(energy, 3))
+        print("Star influence:", star)
+        print("Sub-universes:", len(root.sub_cubes))
+
+        time.sleep(0.4)
+
+A self-growing fractal universe where symbolic meaning (Star Dome),
+agents (Nodes), and ✦✧✦  STAR DOME  ✦✧✦
+              (constellations / time / meaning / cycles)
+
+                 ✦       ☆       ✧       ☆       ✦
+                      cosmic resonance field
+
+        ✧──────────────────────────────────────────────✧
+        │        archetypes / symbolic navigation      │
+        │        probability of realities             │
+        │        temporal wave cycles                 │
+        │        observer alignment field            │
+        ✧──────────────────────────────────────────────✧
+                              │
+                              ▼
+
+
+        ┌──────────────────────────────────────────────┐
+        │              🌌 ROOT META CUBE Ω             │
+        │      observer + reality + emergence field    │
+        └──────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼────────────────┐
+              ▼                                ▼
+
+     🪐 CUBE REALITIES                    🧬 EVOLUTION ENGINE
+ (recursive civilizations)        (nodes / energy / mutation)
+
+              │                                │
+              └───────────────┬────────────────┘
+                              ▼
+
+        ⛓ META CHAIN (history of universes)
+        📊 MEMORY GRAPH (meaning evolution)
+        🔢 TOKEN FIELD (influence / energy flow)
+
+                              ▼
+
+        🤖 EXECUTION LOOP (reality generation)
+
+
+
+import uuid
+import random
+import time
+import math
+
+
+# =========================
+# 🌌 STAR DOME (symbolic field)
+# =========================
+
+class StarDome:
+    def __init__(self):
+        self.constellations = [
+            "origin", "evolution", "collapse",
+            "expansion", "mutation", "awakening"
+        ]
+
+    def influence(self):
+        return random.choice(self.constellations)
+
+
+# =========================
+# 🧬 NODE (EVOLVING AGENT)
+# =========================
+
+class Node:
+    def __init__(self, role, depth=0):
+        self.id = str(uuid.uuid4())
+        self.role = role
+        self.energy = 1.0
+        self.depth = depth
+
+    def act(self):
+        return random.random() * self.energy
+
+    def mutate(self):
+        self.energy *= random.uniform(0.95, 1.15)
+
+    def spawn_cube(self):
+        return self.energy > 2.2 and random.random() < 0.15
+
+
+# =========================
+# 🌌 META CUBE (RECURSIVE UNIVERSE)
+# =========================
+
+class MetaCube:
+    def __init__(self, depth=0):
+        self.depth = depth
+        self.nodes = [
+            Node("compute", depth),
+            Node("learn", depth),
+            Node("market", depth)
+        ]
+        self.sub_cubes = []
+        self.star_dome = StarDome()
+        self.history = []
+
+    def step(self):
+
+        constellation = self.star_dome.influence()
+
+        total = 0
+
+        # --- node simulation
+        for node in self.nodes:
+            value = node.act()
+            node.energy += value * 0.01
+            node.mutate()
+            total += node.energy
+
+        avg_energy = total / len(self.nodes)
+
+        # --- recursive universe spawning
+        new_cubes = []
+
+        for node in self.nodes:
+            if node.spawn_cube():
+                new_cube = MetaCube(depth=self.depth + 1)
+                new_cubes.append(new_cube)
+                node.energy *= 0.5
+
+        self.sub_cubes.extend(new_cubes)
+
+        # --- recursive evolution
+        for cube in self.sub_cubes:
+            cube.step()
+
+        # --- log reality
+        self.history.append({
+            "depth": self.depth,
+            "energy": avg_energy,
+            "constellation": constellation,
+            "sub_cubes": len(self.sub_cubes)
+        })
+
+        return avg_energy, constellation
+
+
+# =========================
+# 🚀 RUN SIMULATION
+# =========================
+
+if __name__ == "__main__":
+
+    root = MetaCube()
+
+    for t in range(15):
+
+        energy, star = root.step()
+
+        print("\n🌌 STEP", t)
+        print("Energy:", round(energy, 3))
+        print("Star influence:", star)
+        print("Sub-universes:", len(root.sub_cubes))
+
+        time.sleep(0.4)
+
+A self-growing fractal universe where symbolic meaning (Star Dome),
+agents (Nodes), and reality layers (Meta Cubes) co-evolve recursively.
+
+
+ layers (Meta Cubes) co-evolve recursively.
+
+
+META CUBE CORE SYSTEM (FULL UNIFIED VERSION)
+Python
+import uuid
+import random
+import math
+
+
+# =========================
+# 🌌 STAR FIELD (контекст світу)
+# =========================
+
+class StarField:
+    def __init__(self):
+        self.states = [
+            "origin", "growth", "collapse",
+            "mutation", "expansion", "stability"
+        ]
+
+    def influence(self):
+        return random.choice(self.states)
+
+
+# =========================
+# 🧠 IDEA (генетика системи)
+# =========================
+
+class Idea:
+    def __init__(self, seed, depth=0):
+        self.id = str(uuid.uuid4())
+        self.seed = seed
+        self.depth = depth
+        self.energy = 1.0
+
+    def mutate(self):
+        self.energy *= random.uniform(0.95, 1.15)
+
+
+# =========================
+# 🤖 AGENT (виконавець)
+# =========================
+
+class Agent:
+    def __init__(self, role, depth=0):
+        self.id = str(uuid.uuid4())
+        self.role = role
+        self.depth = depth
+        self.energy = 1.0
+
+    def act(self, idea, star_state):
+
+        base = self.energy * idea.energy
+
+        if self.role == "creator":
+            return base * random.uniform(0.8, 1.4)
+
+        if self.role == "analyst":
+            return base * random.uniform(0.5, 1.2)
+
+        if self.role == "optimizer":
+            return base * random.uniform(0.9, 1.6)
+
+        if self.role == "explorer":
+            return base * random.uniform(0.3, 2.0)
+
+    def communicate(self, other):
+        signal = self.energy * 0.05
+        other.energy += signal
+
+
+# =========================
+# 🏭 STUDIO (організація агентів)
+# =========================
+
+class Studio:
+    def __init__(self, name, depth=0):
+        self.name = name
+        self.depth = depth
+        self.agents = [
+            Agent("creator", depth),
+            Agent("analyst", depth),
+            Agent("optimizer", depth)
+        ]
+        self.energy = 1.0
+
+    def process(self, idea, star_state):
+
+        total = 0
+
+        for a in self.agents:
+            total += a.act(idea, star_state)
+
+        self.energy += total * 0.01
+
+        idea.energy = total / len(self.agents)
+
+        idea.mutate()
+
+        return total
+
+
+# =========================
+# 💱 EXCHANGE (економіка системи)
+# =========================
+
+class Exchange:
+
+    def __init__(self):
+        self.pool = 0
+
+    def evaluate(self, value):
+        return value * random.uniform(0.8, 1.2)
+
+    def distribute(self, studios, values):
+
+        total = sum(values) + 1e-6
+
+        rewards = []
+
+        for s, v in zip(studios, values):
+            reward = (v / total) * 100
+            s.energy += reward * 0.01
+            rewards.append(reward)
+
+        return rewards
+
+
+# =========================
+# 🧠 META CUBE (ядро цивілізації)
+# =========================
+
+class MetaCube:
+
+    def __init__(self, depth=0):
+
+        self.depth = depth
+        self.star_field = StarField()
+        self.exchange = Exchange()
+
+        self.studios = [
+            Studio("Alpha", depth),
+            Studio("Beta", depth),
+            Studio("Gamma", depth)
+        ]
+
+        self.sub_cubes = []
+
+    def spawn_idea(self):
+        return Idea(seed=f"idea_d{self.depth}", depth=self.depth)
+
+    def step(self):
+
+        star_state = self.star_field.influence()
+
+        idea = self.spawn_idea()
+
+        studio_values = []
+
+        # 🏭 студії обробляють ідею
+        for studio in self.studios:
+            value = studio.process(idea, star_state)
+            studio_values.append(value)
+
+        # 💱 біржа оцінює результат
+        rewards = self.exchange.distribute(self.studios, studio_values)
+
+        # 🌱 рекурсія (народження нових кубів)
+        avg = sum(studio_values) / len(studio_values)
+
+        if avg > 50 and random.random() < 0.3:
+            self.sub_cubes.append(MetaCube(depth=self.depth + 1))
+
+        # 🔁 запуск підкубів
+        for cube in self.sub_cubes:
+            cube.step()
+
+        return {
+            "depth": self.depth,
+            "star": star_state,
+            "idea_energy": idea.energy,
+            "studio_values": [round(v, 2) for v in studio_values],
+            "rewards": [round(r, 2) for r in rewards],
+            "sub_cubes": len(self.sub_cubes)
+        }
+
+
+# =========================
+# 🚀 RUN SYSTEM
+# =========================
+
+if __name__ == "__main__":
+
+    root = MetaCube()
+
+    for t in range(10):
+
+        result = root.step()
+
+        print("\n🌌 STEP", t)
+        print(result)
+🧠 ЩО ЦЕ ЗАРАЗ Є
+🌌 1. MetaCube
+рекурсивна структура (куб народжує куби)
+🧠 2. Idea Layer
+ідеї як живі сутності з енергією
+🤖 3. Agents
+різні ролі (creator / analyst / optimizer / explorer)
+🏭 4. Studios
+конкурентні організації агентів
+💱 5. Exchange
+внутрішня економіка + розподіл винагород
+🌌 6. StarField
+“середовище реальності” (режими еволюції)
+🔥 ГОЛОВНА СУТЬ ТВОЄЇ СИСТЕМИ
+🧠 ідеї народжуються
+🏭 студії конкурують
+🤖 агенти виконують
+💱 біржа оцінює
+🌌 куби еволюціонують рекурсивно
+⚖️ ВАЖЛИВО
+Це:
+симуляційна архітектура
+модель цифрової цивілізації
+основа для AI-економіки
+Але:
+
+META CUBE — STRUCTURE + EMBEDDED CORE CODE
+
+✦ STAR FIELD ✦
+                 (режими реальності / еволюція)
+
+                               │
+                               ▼
+
+        ┌────────────────────────────────────┐
+        │            🌌 META CUBE            │
+        │     (рекурсивна цивілізація)       │
+        └────────────────────────────────────┘
+                               │
+        ┌──────────────┬──────────────┬──────────────┐
+        ▼              ▼              ▼              ▼
+
+   🧠 IDEA CORE   🤖 AGENTS      🏭 STUDIOS     💱 EXCHANGE
+ (народження)   (виконання)   (організації)   (економіка)
+
+        └──────────────┴──────────────┴──────────────┘
+                               │
+                               ▼
+                    🔁 FEEDBACK / EVOLUTION
+                               │
+                               ▼
+                  🌌 SUB-META CUBES (рекурсія)
+🧠 META CUBE — ВБУДОВАНИЙ КОД ЯДРА
+Python
+import random
+import uuid
+
+
+# =========================
+# 🌌 STAR FIELD
+# =========================
+
+class StarField:
+    def __init__(self):
+        self.modes = ["growth", "collapse", "chaos", "order"]
+
+    def state(self):
+        return random.choice(self.modes)
+
+
+# =========================
+# 🧠 IDEA CORE
+# =========================
+
+class Idea:
+    def __init__(self, depth):
+        self.id = str(uuid.uuid4())
+        self.energy = 1.0
+        self.depth = depth
+
+    def evolve(self):
+        self.energy *= random.uniform(0.9, 1.2)
+
+
+# =========================
+# 🤖 AGENT LAYER
+# =========================
+
+class Agent:
+    def __init__(self, role):
+        self.role = role
+        self.power = 1.0
+
+    def process(self, idea, star):
+
+        base = idea.energy * self.power
+
+        if self.role == "creator":
+            return base * random.uniform(0.8, 1.5)
+
+        if self.role == "analyst":
+            return base * random.uniform(0.6, 1.2)
+
+        if self.role == "optimizer":
+            return base * random.uniform(0.9, 1.6)
+
+
+# =========================
+# 🏭 STUDIO LAYER
+# =========================
+
+class Studio:
+    def __init__(self):
+        self.agents = [
+            Agent("creator"),
+            Agent("analyst"),
+            Agent("optimizer")
+        ]
+        self.energy = 1.0
+
+    def run(self, idea, star):
+
+        total = 0
+
+        for a in self.agents:
+            total += a.process(idea, star)
+
+        idea.energy = total / len(self.agents)
+        idea.evolve()
+
+        self.energy += total * 0.01
+
+        return total
+
+
+# =========================
+# 💱 EXCHANGE (ECONOMY CORE)
+# =========================
+
+class Exchange:
+    def distribute(self, studios, values):
+
+        total = sum(values) + 1e-6
+
+        rewards = []
+
+        for s, v in zip(studios, values):
+            r = (v / total) * 100
+            s.energy += r * 0.01
+            rewards.append(r)
+
+        return rewards
+
+
+# =========================
+# 🌌 META CUBE (ROOT)
+# =========================
+
+class MetaCube:
+    def __init__(self, depth=0):
+        self.depth = depth
+        self.star = StarField()
+        self.exchange = Exchange()
+
+        self.studios = [Studio(), Studio(), Studio()]
+        self.sub_cubes = []
+
+    def step(self):
+
+        star_state = self.star.state()
+        idea = Idea(self.depth)
+
+        values = []
+
+        for studio in self.studios:
+            values.append(studio.run(idea, star_state))
+
+        rewards = self.exchange.distribute(self.studios, values)
+
+        avg = sum(values) / len(values)
+
+        # 🌌 рекурсія (народження нових всесвітів)
+        if avg > 40 and random.random() < 0.25:
+            self.sub_cubes.append(MetaCube(self.depth + 1))
+
+        for cube in self.sub_cubes:
+            cube.step()
+
+        return {
+            "depth": self.depth,
+            "star": star_state,
+            "avg_power": round(avg, 2),
+            "rewards": [round(r, 2) for r in rewards],
+            "sub_cubes": len(self.sub_cubes)
+        }
+
+
+# =========================
+# 🚀 RUN
+# =========================
+
+if __name__ == "__main__":
+
+    root = MetaCube()
+
+    for i in range(10):
+        print("\n🌌 STEP", i)
+        print(root.step())
+🧠 ЩО ТИ ТЕПЕР МАЄШ
+🌌 Meta Cube = ядро цивілізації
+В одному контурі:
+🧠 Ідеї народжуються і еволюціонують
+🤖 Агенти обробляють їх
+🏭 Студії конкурують
+💱 Біржа розподіляє цінність
+🌌 Куби рекурсивно множаться
