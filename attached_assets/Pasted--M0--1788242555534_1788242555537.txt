@@ -1,0 +1,156 @@
+✦     ✦
+           ✦   M0   ✦
+              /  |  \
+             /   |   \
+        ✦───●────●────●───✦
+           N3   N2   N7
+             \   |   /
+              \  |  /
+           ✦   T0   ✦
+              ✦     ✦ 
+
+M0 = META BRAIN (vNext core / decision engine)
+N2 = COMPUTE NODE (execution / v1 engine)
+N3 = LEARNING NODE (adaptation / memory update)
+N7 = MARKET NODE (tasks / economy pressure)
+T0 = ECONOMY LAYER (tokens / energy / cost)
+
+● = active processing node
+✦ = world / uncertainty / stochastic boundary
+
+T0 → NODES (2/3/7)
+      ↓
+   PROCESSING
+      ↓
+     M0
+      ↓
+  STRATEGY UPDATE
+      ↓
+   EXECUTION LOOP
+      ↓
+   REWARD / COST
+      ↓
+      T0
+↺ (self-evolving loop)
+
+import random
+import uuid
+
+class M0:
+    def decide(self, state):
+        return random.choice(["fast", "deep", "balanced"])
+
+class Node:
+    def __init__(self, t):
+        self.t = t
+        self.id = uuid.uuid4()
+        self.tokens = 0
+        self.trust = 1.0
+
+    def run(self, mode):
+        q = random.random()
+        return {"quality": q, "success": q > 0.5}
+
+class T0:
+    def update(self, node, reward, cost):
+        node.tokens += (reward - cost)
+
+class System:
+    def __init__(self):
+        self.m0 = M0()
+        self.nodes = {
+            "N2": Node("compute"),
+            "N3": Node("learn"),
+            "N7": Node("market")
+        }
+        self.t0 = T0()
+
+    def cycle(self):
+        state = {}
+
+        mode = self.m0.decide(state)
+        node = random.choice(list(self.nodes.values()))
+
+        result = node.run(mode)
+
+        cost = random.randint(1, 10)
+        reward = int(result["quality"] * 20)
+
+        self.t0.update(node, reward, cost)
+
+        return {
+            "mode": mode,
+            "reward": reward,
+            "cost": cost,
+            "tokens": node.tokens
+        }
+
+NOT AI SYSTEM
+
+BUT:
+
+→ adaptive economic decision loop
+→ multi-agent stochastic machine
+→ self-updating reward graph
+
+✦  UNKNOWN  ✦
+           ✦      M0       ✦
+              /    |    \
+             /     |     \
+        ✦───●──────●──────●───✦
+           N3     N2     N7
+             \      |      /
+              \     |     /
+           ✦────── T0 ──────✦
+              ✦  LOOP ✦
+
+
+✦     ✦
+                    ✦   WORLD DATA  ✦
+                         (APIs, web, signals)
+                    ✦               ✦
+
+
+              ✦─────────── M0 (META BRAIN) ───────────✦
+                         /        |        \
+                        /         |         \
+                       /          |          \
+          ✦──────── N3 ──────── N2 ──────── N7 ───────✦
+         (learning)     (compute/execution)   (market)
+              \             |             /
+               \            |            /
+                \           |           /
+                 ✦────────── T0 ──────────✦
+                      (economy / tokens)
+
+                         │
+                         ▼
+
+            🧬 MEMORY + KNOWLEDGE GRAPH LAYER
+        (history, patterns, trust, relationships)
+
+                         │
+                         ▼
+
+        📊 STATISTICAL + STOCHASTIC ENGINE LAYER
+     (μ / σ / risk / jumps / scenario generation)
+
+                         │
+                         ▼
+
+        🤖 EXECUTION LOOP (v1 SYSTEM ENGINE)
+     ┌─────────────────────────────────────────┐
+     │ N2 compute → N3 adapt → N7 allocate     │
+     │ + task execution + simple economy       │
+     └─────────────────────────────────────────┘
+
+                         │
+                         ▼
+
+                💰 REWARD / COST SIGNALS
+            (profit, error, performance score)
+
+                         │
+                         ▼
+
+              ↺ FEEDBACK TO M0 + MEMORY
