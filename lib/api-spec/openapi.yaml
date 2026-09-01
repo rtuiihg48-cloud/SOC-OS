@@ -36,6 +36,8 @@ tags:
     description: Virus intelligence catalog and private sample metadata
   - name: traffic
     description: Normalized Node Gateway traffic telemetry and deterministic analysis
+  - name: node-exchange
+    description: Signed node-to-node exchange ledger and route verification
 paths:
   /auth/me:
     get:
@@ -808,6 +810,145 @@ paths:
                 $ref: "#/components/schemas/StrategySandboxPreview"
         "400":
           description: Invalid strategy preview input
+
+  /node-exchange/nodes:
+    post:
+      operationId: registerNodeExchangeKey
+      tags: [node-exchange]
+      summary: Register a versioned Ed25519 public key for a node
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeExchangeRegistrationInput"
+      responses:
+        "201":
+          description: Node key registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeNode"
+        "400":
+          description: Invalid node registration
+        "409":
+          description: Node key version already exists
+
+  /node-exchange/nodes/{nodeId}/{keyVersion}/status:
+    patch:
+      operationId: updateNodeExchangeKeyStatus
+      tags: [node-exchange]
+      summary: Activate, suspend, or revoke a node key version
+      parameters:
+        - { name: nodeId, in: path, required: true, schema: { type: string } }
+        - { name: keyVersion, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeExchangeStatusInput"
+      responses:
+        "200":
+          description: Key status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeKeyStatus"
+
+  /node-exchange/messages:
+    get:
+      operationId: listNodeExchangeMessages
+      tags: [node-exchange]
+      summary: List recent ledger message identities for route inspection
+      responses:
+        "200":
+          description: Recent messages recorded in the tenant ledger
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 20
+                items:
+                  $ref: "#/components/schemas/NodeExchangeMessageSummary"
+    post:
+      operationId: submitNodeExchangeMessage
+      tags: [node-exchange]
+      summary: Verify and append a signed node exchange envelope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeExchangeEnvelope"
+      responses:
+        "201":
+          description: Signed message accepted into the immutable ledger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeAccepted"
+        "200":
+          description: Idempotent retry of an already accepted message hop
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeAccepted"
+        "400":
+          description: Hash, signature, protocol, TTL, or envelope validation failed
+        "403":
+          description: Principal or route is not authorized
+        "409":
+          description: Replay, sequence, predecessor, or message conflict
+
+  /node-exchange/messages/{messageId}/route:
+    get:
+      operationId: getNodeExchangeRoute
+      tags: [node-exchange]
+      summary: Get and verify the full route for an exchanged message
+      parameters:
+        - { name: messageId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Ordered route with block and cryptographic checks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeRoute"
+        "404":
+          description: Message not found
+
+  /node-exchange/verify:
+    post:
+      operationId: verifyNodeExchangeRoute
+      tags: [node-exchange]
+      summary: Recompute all available integrity checks for a message route
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeExchangeVerificationInput"
+      responses:
+        "200":
+          description: Route verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeRoute"
+
+  /node-exchange/health:
+    get:
+      operationId: getNodeExchangeHealth
+      tags: [node-exchange]
+      summary: Get tenant-scoped exchange ledger integrity status
+      responses:
+        "200":
+          description: Exchange ledger health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeExchangeHealth"
 
   /queue-stats:
     get:
@@ -2526,6 +2667,311 @@ components:
         count:
           type: integer
       required: [hour, avgScore, count]
+
+    NodeExchangeRegistrationInput:
+      type: object
+      additionalProperties: false
+      properties:
+        nodeId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        role:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]{0,63}$"
+        publicKey:
+          type: string
+          minLength: 64
+          maxLength: 4096
+        keyVersion:
+          type: integer
+          minimum: 1
+        allowedPeerIds:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+      required: [nodeId, role, publicKey, keyVersion, allowedPeerIds]
+
+    NodeExchangeNode:
+      type: object
+      properties:
+        nodeId: { type: string }
+        role: { type: string }
+        keyVersion: { type: integer }
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, REVOKED]
+        allowedPeerIds:
+          type: array
+          items: { type: string }
+        createdAt:
+          type: string
+          format: date-time
+      required: [nodeId, role, keyVersion, status, allowedPeerIds, createdAt]
+
+    NodeExchangeStatusInput:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, REVOKED]
+      required: [status]
+
+    NodeExchangeKeyStatus:
+      type: object
+      properties:
+        nodeId: { type: string }
+        keyVersion: { type: integer }
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, REVOKED]
+        revokedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [nodeId, keyVersion, status, revokedAt]
+
+    NodeExchangeEnvelope:
+      type: object
+      additionalProperties: false
+      properties:
+        protocolVersion:
+          type: string
+          enum: [node-exchange-v1]
+        messageId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        correlationId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        senderNodeId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        recipientNodeId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        sequence:
+          type: integer
+          minimum: 0
+        hopSequence:
+          type: integer
+          minimum: 0
+          maximum: 31
+        nonce:
+          type: string
+          minLength: 16
+          maxLength: 256
+          pattern: "^[A-Za-z0-9_-]+$"
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        payloadType:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+        payload:
+          type: object
+          additionalProperties: true
+        payloadHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        previousMessageHash:
+          type: string
+        keyVersion:
+          type: integer
+          minimum: 1
+        signatureAlgorithm:
+          type: string
+          enum: [Ed25519]
+        signature:
+          type: string
+          minLength: 16
+          maxLength: 256
+          pattern: "^[A-Za-z0-9_-]+$"
+      required: [protocolVersion, messageId, correlationId, senderNodeId, recipientNodeId, sequence, hopSequence, nonce, issuedAt, expiresAt, payloadType, payload, payloadHash, previousMessageHash, keyVersion, signatureAlgorithm, signature]
+
+    NodeExchangeBlock:
+      type: object
+      properties:
+        id: { type: integer }
+        sequence: { type: integer }
+        messageId: { type: string }
+        correlationId: { type: string }
+        hopSequence: { type: integer }
+        senderNodeId: { type: string }
+        recipientNodeId: { type: string }
+        gatewayNodeId: { type: string }
+        payloadType: { type: string }
+        payloadHash: { type: string }
+        envelopeHash: { type: string }
+        previousBlockHash: { type: string }
+        blockHash: { type: string }
+        previousMessageHash: { type: string }
+        keyVersion: { type: integer }
+        verificationStatus:
+          type: string
+          enum: [VERIFIED, REJECTED]
+        acceptedAt:
+          type: string
+          format: date-time
+      required: [id, sequence, messageId, correlationId, hopSequence, senderNodeId, recipientNodeId, gatewayNodeId, payloadType, payloadHash, envelopeHash, previousBlockHash, blockHash, previousMessageHash, keyVersion, verificationStatus, acceptedAt]
+
+    NodeExchangeChecks:
+      type: object
+      properties:
+        payloadHash: { type: boolean }
+        envelopeHash: { type: boolean }
+        signature: { type: boolean }
+        previousBlock: { type: boolean }
+        blockHash: { type: boolean }
+        hopHash: { type: boolean }
+        routeChain: { type: boolean }
+        routePolicy: { type: boolean }
+      required: [payloadHash, envelopeHash, signature, previousBlock, blockHash, hopHash, routeChain, routePolicy]
+
+    NodeExchangeHop:
+      type: object
+      properties:
+        sequence: { type: integer }
+        sourceNodeId: { type: string }
+        gatewayNodeId: { type: string }
+        destinationNodeId: { type: string }
+        hopHash: { type: string }
+        blockId: { type: integer }
+        decision:
+          type: string
+          enum: [ACCEPTED, REJECTED, EXPIRED, REPLAYED]
+        reasonCode: { type: string }
+        checks:
+          $ref: "#/components/schemas/NodeExchangeChecks"
+        receivedAt:
+          type: string
+          format: date-time
+        forwardedAt:
+          type: ["string", "null"]
+          format: date-time
+        block:
+          $ref: "#/components/schemas/NodeExchangeBlock"
+        integrityVerified: { type: boolean }
+        errorCode:
+          type: ["string", "null"]
+      required: [sequence, sourceNodeId, gatewayNodeId, destinationNodeId, hopHash, blockId, decision, reasonCode, checks, receivedAt, forwardedAt, block, integrityVerified, errorCode]
+
+    NodeExchangeAcceptedHop:
+      type: object
+      properties:
+        sequence: { type: integer }
+        sourceNodeId: { type: string }
+        gatewayNodeId: { type: string }
+        destinationNodeId: { type: string }
+        hopHash: { type: string }
+        blockId: { type: integer }
+        decision:
+          type: string
+          enum: [ACCEPTED, REJECTED, EXPIRED, REPLAYED]
+        reasonCode: { type: string }
+        checks:
+          type: object
+          properties:
+            payloadHash: { type: boolean }
+            signature: { type: boolean }
+            previousBlock: { type: boolean }
+            routePolicy: { type: boolean }
+          required: [payloadHash, signature, previousBlock, routePolicy]
+        receivedAt:
+          type: string
+          format: date-time
+        forwardedAt:
+          type: ["string", "null"]
+          format: date-time
+      required: [sequence, sourceNodeId, gatewayNodeId, destinationNodeId, hopHash, blockId, decision, reasonCode, checks, receivedAt, forwardedAt]
+
+    NodeExchangeAccepted:
+      type: object
+      properties:
+        messageId: { type: string }
+        correlationId: { type: string }
+        idempotent: { type: boolean }
+        verificationStatus:
+          type: string
+          enum: [VERIFIED]
+        block:
+          $ref: "#/components/schemas/NodeExchangeBlock"
+        hop:
+          $ref: "#/components/schemas/NodeExchangeAcceptedHop"
+        policy: { type: string }
+      required: [messageId, correlationId, idempotent, verificationStatus, block, hop, policy]
+
+    NodeExchangeVerificationInput:
+      type: object
+      additionalProperties: false
+      properties:
+        messageId:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$"
+      required: [messageId]
+
+    NodeExchangeMessageSummary:
+      type: object
+      properties:
+        messageId: { type: string }
+        correlationId: { type: string }
+        sourceNodeId: { type: string }
+        destinationNodeId: { type: string }
+        hopCount: { type: integer }
+        lastAcceptedAt:
+          type: string
+          format: date-time
+        recordedStatus:
+          type: string
+          enum: [RECORDED]
+      required: [messageId, correlationId, sourceNodeId, destinationNodeId, hopCount, lastAcceptedAt, recordedStatus]
+
+    NodeExchangeRoute:
+      type: object
+      properties:
+        messageId: { type: string }
+        correlationId: { type: string }
+        integrityVerified: { type: boolean }
+        route:
+          type: array
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/NodeExchangeHop"
+        policy: { type: string }
+      required: [messageId, correlationId, integrityVerified, route, policy]
+
+    NodeExchangeHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [HEALTHY, VERIFICATION_FAILED]
+        scopeKey: { type: string }
+        headSequence: { type: integer }
+        headHash: { type: string }
+        activeNodeKeys: { type: integer }
+        lastAcceptedAt:
+          type: ["string", "null"]
+          format: date-time
+        headConsistent:
+          type: boolean
+          description: Whether the stored head matches the latest ledger block; this is not a full route verification.
+        protocolVersion:
+          type: string
+          enum: [node-exchange-v1]
+        hashAlgorithm:
+          type: string
+          enum: [SHA-256]
+        signatureAlgorithm:
+          type: string
+          enum: [Ed25519]
+        transportPolicy: { type: string }
+      required: [status, scopeKey, headSequence, headHash, activeNodeKeys, lastAcceptedAt, headConsistent, protocolVersion, hashAlgorithm, signatureAlgorithm, transportPolicy]
 
     StrategyCycle:
       type: object

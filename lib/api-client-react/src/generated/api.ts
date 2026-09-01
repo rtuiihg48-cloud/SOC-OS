@@ -56,6 +56,16 @@ import type {
   MetaCubeExecutionInput,
   MetaCubeHealth,
   MitreStat,
+  NodeExchangeAccepted,
+  NodeExchangeEnvelope,
+  NodeExchangeHealth,
+  NodeExchangeKeyStatus,
+  NodeExchangeMessageSummary,
+  NodeExchangeNode,
+  NodeExchangeRegistrationInput,
+  NodeExchangeRoute,
+  NodeExchangeStatusInput,
+  NodeExchangeVerificationInput,
   ObserverAgentInput,
   ObserverAgentRun,
   Patch,
@@ -2768,6 +2778,524 @@ export const usePreviewStrategySandbox = <TError = ErrorType<void>,
       > => {
       return useMutation(getPreviewStrategySandboxMutationOptions(options));
     }
+
+export const getRegisterNodeExchangeKeyUrl = () => {
+
+
+
+
+  return `/api/node-exchange/nodes`
+}
+
+/**
+ * @summary Register a versioned Ed25519 public key for a node
+ */
+export const registerNodeExchangeKey = async (nodeExchangeRegistrationInput: NodeExchangeRegistrationInput, options?: RequestInit): Promise<NodeExchangeNode> => {
+
+  return customFetch<NodeExchangeNode>(getRegisterNodeExchangeKeyUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nodeExchangeRegistrationInput,)
+  }
+);}
+
+
+
+
+export const getRegisterNodeExchangeKeyMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerNodeExchangeKey>>, TError,{data: BodyType<NodeExchangeRegistrationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerNodeExchangeKey>>, TError,{data: BodyType<NodeExchangeRegistrationInput>}, TContext> => {
+
+const mutationKey = ['registerNodeExchangeKey'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerNodeExchangeKey>>, {data: BodyType<NodeExchangeRegistrationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  registerNodeExchangeKey(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterNodeExchangeKeyMutationResult = NonNullable<Awaited<ReturnType<typeof registerNodeExchangeKey>>>
+    export type RegisterNodeExchangeKeyMutationBody = BodyType<NodeExchangeRegistrationInput>
+    export type RegisterNodeExchangeKeyMutationError = ErrorType<void>
+
+    /**
+ * @summary Register a versioned Ed25519 public key for a node
+ */
+export const useRegisterNodeExchangeKey = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerNodeExchangeKey>>, TError,{data: BodyType<NodeExchangeRegistrationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof registerNodeExchangeKey>>,
+        TError,
+        {data: BodyType<NodeExchangeRegistrationInput>},
+        TContext
+      > => {
+      return useMutation(getRegisterNodeExchangeKeyMutationOptions(options));
+    }
+
+export const getUpdateNodeExchangeKeyStatusUrl = (nodeId: string,
+    keyVersion: number,) => {
+
+
+
+
+  return `/api/node-exchange/nodes/${nodeId}/${keyVersion}/status`
+}
+
+/**
+ * @summary Activate, suspend, or revoke a node key version
+ */
+export const updateNodeExchangeKeyStatus = async (nodeId: string,
+    keyVersion: number,
+    nodeExchangeStatusInput: NodeExchangeStatusInput, options?: RequestInit): Promise<NodeExchangeKeyStatus> => {
+
+  return customFetch<NodeExchangeKeyStatus>(getUpdateNodeExchangeKeyStatusUrl(nodeId,keyVersion),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nodeExchangeStatusInput,)
+  }
+);}
+
+
+
+
+export const getUpdateNodeExchangeKeyStatusMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>, TError,{nodeId: string;keyVersion: number;data: BodyType<NodeExchangeStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>, TError,{nodeId: string;keyVersion: number;data: BodyType<NodeExchangeStatusInput>}, TContext> => {
+
+const mutationKey = ['updateNodeExchangeKeyStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>, {nodeId: string;keyVersion: number;data: BodyType<NodeExchangeStatusInput>}> = (props) => {
+          const {nodeId,keyVersion,data} = props ?? {};
+
+          return  updateNodeExchangeKeyStatus(nodeId,keyVersion,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateNodeExchangeKeyStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>>
+    export type UpdateNodeExchangeKeyStatusMutationBody = BodyType<NodeExchangeStatusInput>
+    export type UpdateNodeExchangeKeyStatusMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Activate, suspend, or revoke a node key version
+ */
+export const useUpdateNodeExchangeKeyStatus = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>, TError,{nodeId: string;keyVersion: number;data: BodyType<NodeExchangeStatusInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateNodeExchangeKeyStatus>>,
+        TError,
+        {nodeId: string;keyVersion: number;data: BodyType<NodeExchangeStatusInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateNodeExchangeKeyStatusMutationOptions(options));
+    }
+
+export const getListNodeExchangeMessagesUrl = () => {
+
+
+
+
+  return `/api/node-exchange/messages`
+}
+
+/**
+ * @summary List recent ledger message identities for route inspection
+ */
+export const listNodeExchangeMessages = async ( options?: RequestInit): Promise<NodeExchangeMessageSummary[]> => {
+
+  return customFetch<NodeExchangeMessageSummary[]>(getListNodeExchangeMessagesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListNodeExchangeMessagesQueryKey = () => {
+    return [
+    `/api/node-exchange/messages`
+    ] as const;
+    }
+
+
+export const getListNodeExchangeMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listNodeExchangeMessages>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNodeExchangeMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNodeExchangeMessagesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNodeExchangeMessages>>> = ({ signal }) => listNodeExchangeMessages({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNodeExchangeMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListNodeExchangeMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listNodeExchangeMessages>>>
+export type ListNodeExchangeMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List recent ledger message identities for route inspection
+ */
+
+export function useListNodeExchangeMessages<TData = Awaited<ReturnType<typeof listNodeExchangeMessages>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listNodeExchangeMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListNodeExchangeMessagesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSubmitNodeExchangeMessageUrl = () => {
+
+
+
+
+  return `/api/node-exchange/messages`
+}
+
+/**
+ * @summary Verify and append a signed node exchange envelope
+ */
+export const submitNodeExchangeMessage = async (nodeExchangeEnvelope: NodeExchangeEnvelope, options?: RequestInit): Promise<NodeExchangeAccepted> => {
+
+  return customFetch<NodeExchangeAccepted>(getSubmitNodeExchangeMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nodeExchangeEnvelope,)
+  }
+);}
+
+
+
+
+export const getSubmitNodeExchangeMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitNodeExchangeMessage>>, TError,{data: BodyType<NodeExchangeEnvelope>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitNodeExchangeMessage>>, TError,{data: BodyType<NodeExchangeEnvelope>}, TContext> => {
+
+const mutationKey = ['submitNodeExchangeMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitNodeExchangeMessage>>, {data: BodyType<NodeExchangeEnvelope>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitNodeExchangeMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitNodeExchangeMessageMutationResult = NonNullable<Awaited<ReturnType<typeof submitNodeExchangeMessage>>>
+    export type SubmitNodeExchangeMessageMutationBody = BodyType<NodeExchangeEnvelope>
+    export type SubmitNodeExchangeMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary Verify and append a signed node exchange envelope
+ */
+export const useSubmitNodeExchangeMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitNodeExchangeMessage>>, TError,{data: BodyType<NodeExchangeEnvelope>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitNodeExchangeMessage>>,
+        TError,
+        {data: BodyType<NodeExchangeEnvelope>},
+        TContext
+      > => {
+      return useMutation(getSubmitNodeExchangeMessageMutationOptions(options));
+    }
+
+export const getGetNodeExchangeRouteUrl = (messageId: string,) => {
+
+
+
+
+  return `/api/node-exchange/messages/${messageId}/route`
+}
+
+/**
+ * @summary Get and verify the full route for an exchanged message
+ */
+export const getNodeExchangeRoute = async (messageId: string, options?: RequestInit): Promise<NodeExchangeRoute> => {
+
+  return customFetch<NodeExchangeRoute>(getGetNodeExchangeRouteUrl(messageId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNodeExchangeRouteQueryKey = (messageId: string,) => {
+    return [
+    `/api/node-exchange/messages/${messageId}/route`
+    ] as const;
+    }
+
+
+export const getGetNodeExchangeRouteQueryOptions = <TData = Awaited<ReturnType<typeof getNodeExchangeRoute>>, TError = ErrorType<void>>(messageId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeRoute>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNodeExchangeRouteQueryKey(messageId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNodeExchangeRoute>>> = ({ signal }) => getNodeExchangeRoute(messageId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(messageId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeRoute>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNodeExchangeRouteQueryResult = NonNullable<Awaited<ReturnType<typeof getNodeExchangeRoute>>>
+export type GetNodeExchangeRouteQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get and verify the full route for an exchanged message
+ */
+
+export function useGetNodeExchangeRoute<TData = Awaited<ReturnType<typeof getNodeExchangeRoute>>, TError = ErrorType<void>>(
+ messageId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeRoute>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNodeExchangeRouteQueryOptions(messageId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifyNodeExchangeRouteUrl = () => {
+
+
+
+
+  return `/api/node-exchange/verify`
+}
+
+/**
+ * @summary Recompute all available integrity checks for a message route
+ */
+export const verifyNodeExchangeRoute = async (nodeExchangeVerificationInput: NodeExchangeVerificationInput, options?: RequestInit): Promise<NodeExchangeRoute> => {
+
+  return customFetch<NodeExchangeRoute>(getVerifyNodeExchangeRouteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      nodeExchangeVerificationInput,)
+  }
+);}
+
+
+
+
+export const getVerifyNodeExchangeRouteMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyNodeExchangeRoute>>, TError,{data: BodyType<NodeExchangeVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyNodeExchangeRoute>>, TError,{data: BodyType<NodeExchangeVerificationInput>}, TContext> => {
+
+const mutationKey = ['verifyNodeExchangeRoute'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyNodeExchangeRoute>>, {data: BodyType<NodeExchangeVerificationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyNodeExchangeRoute(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyNodeExchangeRouteMutationResult = NonNullable<Awaited<ReturnType<typeof verifyNodeExchangeRoute>>>
+    export type VerifyNodeExchangeRouteMutationBody = BodyType<NodeExchangeVerificationInput>
+    export type VerifyNodeExchangeRouteMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Recompute all available integrity checks for a message route
+ */
+export const useVerifyNodeExchangeRoute = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyNodeExchangeRoute>>, TError,{data: BodyType<NodeExchangeVerificationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyNodeExchangeRoute>>,
+        TError,
+        {data: BodyType<NodeExchangeVerificationInput>},
+        TContext
+      > => {
+      return useMutation(getVerifyNodeExchangeRouteMutationOptions(options));
+    }
+
+export const getGetNodeExchangeHealthUrl = () => {
+
+
+
+
+  return `/api/node-exchange/health`
+}
+
+/**
+ * @summary Get tenant-scoped exchange ledger integrity status
+ */
+export const getNodeExchangeHealth = async ( options?: RequestInit): Promise<NodeExchangeHealth> => {
+
+  return customFetch<NodeExchangeHealth>(getGetNodeExchangeHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNodeExchangeHealthQueryKey = () => {
+    return [
+    `/api/node-exchange/health`
+    ] as const;
+    }
+
+
+export const getGetNodeExchangeHealthQueryOptions = <TData = Awaited<ReturnType<typeof getNodeExchangeHealth>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNodeExchangeHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNodeExchangeHealth>>> = ({ signal }) => getNodeExchangeHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeHealth>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetNodeExchangeHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getNodeExchangeHealth>>>
+export type GetNodeExchangeHealthQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get tenant-scoped exchange ledger integrity status
+ */
+
+export function useGetNodeExchangeHealth<TData = Awaited<ReturnType<typeof getNodeExchangeHealth>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getNodeExchangeHealth>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetNodeExchangeHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetQueueStatsUrl = () => {
 

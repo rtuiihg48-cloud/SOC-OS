@@ -61,6 +61,7 @@ export function Layout({ children }: { children: ReactNode }) {
       label: "Platform",
       items: [
         { href: "/runtime", label: "Runtime", icon: TerminalSquare },
+        { href: "/node-exchange", label: "Node Exchange", icon: Radio },
         { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
         ...(canReadAudit ? [{ href: "/audit-trail", label: "Audit Trail", icon: Activity }] : []),
         { href: "/tenants", label: "Tenants", icon: Building2 },

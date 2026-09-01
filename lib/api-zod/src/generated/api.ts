@@ -1122,6 +1122,305 @@ export const PreviewStrategySandboxResponse = zod.object({
 
 
 /**
+ * @summary Register a versioned Ed25519 public key for a node
+ */
+export const registerNodeExchangeKeyBodyNodeIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const registerNodeExchangeKeyBodyRoleRegExp = new RegExp('^[A-Z][A-Z0-9_]{0,63}$');
+export const registerNodeExchangeKeyBodyPublicKeyMin = 64;
+export const registerNodeExchangeKeyBodyPublicKeyMax = 4096;
+
+
+export const registerNodeExchangeKeyBodyAllowedPeerIdsItemRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const registerNodeExchangeKeyBodyAllowedPeerIdsMax = 64;
+
+
+
+export const RegisterNodeExchangeKeyBody = zod.object({
+  "nodeId": zod.string().regex(registerNodeExchangeKeyBodyNodeIdRegExp),
+  "role": zod.string().regex(registerNodeExchangeKeyBodyRoleRegExp),
+  "publicKey": zod.string().min(registerNodeExchangeKeyBodyPublicKeyMin).max(registerNodeExchangeKeyBodyPublicKeyMax),
+  "keyVersion": zod.number().min(1),
+  "allowedPeerIds": zod.array(zod.string().regex(registerNodeExchangeKeyBodyAllowedPeerIdsItemRegExp)).max(registerNodeExchangeKeyBodyAllowedPeerIdsMax)
+})
+
+
+/**
+ * @summary Activate, suspend, or revoke a node key version
+ */
+
+
+
+export const UpdateNodeExchangeKeyStatusParams = zod.object({
+  "nodeId": zod.coerce.string(),
+  "keyVersion": zod.coerce.number().min(1)
+})
+
+export const UpdateNodeExchangeKeyStatusBody = zod.object({
+  "status": zod.enum(['ACTIVE', 'SUSPENDED', 'REVOKED'])
+})
+
+export const UpdateNodeExchangeKeyStatusResponse = zod.object({
+  "nodeId": zod.string(),
+  "keyVersion": zod.number(),
+  "status": zod.enum(['ACTIVE', 'SUSPENDED', 'REVOKED']),
+  "revokedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary List recent ledger message identities for route inspection
+ */
+export const ListNodeExchangeMessagesResponseItem = zod.object({
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "sourceNodeId": zod.string(),
+  "destinationNodeId": zod.string(),
+  "hopCount": zod.number(),
+  "lastAcceptedAt": zod.coerce.date(),
+  "recordedStatus": zod.enum(['RECORDED'])
+})
+export const ListNodeExchangeMessagesResponse = zod.array(ListNodeExchangeMessagesResponseItem).max(20)
+
+
+/**
+ * @summary Verify and append a signed node exchange envelope
+ */
+export const submitNodeExchangeMessageBodyMessageIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const submitNodeExchangeMessageBodyCorrelationIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const submitNodeExchangeMessageBodySenderNodeIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const submitNodeExchangeMessageBodyRecipientNodeIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const submitNodeExchangeMessageBodySequenceMin = 0;
+
+export const submitNodeExchangeMessageBodyHopSequenceMin = 0;
+export const submitNodeExchangeMessageBodyHopSequenceMax = 31;
+
+export const submitNodeExchangeMessageBodyNonceMin = 16;
+export const submitNodeExchangeMessageBodyNonceMax = 256;
+
+
+export const submitNodeExchangeMessageBodyNonceRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+export const submitNodeExchangeMessageBodyPayloadTypeRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+export const submitNodeExchangeMessageBodyPayloadHashRegExp = new RegExp('^sha256:[a-f0-9]{64}$');
+
+export const submitNodeExchangeMessageBodySignatureMin = 16;
+export const submitNodeExchangeMessageBodySignatureMax = 256;
+
+
+export const submitNodeExchangeMessageBodySignatureRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const SubmitNodeExchangeMessageBody = zod.object({
+  "protocolVersion": zod.enum(['node-exchange-v1']),
+  "messageId": zod.string().regex(submitNodeExchangeMessageBodyMessageIdRegExp),
+  "correlationId": zod.string().regex(submitNodeExchangeMessageBodyCorrelationIdRegExp),
+  "senderNodeId": zod.string().regex(submitNodeExchangeMessageBodySenderNodeIdRegExp),
+  "recipientNodeId": zod.string().regex(submitNodeExchangeMessageBodyRecipientNodeIdRegExp),
+  "sequence": zod.number().min(submitNodeExchangeMessageBodySequenceMin),
+  "hopSequence": zod.number().min(submitNodeExchangeMessageBodyHopSequenceMin).max(submitNodeExchangeMessageBodyHopSequenceMax),
+  "nonce": zod.string().min(submitNodeExchangeMessageBodyNonceMin).max(submitNodeExchangeMessageBodyNonceMax).regex(submitNodeExchangeMessageBodyNonceRegExp),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "payloadType": zod.string().regex(submitNodeExchangeMessageBodyPayloadTypeRegExp),
+  "payload": zod.record(zod.string(), zod.unknown()),
+  "payloadHash": zod.string().regex(submitNodeExchangeMessageBodyPayloadHashRegExp),
+  "previousMessageHash": zod.string(),
+  "keyVersion": zod.number().min(1),
+  "signatureAlgorithm": zod.enum(['Ed25519']),
+  "signature": zod.string().min(submitNodeExchangeMessageBodySignatureMin).max(submitNodeExchangeMessageBodySignatureMax).regex(submitNodeExchangeMessageBodySignatureRegExp)
+})
+
+export const SubmitNodeExchangeMessageResponse = zod.object({
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "idempotent": zod.boolean(),
+  "verificationStatus": zod.enum(['VERIFIED']),
+  "block": zod.object({
+  "id": zod.number(),
+  "sequence": zod.number(),
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "hopSequence": zod.number(),
+  "senderNodeId": zod.string(),
+  "recipientNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "payloadType": zod.string(),
+  "payloadHash": zod.string(),
+  "envelopeHash": zod.string(),
+  "previousBlockHash": zod.string(),
+  "blockHash": zod.string(),
+  "previousMessageHash": zod.string(),
+  "keyVersion": zod.number(),
+  "verificationStatus": zod.enum(['VERIFIED', 'REJECTED']),
+  "acceptedAt": zod.coerce.date()
+}),
+  "hop": zod.object({
+  "sequence": zod.number(),
+  "sourceNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "destinationNodeId": zod.string(),
+  "hopHash": zod.string(),
+  "blockId": zod.number(),
+  "decision": zod.enum(['ACCEPTED', 'REJECTED', 'EXPIRED', 'REPLAYED']),
+  "reasonCode": zod.string(),
+  "checks": zod.object({
+  "payloadHash": zod.boolean(),
+  "signature": zod.boolean(),
+  "previousBlock": zod.boolean(),
+  "routePolicy": zod.boolean()
+}),
+  "receivedAt": zod.coerce.date(),
+  "forwardedAt": zod.coerce.date().nullable()
+}),
+  "policy": zod.string()
+})
+
+
+/**
+ * @summary Get and verify the full route for an exchanged message
+ */
+export const GetNodeExchangeRouteParams = zod.object({
+  "messageId": zod.coerce.string()
+})
+
+export const getNodeExchangeRouteResponseRouteMax = 32;
+
+
+
+export const GetNodeExchangeRouteResponse = zod.object({
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "integrityVerified": zod.boolean(),
+  "route": zod.array(zod.object({
+  "sequence": zod.number(),
+  "sourceNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "destinationNodeId": zod.string(),
+  "hopHash": zod.string(),
+  "blockId": zod.number(),
+  "decision": zod.enum(['ACCEPTED', 'REJECTED', 'EXPIRED', 'REPLAYED']),
+  "reasonCode": zod.string(),
+  "checks": zod.object({
+  "payloadHash": zod.boolean(),
+  "envelopeHash": zod.boolean(),
+  "signature": zod.boolean(),
+  "previousBlock": zod.boolean(),
+  "blockHash": zod.boolean(),
+  "hopHash": zod.boolean(),
+  "routeChain": zod.boolean(),
+  "routePolicy": zod.boolean()
+}),
+  "receivedAt": zod.coerce.date(),
+  "forwardedAt": zod.coerce.date().nullable(),
+  "block": zod.object({
+  "id": zod.number(),
+  "sequence": zod.number(),
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "hopSequence": zod.number(),
+  "senderNodeId": zod.string(),
+  "recipientNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "payloadType": zod.string(),
+  "payloadHash": zod.string(),
+  "envelopeHash": zod.string(),
+  "previousBlockHash": zod.string(),
+  "blockHash": zod.string(),
+  "previousMessageHash": zod.string(),
+  "keyVersion": zod.number(),
+  "verificationStatus": zod.enum(['VERIFIED', 'REJECTED']),
+  "acceptedAt": zod.coerce.date()
+}),
+  "integrityVerified": zod.boolean(),
+  "errorCode": zod.string().nullable()
+})).max(getNodeExchangeRouteResponseRouteMax),
+  "policy": zod.string()
+})
+
+
+/**
+ * @summary Recompute all available integrity checks for a message route
+ */
+export const verifyNodeExchangeRouteBodyMessageIdRegExp = new RegExp('^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$');
+
+
+export const VerifyNodeExchangeRouteBody = zod.object({
+  "messageId": zod.string().regex(verifyNodeExchangeRouteBodyMessageIdRegExp)
+})
+
+export const verifyNodeExchangeRouteResponseRouteMax = 32;
+
+
+
+export const VerifyNodeExchangeRouteResponse = zod.object({
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "integrityVerified": zod.boolean(),
+  "route": zod.array(zod.object({
+  "sequence": zod.number(),
+  "sourceNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "destinationNodeId": zod.string(),
+  "hopHash": zod.string(),
+  "blockId": zod.number(),
+  "decision": zod.enum(['ACCEPTED', 'REJECTED', 'EXPIRED', 'REPLAYED']),
+  "reasonCode": zod.string(),
+  "checks": zod.object({
+  "payloadHash": zod.boolean(),
+  "envelopeHash": zod.boolean(),
+  "signature": zod.boolean(),
+  "previousBlock": zod.boolean(),
+  "blockHash": zod.boolean(),
+  "hopHash": zod.boolean(),
+  "routeChain": zod.boolean(),
+  "routePolicy": zod.boolean()
+}),
+  "receivedAt": zod.coerce.date(),
+  "forwardedAt": zod.coerce.date().nullable(),
+  "block": zod.object({
+  "id": zod.number(),
+  "sequence": zod.number(),
+  "messageId": zod.string(),
+  "correlationId": zod.string(),
+  "hopSequence": zod.number(),
+  "senderNodeId": zod.string(),
+  "recipientNodeId": zod.string(),
+  "gatewayNodeId": zod.string(),
+  "payloadType": zod.string(),
+  "payloadHash": zod.string(),
+  "envelopeHash": zod.string(),
+  "previousBlockHash": zod.string(),
+  "blockHash": zod.string(),
+  "previousMessageHash": zod.string(),
+  "keyVersion": zod.number(),
+  "verificationStatus": zod.enum(['VERIFIED', 'REJECTED']),
+  "acceptedAt": zod.coerce.date()
+}),
+  "integrityVerified": zod.boolean(),
+  "errorCode": zod.string().nullable()
+})).max(verifyNodeExchangeRouteResponseRouteMax),
+  "policy": zod.string()
+})
+
+
+/**
+ * @summary Get tenant-scoped exchange ledger integrity status
+ */
+export const GetNodeExchangeHealthResponse = zod.object({
+  "status": zod.enum(['HEALTHY', 'VERIFICATION_FAILED']),
+  "scopeKey": zod.string(),
+  "headSequence": zod.number(),
+  "headHash": zod.string(),
+  "activeNodeKeys": zod.number(),
+  "lastAcceptedAt": zod.coerce.date().nullable(),
+  "headConsistent": zod.boolean().describe('Whether the stored head matches the latest ledger block; this is not a full route verification.'),
+  "protocolVersion": zod.enum(['node-exchange-v1']),
+  "hashAlgorithm": zod.enum(['SHA-256']),
+  "signatureAlgorithm": zod.enum(['Ed25519']),
+  "transportPolicy": zod.string()
+})
+
+
+/**
  * @summary Get ingest queue statistics
  */
 export const GetQueueStatsResponse = zod.object({

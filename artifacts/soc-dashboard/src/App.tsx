@@ -23,6 +23,7 @@ import RulesEngine from "@/pages/RulesEngine";
 import Correlations from "@/pages/Correlations";
 import Tenants from "@/pages/Tenants";
 import Runtime from "@/pages/Runtime";
+import NodeExchange from "@/pages/NodeExchange";
 import Quarantine from "@/pages/Quarantine";
 import SelfHealing from "@/pages/SelfHealing";
 import VirusDatabase from "@/pages/VirusDatabase";
@@ -253,6 +254,7 @@ function App() {
                       <Route path="/correlations" component={Correlations} />
                       <Route path="/tenants" component={Tenants} />
                       <Route path="/runtime" component={Runtime} />
+                      <Route path="/node-exchange" component={NodeExchange} />
                       <Route path="/quarantine" component={Quarantine} />
                       <Route path="/self-healing" component={SelfHealing} />
                       <Route path="/virus-database" component={VirusDatabase} />

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, boolean, real, jsonb, index, check, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, bigint, timestamp, boolean, real, jsonb, index, check, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -91,6 +91,110 @@ export const serviceCredentialsTable = pgTable("service_credentials", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 }, (table) => [uniqueIndex("service_credentials_id_uidx").on(table.credentialId), uniqueIndex("service_credentials_prefix_uidx").on(table.credentialPrefix), index("service_credentials_auth_lookup_idx").on(table.credentialPrefix, table.tenantId), check("service_credentials_principal_type_check", sql`${table.principalType} IN ('SERVICE','GATEWAY')`)]);
+
+// ─── Node Exchange Ledger ─────────────────────────────────────────────────────
+// Signed node-to-node envelopes are persisted as an append-only, hash-linked
+// stream. Private signing keys never live in this database.
+export const nodeExchangeNodesTable = pgTable("node_exchange_nodes", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  nodeId: text("node_id").notNull(),
+  role: text("role").notNull(),
+  publicKey: text("public_key").notNull(),
+  keyVersion: integer("key_version").notNull().default(1),
+  status: text("status").notNull().default("ACTIVE"),
+  allowedPeerIds: jsonb("allowed_peer_ids").$type<string[]>().notNull().default([]),
+  lastSenderSequence: bigint("last_sender_sequence", { mode: "number" }).notNull().default(-1),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  rotatedAt: timestamp("rotated_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("node_exchange_nodes_tenant_node_version_uidx").on(table.tenantId, table.nodeId, table.keyVersion),
+  uniqueIndex("node_exchange_nodes_one_active_uidx").on(table.tenantId, table.nodeId).where(sql`${table.status} = 'ACTIVE'`),
+  index("node_exchange_nodes_tenant_status_idx").on(table.tenantId, table.status),
+  check("node_exchange_nodes_key_version_check", sql`${table.keyVersion} > 0`),
+  check("node_exchange_nodes_status_check", sql`${table.status} IN ('ACTIVE','SUSPENDED','REVOKED')`),
+]);
+
+export const nodeExchangeHeadsTable = pgTable("node_exchange_heads", {
+  scopeKey: text("scope_key").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  sequence: integer("sequence").notNull().default(0),
+  currentHash: text("current_hash").notNull().default("GENESIS"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("node_exchange_heads_tenant_uidx").on(table.tenantId),
+  check("node_exchange_heads_sequence_check", sql`${table.sequence} >= 0`),
+]);
+
+export const nodeExchangeBlocksTable = pgTable("node_exchange_blocks", {
+  id: serial("id").primaryKey(),
+  scopeKey: text("scope_key").notNull(),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  blockSequence: integer("block_sequence").notNull(),
+  messageId: text("message_id").notNull(),
+  correlationId: text("correlation_id").notNull(),
+  hopSequence: integer("hop_sequence").notNull().default(0),
+  senderNodeId: text("sender_node_id").notNull(),
+  recipientNodeId: text("recipient_node_id").notNull(),
+  gatewayNodeId: text("gateway_node_id").notNull(),
+  protocolVersion: text("protocol_version").notNull(),
+  payloadType: text("payload_type").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  envelopeHash: text("envelope_hash").notNull(),
+  payloadHash: text("payload_hash").notNull(),
+  previousBlockHash: text("previous_block_hash").notNull(),
+  previousMessageHash: text("previous_message_hash").notNull(),
+  blockHash: text("block_hash").notNull(),
+  nonce: text("nonce").notNull(),
+  senderSequence: integer("sender_sequence").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  signature: text("signature").notNull(),
+  signatureAlgorithm: text("signature_algorithm").notNull(),
+  keyVersion: integer("key_version").notNull(),
+  verificationStatus: text("verification_status").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("node_exchange_blocks_scope_sequence_uidx").on(table.scopeKey, table.blockSequence),
+  uniqueIndex("node_exchange_blocks_scope_hash_uidx").on(table.scopeKey, table.blockHash),
+  uniqueIndex("node_exchange_blocks_message_hop_uidx").on(table.scopeKey, table.messageId, table.hopSequence),
+  uniqueIndex("node_exchange_blocks_sender_sequence_uidx").on(table.tenantId, table.senderNodeId, table.keyVersion, table.senderSequence),
+  uniqueIndex("node_exchange_blocks_sender_nonce_uidx").on(table.tenantId, table.senderNodeId, table.keyVersion, table.nonce),
+  index("node_exchange_blocks_tenant_accepted_idx").on(table.tenantId, table.acceptedAt),
+  index("node_exchange_blocks_message_idx").on(table.messageId),
+  index("node_exchange_blocks_correlation_idx").on(table.correlationId),
+  check("node_exchange_blocks_sequence_check", sql`${table.blockSequence} > 0 AND ${table.senderSequence} >= 0 AND ${table.hopSequence} >= 0`),
+  check("node_exchange_blocks_status_check", sql`${table.verificationStatus} IN ('VERIFIED','REJECTED')`),
+  check("node_exchange_blocks_signature_algorithm_check", sql`${table.signatureAlgorithm} = 'Ed25519'`),
+]);
+
+export const nodeExchangeRouteHopsTable = pgTable("node_exchange_route_hops", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenantsTable.id, { onDelete: "restrict" }),
+  messageId: text("message_id").notNull(),
+  correlationId: text("correlation_id").notNull(),
+  hopSequence: integer("hop_sequence").notNull(),
+  sourceNodeId: text("source_node_id").notNull(),
+  gatewayNodeId: text("gateway_node_id").notNull(),
+  destinationNodeId: text("destination_node_id").notNull(),
+  blockId: integer("block_id").notNull().references(() => nodeExchangeBlocksTable.id, { onDelete: "restrict" }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull(),
+  forwardedAt: timestamp("forwarded_at", { withTimezone: true }),
+  hopHash: text("hop_hash").notNull(),
+  payloadHashVerified: boolean("payload_hash_verified").notNull(),
+  signatureVerified: boolean("signature_verified").notNull(),
+  previousBlockVerified: boolean("previous_block_verified").notNull(),
+  routePolicyVerified: boolean("route_policy_verified").notNull(),
+  routeDecision: text("route_decision").notNull(),
+  reasonCode: text("reason_code").notNull(),
+}, (table) => [
+  uniqueIndex("node_exchange_route_hops_message_sequence_uidx").on(table.tenantId, table.messageId, table.hopSequence),
+  uniqueIndex("node_exchange_route_hops_hash_uidx").on(table.tenantId, table.hopHash),
+  index("node_exchange_route_hops_tenant_message_idx").on(table.tenantId, table.messageId),
+  index("node_exchange_route_hops_correlation_idx").on(table.correlationId),
+  check("node_exchange_route_hops_decision_check", sql`${table.routeDecision} IN ('ACCEPTED','REJECTED','EXPIRED','REPLAYED')`),
+]);
 
 export const auditChainHeadsTable = pgTable("audit_chain_heads", {
   partitionKey: text("partition_key").primaryKey(),

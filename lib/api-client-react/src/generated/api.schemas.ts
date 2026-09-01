@@ -943,6 +943,321 @@ export interface RiskTimelinePoint {
   count: number;
 }
 
+export interface NodeExchangeRegistrationInput {
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  nodeId: string;
+  /** @pattern ^[A-Z][A-Z0-9_]{0,63}$ */
+  role: string;
+  /**
+     * @minLength 64
+     * @maxLength 4096
+     */
+  publicKey: string;
+  /** @minimum 1 */
+  keyVersion: number;
+  /** @maxItems 64 */
+  allowedPeerIds: string[];
+}
+
+export type NodeExchangeNodeStatus = typeof NodeExchangeNodeStatus[keyof typeof NodeExchangeNodeStatus];
+
+
+export const NodeExchangeNodeStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED',
+} as const;
+
+export interface NodeExchangeNode {
+  nodeId: string;
+  role: string;
+  keyVersion: number;
+  status: NodeExchangeNodeStatus;
+  allowedPeerIds: string[];
+  createdAt: string;
+}
+
+export type NodeExchangeStatusInputStatus = typeof NodeExchangeStatusInputStatus[keyof typeof NodeExchangeStatusInputStatus];
+
+
+export const NodeExchangeStatusInputStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED',
+} as const;
+
+export interface NodeExchangeStatusInput {
+  status: NodeExchangeStatusInputStatus;
+}
+
+export type NodeExchangeKeyStatusStatus = typeof NodeExchangeKeyStatusStatus[keyof typeof NodeExchangeKeyStatusStatus];
+
+
+export const NodeExchangeKeyStatusStatus = {
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED',
+} as const;
+
+export interface NodeExchangeKeyStatus {
+  nodeId: string;
+  keyVersion: number;
+  status: NodeExchangeKeyStatusStatus;
+  /** @nullable */
+  revokedAt: string | null;
+}
+
+export type NodeExchangeEnvelopeProtocolVersion = typeof NodeExchangeEnvelopeProtocolVersion[keyof typeof NodeExchangeEnvelopeProtocolVersion];
+
+
+export const NodeExchangeEnvelopeProtocolVersion = {
+  'node-exchange-v1': 'node-exchange-v1',
+} as const;
+
+export type NodeExchangeEnvelopePayload = { [key: string]: unknown };
+
+export type NodeExchangeEnvelopeSignatureAlgorithm = typeof NodeExchangeEnvelopeSignatureAlgorithm[keyof typeof NodeExchangeEnvelopeSignatureAlgorithm];
+
+
+export const NodeExchangeEnvelopeSignatureAlgorithm = {
+  Ed25519: 'Ed25519',
+} as const;
+
+export interface NodeExchangeEnvelope {
+  protocolVersion: NodeExchangeEnvelopeProtocolVersion;
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  messageId: string;
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  correlationId: string;
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  senderNodeId: string;
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  recipientNodeId: string;
+  /** @minimum 0 */
+  sequence: number;
+  /**
+     * @minimum 0
+     * @maximum 31
+     */
+  hopSequence: number;
+  /**
+     * @minLength 16
+     * @maxLength 256
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  nonce: string;
+  issuedAt: string;
+  expiresAt: string;
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  payloadType: string;
+  payload: NodeExchangeEnvelopePayload;
+  /** @pattern ^sha256:[a-f0-9]{64}$ */
+  payloadHash: string;
+  previousMessageHash: string;
+  /** @minimum 1 */
+  keyVersion: number;
+  signatureAlgorithm: NodeExchangeEnvelopeSignatureAlgorithm;
+  /**
+     * @minLength 16
+     * @maxLength 256
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  signature: string;
+}
+
+export type NodeExchangeBlockVerificationStatus = typeof NodeExchangeBlockVerificationStatus[keyof typeof NodeExchangeBlockVerificationStatus];
+
+
+export const NodeExchangeBlockVerificationStatus = {
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export interface NodeExchangeBlock {
+  id: number;
+  sequence: number;
+  messageId: string;
+  correlationId: string;
+  hopSequence: number;
+  senderNodeId: string;
+  recipientNodeId: string;
+  gatewayNodeId: string;
+  payloadType: string;
+  payloadHash: string;
+  envelopeHash: string;
+  previousBlockHash: string;
+  blockHash: string;
+  previousMessageHash: string;
+  keyVersion: number;
+  verificationStatus: NodeExchangeBlockVerificationStatus;
+  acceptedAt: string;
+}
+
+export interface NodeExchangeChecks {
+  payloadHash: boolean;
+  envelopeHash: boolean;
+  signature: boolean;
+  previousBlock: boolean;
+  blockHash: boolean;
+  hopHash: boolean;
+  routeChain: boolean;
+  routePolicy: boolean;
+}
+
+export type NodeExchangeHopDecision = typeof NodeExchangeHopDecision[keyof typeof NodeExchangeHopDecision];
+
+
+export const NodeExchangeHopDecision = {
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  REPLAYED: 'REPLAYED',
+} as const;
+
+export interface NodeExchangeHop {
+  sequence: number;
+  sourceNodeId: string;
+  gatewayNodeId: string;
+  destinationNodeId: string;
+  hopHash: string;
+  blockId: number;
+  decision: NodeExchangeHopDecision;
+  reasonCode: string;
+  checks: NodeExchangeChecks;
+  receivedAt: string;
+  /** @nullable */
+  forwardedAt: string | null;
+  block: NodeExchangeBlock;
+  integrityVerified: boolean;
+  /** @nullable */
+  errorCode: string | null;
+}
+
+export type NodeExchangeAcceptedHopDecision = typeof NodeExchangeAcceptedHopDecision[keyof typeof NodeExchangeAcceptedHopDecision];
+
+
+export const NodeExchangeAcceptedHopDecision = {
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  REPLAYED: 'REPLAYED',
+} as const;
+
+export type NodeExchangeAcceptedHopChecks = {
+  payloadHash: boolean;
+  signature: boolean;
+  previousBlock: boolean;
+  routePolicy: boolean;
+};
+
+export interface NodeExchangeAcceptedHop {
+  sequence: number;
+  sourceNodeId: string;
+  gatewayNodeId: string;
+  destinationNodeId: string;
+  hopHash: string;
+  blockId: number;
+  decision: NodeExchangeAcceptedHopDecision;
+  reasonCode: string;
+  checks: NodeExchangeAcceptedHopChecks;
+  receivedAt: string;
+  /** @nullable */
+  forwardedAt: string | null;
+}
+
+export type NodeExchangeAcceptedVerificationStatus = typeof NodeExchangeAcceptedVerificationStatus[keyof typeof NodeExchangeAcceptedVerificationStatus];
+
+
+export const NodeExchangeAcceptedVerificationStatus = {
+  VERIFIED: 'VERIFIED',
+} as const;
+
+export interface NodeExchangeAccepted {
+  messageId: string;
+  correlationId: string;
+  idempotent: boolean;
+  verificationStatus: NodeExchangeAcceptedVerificationStatus;
+  block: NodeExchangeBlock;
+  hop: NodeExchangeAcceptedHop;
+  policy: string;
+}
+
+export interface NodeExchangeVerificationInput {
+  /** @pattern ^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$ */
+  messageId: string;
+}
+
+export type NodeExchangeMessageSummaryRecordedStatus = typeof NodeExchangeMessageSummaryRecordedStatus[keyof typeof NodeExchangeMessageSummaryRecordedStatus];
+
+
+export const NodeExchangeMessageSummaryRecordedStatus = {
+  RECORDED: 'RECORDED',
+} as const;
+
+export interface NodeExchangeMessageSummary {
+  messageId: string;
+  correlationId: string;
+  sourceNodeId: string;
+  destinationNodeId: string;
+  hopCount: number;
+  lastAcceptedAt: string;
+  recordedStatus: NodeExchangeMessageSummaryRecordedStatus;
+}
+
+export interface NodeExchangeRoute {
+  messageId: string;
+  correlationId: string;
+  integrityVerified: boolean;
+  /** @maxItems 32 */
+  route: NodeExchangeHop[];
+  policy: string;
+}
+
+export type NodeExchangeHealthStatus = typeof NodeExchangeHealthStatus[keyof typeof NodeExchangeHealthStatus];
+
+
+export const NodeExchangeHealthStatus = {
+  HEALTHY: 'HEALTHY',
+  VERIFICATION_FAILED: 'VERIFICATION_FAILED',
+} as const;
+
+export type NodeExchangeHealthProtocolVersion = typeof NodeExchangeHealthProtocolVersion[keyof typeof NodeExchangeHealthProtocolVersion];
+
+
+export const NodeExchangeHealthProtocolVersion = {
+  'node-exchange-v1': 'node-exchange-v1',
+} as const;
+
+export type NodeExchangeHealthHashAlgorithm = typeof NodeExchangeHealthHashAlgorithm[keyof typeof NodeExchangeHealthHashAlgorithm];
+
+
+export const NodeExchangeHealthHashAlgorithm = {
+  'SHA-256': 'SHA-256',
+} as const;
+
+export type NodeExchangeHealthSignatureAlgorithm = typeof NodeExchangeHealthSignatureAlgorithm[keyof typeof NodeExchangeHealthSignatureAlgorithm];
+
+
+export const NodeExchangeHealthSignatureAlgorithm = {
+  Ed25519: 'Ed25519',
+} as const;
+
+export interface NodeExchangeHealth {
+  status: NodeExchangeHealthStatus;
+  scopeKey: string;
+  headSequence: number;
+  headHash: string;
+  activeNodeKeys: number;
+  /** @nullable */
+  lastAcceptedAt: string | null;
+  /** Whether the stored head matches the latest ledger block; this is not a full route verification. */
+  headConsistent: boolean;
+  protocolVersion: NodeExchangeHealthProtocolVersion;
+  hashAlgorithm: NodeExchangeHealthHashAlgorithm;
+  signatureAlgorithm: NodeExchangeHealthSignatureAlgorithm;
+  transportPolicy: string;
+}
+
 export type StrategyCycleMode = typeof StrategyCycleMode[keyof typeof StrategyCycleMode];
 
 

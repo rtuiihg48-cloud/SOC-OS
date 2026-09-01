@@ -135,10 +135,14 @@ describe("audit chain database integration", () => {
   it("rolls back protected writes when required audit evidence fails", async () => {
     const tenantId = 999_005;
     await client.query("ALTER TABLE audit_records ADD CONSTRAINT audit_failure_test CHECK (false) NOT VALID");
-    await expect(tx.transaction(async (protectedTx: any) => {
-      await appendAudit(protectedTx, { tenantId, principal, action: "protected:write", targetType: "event", targetId: "1", decision: "COMMITTED", reasonCode: "TEST", correlationId: "failure" });
-    })).rejects.toThrow();
-    const head = await client.query("SELECT * FROM audit_chain_heads WHERE partition_key = $1", [`tenant:${tenantId}`]);
-    expect(head.rowCount).toBe(0);
+    try {
+      await expect(tx.transaction(async (protectedTx: any) => {
+        await appendAudit(protectedTx, { tenantId, principal, action: "protected:write", targetType: "event", targetId: "1", decision: "COMMITTED", reasonCode: "TEST", correlationId: "failure" });
+      })).rejects.toThrow();
+      const head = await client.query("SELECT * FROM audit_chain_heads WHERE partition_key = $1", [`tenant:${tenantId}`]);
+      expect(head.rowCount).toBe(0);
+    } finally {
+      await client.query("ALTER TABLE audit_records DROP CONSTRAINT IF EXISTS audit_failure_test");
+    }
   });
 });

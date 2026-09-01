@@ -1,0 +1,107 @@
+
+Приклад на Python:
+
+import hashlib
+import time
+
+def generate_key(secret, previous_hash=None):
+    # Беремо поточний час як частину вхідних даних
+    current_time = str(int(time.time()))
+    data = current_time + secret
+
+    # Якщо є попередній хеш, додаємо його
+    if previous_hash:
+        data += previous_hash
+
+    # Генеруємо новий ключ за допомогою SHA-256
+    new_key = hashlib.sha256(data.encode()).hexdigest()
+    return new_key
+
+# Приклад використання
+secret_key = "mysecretpassword"
+initial_key = generate_key(secret_key)
+print("Initial key:", initial_key)
+
+# Генерація нового ключа через кілька секунд
+time.sleep(5)
+new_key = generate_key(secret_key, previous_hash=initial_key)
+print("New key:", new_key)
+
+У цьому прикладі кожного разу, коли ми викликаємо функцію generate_key, ми створюємо новий ключ на основі поточного часу і секретного значення.
+
+2. Шифрування з використанням динамічного ключа
+
+Після генерації ключа, можна використовувати його для шифрування даних. Наприклад, використовуючи стандартні криптографічні алгоритми, такі як AES.
+
+Алгоритм:
+
+1. Генеруємо новий ключ за допомогою SHA-256.
+
+
+2. Використовуємо цей ключ для шифрування даних.
+
+
+3. Кожні кілька секунд (або при передачі нового блоку даних) генеруємо новий ключ.
+
+
+
+Ось як можна шифрувати дані з використанням AES і динамічного ключа:
+
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import hashlib
+
+def encrypt_data(data, secret, previous_hash=None):
+    key = generate_key(secret, previous_hash)  # Генерація нового ключа
+    key = key[:16].encode()  # Оскільки AES підтримує ключі до 256 біт, беремо тільки перші 16 символів
+    
+    cipher = AES.new(key, AES.MODE_CBC)  # Використовуємо режим CBC
+    ct_bytes = cipher.encrypt(pad(data.encode(), AES.block_size))
+    iv = cipher.iv
+    return iv, ct_bytes
+
+def decrypt_data(iv, ct_bytes, secret, previous_hash=None):
+    key = generate_key(secret, previous_hash)
+    key = key[:16].encode()
+
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted_data = unpad(cipher.decrypt(ct_bytes), AES.block_size).decode()
+    return decrypted_data
+
+# Приклад використання:
+secret_key = "mysecretpassword"
+data = "Hello, this is a test message!"
+
+# Шифруємо
+iv, encrypted_data = encrypt_data(data, secret_key)
+print(f"Encrypted: {encrypted_data.hex()}")
+
+# Дешифруємо
+decrypted_data = decrypt_data(iv, encrypted_data, secret_key)
+print(f"Decrypted: {decrypted_data}")
+
+Важливо:
+
+AES працює з ключами, що мають фіксовану довжину (128, 192 або 256 біт). Тому потрібно обрізати хеш до необхідної довжини (у прикладі це 16 символів для 128 біт).
+
+При кожному шифруванні або декодуванні використовується новий ключ, що генерується на основі поточного часу і секретного значення.
+
+
+3. Зміна ключа через певний проміжок часу
+
+Для реального застосування такої системи потрібно впровадити механізм, який дозволяє регулярно змінювати ключ:
+
+Кожні кілька секунд чи після кожного нового блоку даних генерується новий ключ.
+
+Використання SHA-256 гарантує, що новий ключ буде сильно випадковим і непрогнозованим.
+
+
+4. Підвищення безпеки через додаткові методи
+
+Крім того, можна додати додаткові заходи для підвищення безпеки, такі як:
+
+Використання сольових значень для кожного ключа перед хешуванням. Це дозволить ще більше ускладнити передбачуваність ключа.
+
+Захист від атак через повторне використання ключа: Можна використовувати різні параметри для кожної сесії чи кожного з'єднання (наприклад, nonce або сесійний ідентифікатор).
+
+Регулярне оновлення секретного значення (наприклад, зміна пароля кожен певний час або після кожного шифрування).

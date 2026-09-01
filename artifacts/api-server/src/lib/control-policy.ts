@@ -4,6 +4,7 @@ export const CAPABILITIES = [
   "quarantine:read", "quarantine:approve", "self_healing:preview", "self_healing:apply", "audit:read", "audit:verify",
   "rules:read", "rules:write", "tenants:read", "tenants:write", "dashboard:read",
   "virus:read", "virus:write", "testing:run", "voice:use", "strategy:global:read",
+  "node-exchange:submit", "node-exchange:read", "node-exchange:verify", "node-exchange:admin",
 ] as const;
 export type Capability = typeof CAPABILITIES[number];
 export type PrincipalType = "USER" | "SERVICE" | "GATEWAY";
@@ -12,7 +13,7 @@ export type PolicyDecision = { allowed: boolean; decisionId: string; subject: Pi
 
 const ROLE_CAPABILITIES: Record<string, Capability[]> = {
   SOC_ADMIN: [...CAPABILITIES],
-  ANALYST: ["events:read", "events:status:update", "traffic:read", "agent:observe", "execution:read", "execution:submit", "execution:retry", "execution:recover", "execution:dlq:operate", "quarantine:read", "quarantine:approve", "self_healing:preview", "self_healing:apply", "audit:read", "audit:verify", "rules:read", "rules:write", "tenants:read", "dashboard:read", "virus:read", "virus:write", "testing:run", "voice:use"],
+  ANALYST: ["events:read", "events:status:update", "traffic:read", "agent:observe", "execution:read", "execution:submit", "execution:retry", "execution:recover", "execution:dlq:operate", "quarantine:read", "quarantine:approve", "self_healing:preview", "self_healing:apply", "audit:read", "audit:verify", "rules:read", "rules:write", "tenants:read", "dashboard:read", "virus:read", "virus:write", "testing:run", "voice:use", "node-exchange:read", "node-exchange:verify"],
   VIEWER: ["events:read", "traffic:read", "execution:read", "quarantine:read", "self_healing:preview", "audit:read", "rules:read", "tenants:read", "dashboard:read", "virus:read"],
 };
 export function capabilitiesForRoles(roles: string[]): Capability[] { return [...new Set(roles.flatMap((role) => ROLE_CAPABILITIES[role] ?? []))]; }
