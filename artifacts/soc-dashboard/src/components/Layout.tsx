@@ -4,6 +4,50 @@ import { Activity, ShieldAlert, GitCommit, Shield, LayoutDashboard, Cpu, Databas
 import { useGetCurrentPrincipal, getGetCurrentPrincipalQueryKey, useGetDashboard, getGetDashboardQueryKey } from "@workspace/api-client-react";
 import { VoiceCommandPanel } from "@/components/VoiceCommandPanel";
 import { useClerk } from "@clerk/react";
+import { getStoredLanguage, languageOptions, menuCopy, type Language } from "@/lib/i18n";
+
+const navStructure = [
+  {
+    key: "operations",
+    items: [
+      { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
+      { href: "/incidents", key: "incidents", icon: Siren },
+      { href: "/alerts", key: "alerts", icon: Bell },
+      { href: "/events", key: "events", icon: Database },
+      { href: "/simulate", key: "simulation", icon: Cpu },
+    ],
+  },
+  {
+    key: "intelligence",
+    items: [
+      { href: "/threat-graph", key: "threatGraph", icon: ShieldAlert },
+      { href: "/virus-database", key: "virusDb", icon: BugOff },
+      { href: "/rules", key: "rules", icon: Zap },
+      { href: "/correlations", key: "correlations", icon: Link2 },
+    ],
+  },
+  {
+    key: "response",
+    items: [
+      { href: "/quarantine", key: "quarantine", icon: Box },
+      { href: "/self-healing", key: "selfHealing", icon: Shield },
+      { href: "/patches", key: "patches", icon: GitCommit },
+      { href: "/playbooks", key: "playbooks", icon: Workflow },
+    ],
+  },
+  {
+    key: "platform",
+    items: [
+      { href: "/runtime", key: "runtime", icon: TerminalSquare },
+      { href: "/approvals", key: "readinessReview", icon: ClipboardCheck },
+      { href: "/node-exchange", key: "nodeExchange", icon: Radio },
+      { href: "/traffic-analysis", key: "trafficAnalysis", icon: Network },
+      { href: "/audit-trail", key: "auditTrail", icon: Activity },
+      { href: "/tenants", key: "tenants", icon: Building2 },
+      { href: "/billing", key: "billing", icon: CreditCard },
+    ],
+  },
+] as const;
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -12,6 +56,7 @@ export function Layout({ children }: { children: ReactNode }) {
   );
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [language, setLanguage] = useState<Language>(getStoredLanguage);
   const { data: dashboard } = useGetDashboard({
     query: { refetchInterval: 5000, queryKey: getGetDashboardQueryKey() }
   });
@@ -21,6 +66,11 @@ export function Layout({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
 
   const canReadAudit = principal?.capabilities?.includes("audit:read");
+
+  useEffect(() => {
+    window.localStorage.setItem("soc-os-language", language);
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     const compactQuery = window.matchMedia("(max-width: 1024px)");
@@ -44,48 +94,13 @@ export function Layout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  const navSections = [
-    {
-      label: "Operations",
-      items: [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/incidents", label: "Incident Center", icon: Siren },
-        { href: "/alerts", label: "Alerts", icon: Bell },
-        { href: "/events", label: "Event Log", icon: Database },
-        { href: "/simulate", label: "Simulation", icon: Cpu },
-      ],
-    },
-    {
-      label: "Intelligence",
-      items: [
-        { href: "/threat-graph", label: "Threat Graph", icon: ShieldAlert },
-        { href: "/virus-database", label: "Virus DB", icon: BugOff },
-        { href: "/rules", label: "Rules Engine", icon: Zap },
-        { href: "/correlations", label: "Correlations", icon: Link2 },
-      ],
-    },
-    {
-      label: "Response",
-      items: [
-        { href: "/quarantine", label: "Quarantine", icon: Box },
-        { href: "/self-healing", label: "Self-Healing", icon: Shield },
-        { href: "/patches", label: "Patches", icon: GitCommit },
-        { href: "/playbooks", label: "Playbooks", icon: Workflow },
-      ],
-    },
-    {
-      label: "Platform",
-      items: [
-        { href: "/runtime", label: "Runtime", icon: TerminalSquare },
-        { href: "/approvals", label: "Readiness Review", icon: ClipboardCheck },
-        { href: "/node-exchange", label: "Node Exchange", icon: Radio },
-        { href: "/traffic-analysis", label: "Traffic Analysis", icon: Network },
-        ...(canReadAudit ? [{ href: "/audit-trail", label: "Audit Trail", icon: Activity }] : []),
-        { href: "/tenants", label: "Tenants", icon: Building2 },
-        { href: "/billing", label: "Billing", icon: CreditCard },
-      ],
-    },
-  ];
+  const copy = menuCopy[language];
+  const navSections = navStructure.map((section) => ({
+    label: copy.sections[section.key],
+    items: section.items
+      .filter((item) => item.key !== "auditTrail" || canReadAudit)
+      .map((item) => ({ ...item, label: copy.items[item.key] })),
+  }));
   const navItems = navSections.flatMap((section) => section.items);
 
   const statusColor =
@@ -115,8 +130,8 @@ export function Layout({ children }: { children: ReactNode }) {
             type="button"
             onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-sm border border-transparent text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-            aria-label={isSidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-            title={isSidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
+            aria-label={isSidebarCollapsed ? copy.ui.expandNavigation : copy.ui.collapseNavigation}
+            title={isSidebarCollapsed ? copy.ui.expandNavigation : copy.ui.collapseNavigation}
           >
             {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
           </button>
@@ -204,18 +219,33 @@ export function Layout({ children }: { children: ReactNode }) {
 
         <header className="h-16 flex-shrink-0 border-b border-border bg-background/80 backdrop-blur-sm flex items-center px-8 z-30 justify-between">
           <h1 className="text-xl font-semibold tracking-wide capitalize">
-            {navItems.find(n => n.href === location)?.label || "Dashboard"}
+            {navItems.find(n => n.href === location)?.label || copy.items.dashboard}
           </h1>
           <div className="flex items-center gap-3 text-sm font-mono">
+            <label className="flex max-w-[7rem] items-center gap-1 rounded border border-border px-1.5 py-1.5 text-[10px] text-muted-foreground sm:max-w-[8.5rem] sm:gap-2 sm:px-2" title={copy.ui.language}>
+              <span className="sr-only">{copy.ui.language}</span>
+              <select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as Language)}
+                aria-label={copy.ui.language}
+                className="max-w-[8.5rem] cursor-pointer bg-transparent font-mono text-[10px] uppercase outline-none"
+              >
+                {languageOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-card text-foreground">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
               onClick={() => setIsCommandOpen(true)}
               className="hidden items-center gap-2 rounded border border-border px-2 py-1.5 text-[10px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary md:flex"
-              aria-label="Open global search"
+              aria-label={copy.ui.search}
             >
-              <Search className="h-3.5 w-3.5" /> SEARCH <span className="text-[9px] opacity-70">CTRL K</span>
+              <Search className="h-3.5 w-3.5" /> {copy.ui.search} <span className="text-[9px] opacity-70">{copy.ui.shortcut}</span>
             </button>
-            <span className="text-muted-foreground">THREAT_LEVEL:</span>
+            <span className="text-muted-foreground">{copy.ui.threatLevel}</span>
             <span className={`font-bold ${dashboard?.threatLevel && dashboard.threatLevel > 75 ? 'text-critical' : dashboard?.threatLevel && dashboard.threatLevel > 50 ? 'text-warn' : 'text-safe'}`}>
               {dashboard?.threatLevel ?? 0}%
             </span>
@@ -232,10 +262,10 @@ export function Layout({ children }: { children: ReactNode }) {
                   autoFocus
                   value={commandQuery}
                   onChange={(event) => setCommandQuery(event.target.value)}
-                  placeholder="Search control surfaces..."
+                  placeholder={copy.ui.searchPlaceholder}
                   className="h-12 flex-1 bg-transparent text-sm font-mono outline-none placeholder:text-muted-foreground"
                 />
-                <button type="button" onClick={() => setIsCommandOpen(false)} className="text-[10px] font-mono text-muted-foreground">ESC</button>
+                <button type="button" onClick={() => setIsCommandOpen(false)} className="text-[10px] font-mono text-muted-foreground">{copy.ui.close}</button>
               </div>
               <div className="max-h-80 overflow-y-auto p-2">
                 {navItems.filter((item) => item.label.toLowerCase().includes(commandQuery.toLowerCase())).slice(0, 12).map((item) => (
@@ -244,7 +274,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   </Link>
                 ))}
                 {navItems.filter((item) => item.label.toLowerCase().includes(commandQuery.toLowerCase())).length === 0 && (
-                  <div className="p-6 text-center text-xs font-mono text-muted-foreground">NO CONTROL SURFACE MATCHES</div>
+                  <div className="p-6 text-center text-xs font-mono text-muted-foreground">{copy.ui.noMatches}</div>
                 )}
               </div>
             </div>
