@@ -8,6 +8,7 @@ import { Play, Shield, Terminal, Zap, CheckCircle2, AlertTriangle, Bug, Wrench, 
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { CyberRangePanel } from "@/components/CyberRangePanel";
 
 type SimStep = {
   id: string;
@@ -137,11 +138,12 @@ export default function Simulation() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex items-center justify-between border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-mono">
         <span className="text-muted-foreground">SECURITY TEST QUOTA</span>
         <span className={quota?.paidAccess ? "text-safe" : "text-primary"}>{quota?.paidAccess ? "PRO ACCESS ACTIVE" : `${quota?.freeRemaining ?? "—"} / ${quota?.freeLimit ?? 3} FREE TESTS REMAINING`}</span>
       </div>
+      <CyberRangePanel />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="bg-card/50 backdrop-blur border-primary/20 overflow-hidden relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-primary/50"></div>

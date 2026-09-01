@@ -13,6 +13,7 @@ import { callMetaCube } from "./lib/meta-cube-client";
 import { bootHckBios, getRequiredHckTables } from "./lib/hck-bios";
 import { assertAuditReadiness } from "./lib/audit";
 import { bindAfterBios } from "./lib/startup-orchestration";
+import { cyberRangeManager } from "./lib/cyber-range";
 
 const rawPort = process.env["PORT"];
 
@@ -142,6 +143,7 @@ server.on("error", (err) => {
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, async () => {
     logger.info({ signal }, "Stopping SOC-OS services");
+    cyberRangeManager.stopAll();
     await cpuSimulator.stop();
     server.close(() => {
       void pool.end().finally(() => process.exit(0));

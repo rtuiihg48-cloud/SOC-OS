@@ -795,6 +795,254 @@ export const RunSimulationResponse = zod.object({
 
 
 /**
+ * @summary Get the tenant-scoped 100-cube cyber range state
+ */
+export const getCyberRangeResponseActiveProcessWorkersMin = 0;
+export const getCyberRangeResponseActiveProcessWorkersMax = 8;
+
+export const getCyberRangeResponseRunningCubesMin = 0;
+export const getCyberRangeResponseRunningCubesMax = 100;
+
+export const getCyberRangeResponseSuccessCubesMin = 0;
+export const getCyberRangeResponseSuccessCubesMax = 100;
+
+export const getCyberRangeResponseIsolatedCubesMin = 0;
+export const getCyberRangeResponseIsolatedCubesMax = 100;
+
+export const getCyberRangeResponseFailedCubesMin = 0;
+export const getCyberRangeResponseFailedCubesMax = 100;
+
+export const getCyberRangeResponseCompletedCubesMin = 0;
+export const getCyberRangeResponseCompletedCubesMax = 100;
+
+export const getCyberRangeResponseCubesItemIndexMin = 0;
+export const getCyberRangeResponseCubesItemIndexMax = 99;
+
+export const getCyberRangeResponseCubesItemProgressMin = 0;
+export const getCyberRangeResponseCubesItemProgressMax = 100;
+
+export const getCyberRangeResponseCubesItemCyclesMin = 0;
+
+export const getCyberRangeResponseCubesItemCoresMin = 0;
+
+export const getCyberRangeResponseCubesItemNumaNodesMin = 0;
+
+export const getCyberRangeResponseCubesItemCacheHitRateMin = 0;
+export const getCyberRangeResponseCubesItemCacheHitRateMax = 1;
+
+export const getCyberRangeResponseCubesItemNumaLatencyNsMin = 0;
+
+export const getCyberRangeResponseCubesMin = 100;
+export const getCyberRangeResponseCubesMax = 100;
+
+
+
+export const GetCyberRangeResponse = zod.object({
+  "rangeId": zod.string(),
+  "status": zod.enum(['READY', 'RUNNING', 'PAUSED', 'COMPLETED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "arbitraryExecutionDisabled": zod.literal(true),
+  "isolationBoundary": zod.enum(['TRUSTED_FIXED_CODE_PROCESS']),
+  "coordination": zod.enum(['INSTANCE_LOCAL_VOLATILE']),
+  "totalCubes": zod.literal(100),
+  "activeProcessWorkers": zod.number().min(getCyberRangeResponseActiveProcessWorkersMin).max(getCyberRangeResponseActiveProcessWorkersMax),
+  "runningCubes": zod.number().min(getCyberRangeResponseRunningCubesMin).max(getCyberRangeResponseRunningCubesMax),
+  "successCubes": zod.number().min(getCyberRangeResponseSuccessCubesMin).max(getCyberRangeResponseSuccessCubesMax),
+  "isolatedCubes": zod.number().min(getCyberRangeResponseIsolatedCubesMin).max(getCyberRangeResponseIsolatedCubesMax),
+  "failedCubes": zod.number().min(getCyberRangeResponseFailedCubesMin).max(getCyberRangeResponseFailedCubesMax),
+  "completedCubes": zod.number().min(getCyberRangeResponseCompletedCubesMin).max(getCyberRangeResponseCompletedCubesMax),
+  "cubes": zod.array(zod.object({
+  "id": zod.string(),
+  "index": zod.number().min(getCyberRangeResponseCubesItemIndexMin).max(getCyberRangeResponseCubesItemIndexMax),
+  "status": zod.enum(['IDLE', 'RUNNING', 'PAUSED', 'SUCCESS', 'ISOLATED', 'FAILED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "progress": zod.number().min(getCyberRangeResponseCubesItemProgressMin).max(getCyberRangeResponseCubesItemProgressMax),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().nullable(),
+  "cycles": zod.number().min(getCyberRangeResponseCubesItemCyclesMin),
+  "cores": zod.number().min(getCyberRangeResponseCubesItemCoresMin),
+  "numaNodes": zod.number().min(getCyberRangeResponseCubesItemNumaNodesMin),
+  "cacheState": zod.union([zod.literal('M'),zod.literal('E'),zod.literal('S'),zod.literal('I'),zod.literal(null)]).nullable(),
+  "cacheHitRate": zod.number().min(getCyberRangeResponseCubesItemCacheHitRateMin).max(getCyberRangeResponseCubesItemCacheHitRateMax).nullable(),
+  "numaLatencyNs": zod.number().min(getCyberRangeResponseCubesItemNumaLatencyNsMin).nullable(),
+  "event": zod.string().nullable(),
+  "error": zod.string().nullable()
+})).min(getCyberRangeResponseCubesMin).max(getCyberRangeResponseCubesMax)
+})
+
+
+/**
+ * @summary Start a bounded deterministic process-worker simulation across 100 cubes
+ */
+export const StartCyberRangeBody = zod.object({
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION'])
+})
+
+
+/**
+ * @summary Pause the current cyber range and terminate active process workers
+ */
+export const pauseCyberRangeResponseActiveProcessWorkersMin = 0;
+export const pauseCyberRangeResponseActiveProcessWorkersMax = 8;
+
+export const pauseCyberRangeResponseRunningCubesMin = 0;
+export const pauseCyberRangeResponseRunningCubesMax = 100;
+
+export const pauseCyberRangeResponseSuccessCubesMin = 0;
+export const pauseCyberRangeResponseSuccessCubesMax = 100;
+
+export const pauseCyberRangeResponseIsolatedCubesMin = 0;
+export const pauseCyberRangeResponseIsolatedCubesMax = 100;
+
+export const pauseCyberRangeResponseFailedCubesMin = 0;
+export const pauseCyberRangeResponseFailedCubesMax = 100;
+
+export const pauseCyberRangeResponseCompletedCubesMin = 0;
+export const pauseCyberRangeResponseCompletedCubesMax = 100;
+
+export const pauseCyberRangeResponseCubesItemIndexMin = 0;
+export const pauseCyberRangeResponseCubesItemIndexMax = 99;
+
+export const pauseCyberRangeResponseCubesItemProgressMin = 0;
+export const pauseCyberRangeResponseCubesItemProgressMax = 100;
+
+export const pauseCyberRangeResponseCubesItemCyclesMin = 0;
+
+export const pauseCyberRangeResponseCubesItemCoresMin = 0;
+
+export const pauseCyberRangeResponseCubesItemNumaNodesMin = 0;
+
+export const pauseCyberRangeResponseCubesItemCacheHitRateMin = 0;
+export const pauseCyberRangeResponseCubesItemCacheHitRateMax = 1;
+
+export const pauseCyberRangeResponseCubesItemNumaLatencyNsMin = 0;
+
+export const pauseCyberRangeResponseCubesMin = 100;
+export const pauseCyberRangeResponseCubesMax = 100;
+
+
+
+export const PauseCyberRangeResponse = zod.object({
+  "rangeId": zod.string(),
+  "status": zod.enum(['READY', 'RUNNING', 'PAUSED', 'COMPLETED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "arbitraryExecutionDisabled": zod.literal(true),
+  "isolationBoundary": zod.enum(['TRUSTED_FIXED_CODE_PROCESS']),
+  "coordination": zod.enum(['INSTANCE_LOCAL_VOLATILE']),
+  "totalCubes": zod.literal(100),
+  "activeProcessWorkers": zod.number().min(pauseCyberRangeResponseActiveProcessWorkersMin).max(pauseCyberRangeResponseActiveProcessWorkersMax),
+  "runningCubes": zod.number().min(pauseCyberRangeResponseRunningCubesMin).max(pauseCyberRangeResponseRunningCubesMax),
+  "successCubes": zod.number().min(pauseCyberRangeResponseSuccessCubesMin).max(pauseCyberRangeResponseSuccessCubesMax),
+  "isolatedCubes": zod.number().min(pauseCyberRangeResponseIsolatedCubesMin).max(pauseCyberRangeResponseIsolatedCubesMax),
+  "failedCubes": zod.number().min(pauseCyberRangeResponseFailedCubesMin).max(pauseCyberRangeResponseFailedCubesMax),
+  "completedCubes": zod.number().min(pauseCyberRangeResponseCompletedCubesMin).max(pauseCyberRangeResponseCompletedCubesMax),
+  "cubes": zod.array(zod.object({
+  "id": zod.string(),
+  "index": zod.number().min(pauseCyberRangeResponseCubesItemIndexMin).max(pauseCyberRangeResponseCubesItemIndexMax),
+  "status": zod.enum(['IDLE', 'RUNNING', 'PAUSED', 'SUCCESS', 'ISOLATED', 'FAILED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "progress": zod.number().min(pauseCyberRangeResponseCubesItemProgressMin).max(pauseCyberRangeResponseCubesItemProgressMax),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().nullable(),
+  "cycles": zod.number().min(pauseCyberRangeResponseCubesItemCyclesMin),
+  "cores": zod.number().min(pauseCyberRangeResponseCubesItemCoresMin),
+  "numaNodes": zod.number().min(pauseCyberRangeResponseCubesItemNumaNodesMin),
+  "cacheState": zod.union([zod.literal('M'),zod.literal('E'),zod.literal('S'),zod.literal('I'),zod.literal(null)]).nullable(),
+  "cacheHitRate": zod.number().min(pauseCyberRangeResponseCubesItemCacheHitRateMin).max(pauseCyberRangeResponseCubesItemCacheHitRateMax).nullable(),
+  "numaLatencyNs": zod.number().min(pauseCyberRangeResponseCubesItemNumaLatencyNsMin).nullable(),
+  "event": zod.string().nullable(),
+  "error": zod.string().nullable()
+})).min(pauseCyberRangeResponseCubesMin).max(pauseCyberRangeResponseCubesMax)
+})
+
+
+/**
+ * @summary Reset all 100 cubes to an idle logical state
+ */
+export const resetCyberRangeResponseActiveProcessWorkersMin = 0;
+export const resetCyberRangeResponseActiveProcessWorkersMax = 8;
+
+export const resetCyberRangeResponseRunningCubesMin = 0;
+export const resetCyberRangeResponseRunningCubesMax = 100;
+
+export const resetCyberRangeResponseSuccessCubesMin = 0;
+export const resetCyberRangeResponseSuccessCubesMax = 100;
+
+export const resetCyberRangeResponseIsolatedCubesMin = 0;
+export const resetCyberRangeResponseIsolatedCubesMax = 100;
+
+export const resetCyberRangeResponseFailedCubesMin = 0;
+export const resetCyberRangeResponseFailedCubesMax = 100;
+
+export const resetCyberRangeResponseCompletedCubesMin = 0;
+export const resetCyberRangeResponseCompletedCubesMax = 100;
+
+export const resetCyberRangeResponseCubesItemIndexMin = 0;
+export const resetCyberRangeResponseCubesItemIndexMax = 99;
+
+export const resetCyberRangeResponseCubesItemProgressMin = 0;
+export const resetCyberRangeResponseCubesItemProgressMax = 100;
+
+export const resetCyberRangeResponseCubesItemCyclesMin = 0;
+
+export const resetCyberRangeResponseCubesItemCoresMin = 0;
+
+export const resetCyberRangeResponseCubesItemNumaNodesMin = 0;
+
+export const resetCyberRangeResponseCubesItemCacheHitRateMin = 0;
+export const resetCyberRangeResponseCubesItemCacheHitRateMax = 1;
+
+export const resetCyberRangeResponseCubesItemNumaLatencyNsMin = 0;
+
+export const resetCyberRangeResponseCubesMin = 100;
+export const resetCyberRangeResponseCubesMax = 100;
+
+
+
+export const ResetCyberRangeResponse = zod.object({
+  "rangeId": zod.string(),
+  "status": zod.enum(['READY', 'RUNNING', 'PAUSED', 'COMPLETED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "arbitraryExecutionDisabled": zod.literal(true),
+  "isolationBoundary": zod.enum(['TRUSTED_FIXED_CODE_PROCESS']),
+  "coordination": zod.enum(['INSTANCE_LOCAL_VOLATILE']),
+  "totalCubes": zod.literal(100),
+  "activeProcessWorkers": zod.number().min(resetCyberRangeResponseActiveProcessWorkersMin).max(resetCyberRangeResponseActiveProcessWorkersMax),
+  "runningCubes": zod.number().min(resetCyberRangeResponseRunningCubesMin).max(resetCyberRangeResponseRunningCubesMax),
+  "successCubes": zod.number().min(resetCyberRangeResponseSuccessCubesMin).max(resetCyberRangeResponseSuccessCubesMax),
+  "isolatedCubes": zod.number().min(resetCyberRangeResponseIsolatedCubesMin).max(resetCyberRangeResponseIsolatedCubesMax),
+  "failedCubes": zod.number().min(resetCyberRangeResponseFailedCubesMin).max(resetCyberRangeResponseFailedCubesMax),
+  "completedCubes": zod.number().min(resetCyberRangeResponseCompletedCubesMin).max(resetCyberRangeResponseCompletedCubesMax),
+  "cubes": zod.array(zod.object({
+  "id": zod.string(),
+  "index": zod.number().min(resetCyberRangeResponseCubesItemIndexMin).max(resetCyberRangeResponseCubesItemIndexMax),
+  "status": zod.enum(['IDLE', 'RUNNING', 'PAUSED', 'SUCCESS', 'ISOLATED', 'FAILED']),
+  "scenario": zod.enum(['MESI_COHERENCE', 'NUMA_LATENCY', 'PIPELINE_STALL', 'SCHEDULER_PRESSURE', 'QUARANTINE_PROPAGATION']),
+  "progress": zod.number().min(resetCyberRangeResponseCubesItemProgressMin).max(resetCyberRangeResponseCubesItemProgressMax),
+  "startedAt": zod.coerce.date().nullable(),
+  "completedAt": zod.coerce.date().nullable(),
+  "durationMs": zod.number().nullable(),
+  "cycles": zod.number().min(resetCyberRangeResponseCubesItemCyclesMin),
+  "cores": zod.number().min(resetCyberRangeResponseCubesItemCoresMin),
+  "numaNodes": zod.number().min(resetCyberRangeResponseCubesItemNumaNodesMin),
+  "cacheState": zod.union([zod.literal('M'),zod.literal('E'),zod.literal('S'),zod.literal('I'),zod.literal(null)]).nullable(),
+  "cacheHitRate": zod.number().min(resetCyberRangeResponseCubesItemCacheHitRateMin).max(resetCyberRangeResponseCubesItemCacheHitRateMax).nullable(),
+  "numaLatencyNs": zod.number().min(resetCyberRangeResponseCubesItemNumaLatencyNsMin).nullable(),
+  "event": zod.string().nullable(),
+  "error": zod.string().nullable()
+})).min(resetCyberRangeResponseCubesMin).max(resetCyberRangeResponseCubesMax)
+})
+
+
+/**
  * @summary Transcribe an audio command without storing the audio
  */
 export const TranscribeVoiceResponse = zod.object({

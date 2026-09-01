@@ -5,6 +5,165 @@
  * SOC OS - SaaS Security Platform API (V30/V50)
  * OpenAPI spec version: 0.3.0
  */
+export type CyberRangeScenario = typeof CyberRangeScenario[keyof typeof CyberRangeScenario];
+
+
+export const CyberRangeScenario = {
+  MESI_COHERENCE: 'MESI_COHERENCE',
+  NUMA_LATENCY: 'NUMA_LATENCY',
+  PIPELINE_STALL: 'PIPELINE_STALL',
+  SCHEDULER_PRESSURE: 'SCHEDULER_PRESSURE',
+  QUARANTINE_PROPAGATION: 'QUARANTINE_PROPAGATION',
+} as const;
+
+export type CyberRangeCubeStatus = typeof CyberRangeCubeStatus[keyof typeof CyberRangeCubeStatus];
+
+
+export const CyberRangeCubeStatus = {
+  IDLE: 'IDLE',
+  RUNNING: 'RUNNING',
+  PAUSED: 'PAUSED',
+  SUCCESS: 'SUCCESS',
+  ISOLATED: 'ISOLATED',
+  FAILED: 'FAILED',
+} as const;
+
+/**
+ * @nullable
+ */
+export type CyberRangeCubeCacheState = typeof CyberRangeCubeCacheState[keyof typeof CyberRangeCubeCacheState] | null;
+
+
+export const CyberRangeCubeCacheState = {
+  M: 'M',
+  E: 'E',
+  S: 'S',
+  I: 'I',
+} as const;
+
+export interface CyberRangeCube {
+  id: string;
+  /**
+     * @minimum 0
+     * @maximum 99
+     */
+  index: number;
+  status: CyberRangeCubeStatus;
+  scenario: CyberRangeScenario;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  progress: number;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  completedAt: string | null;
+  /** @nullable */
+  durationMs: number | null;
+  /** @minimum 0 */
+  cycles: number;
+  /** @minimum 0 */
+  cores: number;
+  /** @minimum 0 */
+  numaNodes: number;
+  /** @nullable */
+  cacheState: CyberRangeCubeCacheState;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  cacheHitRate: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  numaLatencyNs: number | null;
+  /** @nullable */
+  event: string | null;
+  /** @nullable */
+  error: string | null;
+}
+
+export type CyberRangeStateStatus = typeof CyberRangeStateStatus[keyof typeof CyberRangeStateStatus];
+
+
+export const CyberRangeStateStatus = {
+  READY: 'READY',
+  RUNNING: 'RUNNING',
+  PAUSED: 'PAUSED',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export type CyberRangeStateIsolationBoundary = typeof CyberRangeStateIsolationBoundary[keyof typeof CyberRangeStateIsolationBoundary];
+
+
+export const CyberRangeStateIsolationBoundary = {
+  TRUSTED_FIXED_CODE_PROCESS: 'TRUSTED_FIXED_CODE_PROCESS',
+} as const;
+
+export type CyberRangeStateCoordination = typeof CyberRangeStateCoordination[keyof typeof CyberRangeStateCoordination];
+
+
+export const CyberRangeStateCoordination = {
+  INSTANCE_LOCAL_VOLATILE: 'INSTANCE_LOCAL_VOLATILE',
+} as const;
+
+export type CyberRangeStateTotalCubes = typeof CyberRangeStateTotalCubes[keyof typeof CyberRangeStateTotalCubes];
+
+
+export const CyberRangeStateTotalCubes = {
+  NUMBER_100: 100,
+} as const;
+
+export interface CyberRangeState {
+  rangeId: string;
+  status: CyberRangeStateStatus;
+  scenario: CyberRangeScenario;
+  createdAt: string;
+  updatedAt: string;
+  arbitraryExecutionDisabled: true;
+  isolationBoundary: CyberRangeStateIsolationBoundary;
+  coordination: CyberRangeStateCoordination;
+  totalCubes: CyberRangeStateTotalCubes;
+  /**
+     * @minimum 0
+     * @maximum 8
+     */
+  activeProcessWorkers: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  runningCubes: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  successCubes: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  isolatedCubes: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  failedCubes: number;
+  /**
+     * @minimum 0
+     * @maximum 100
+     */
+  completedCubes: number;
+  /**
+     * @minItems 100
+     * @maxItems 100
+     */
+  cubes: CyberRangeCube[];
+}
+
 export type IncidentCenterItemKind = typeof IncidentCenterItemKind[keyof typeof IncidentCenterItemKind];
 
 
@@ -2285,6 +2444,10 @@ export const ListTrafficFlowsObservationType = {
   FLOW: 'FLOW',
   HEARTBEAT: 'HEARTBEAT',
 } as const;
+
+export type StartCyberRangeBody = {
+  scenario: CyberRangeScenario;
+};
 
 export type ListMetaCubeExecutionsParams = {
 status?: ListMetaCubeExecutionsStatus;

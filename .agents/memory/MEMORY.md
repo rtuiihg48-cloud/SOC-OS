@@ -15,3 +15,4 @@
 - [Billing authorization boundary](billing-authorization-boundary.md) — Whop proves paid access; billing never grants tenant roles, and each user/tenant gets three free security tests.
 - [Adaptive strategy isolation](adaptive-strategy-isolation.md) — global strategy cycles train only on explicitly versioned synthetic records, never tenant-owned DNA data.
 - [Node exchange integrity boundary](node-exchange-integrity-boundary.md) — signed routes are tamper-evident evidence, with versioned keys and monotonic replay defense; they do not prove delivery or execution.
+- [Cyber range process boundary](cyber-range-process-boundary.md) — logical cubes run trusted fixed code with instance-local coordination; never present them as VM/container isolation.

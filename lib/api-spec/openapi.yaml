@@ -14,6 +14,8 @@ tags:
     description: Security event operations
   - name: simulation
     description: Self-healing simulation
+  - name: cyber-range
+    description: Tenant-scoped deterministic process-worker cyber range
   - name: dashboard
     description: Dashboard and analytics
   - name: tenants
@@ -577,6 +579,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SimulationResult"
+
+  /cyber-range:
+    get:
+      operationId: getCyberRange
+      tags: [cyber-range]
+      summary: Get the tenant-scoped 100-cube cyber range state
+      responses:
+        "200":
+          description: Current cyber range state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyberRangeState"
+
+  /cyber-range/start:
+    post:
+      operationId: startCyberRange
+      tags: [cyber-range]
+      summary: Start a bounded deterministic process-worker simulation across 100 cubes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scenario]
+              properties:
+                scenario:
+                  $ref: "#/components/schemas/CyberRangeScenario"
+      responses:
+        "202":
+          description: Cyber range run accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyberRangeState"
+
+  /cyber-range/pause:
+    post:
+      operationId: pauseCyberRange
+      tags: [cyber-range]
+      summary: Pause the current cyber range and terminate active process workers
+      responses:
+        "200":
+          description: Cyber range paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyberRangeState"
+
+  /cyber-range/reset:
+    post:
+      operationId: resetCyberRange
+      tags: [cyber-range]
+      summary: Reset all 100 cubes to an idle logical state
+      responses:
+        "200":
+          description: Cyber range reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyberRangeState"
 
   /voice/transcribe:
     post:
@@ -1686,6 +1750,101 @@ paths:
 
 components:
   schemas:
+    CyberRangeScenario:
+      type: string
+      enum: [MESI_COHERENCE, NUMA_LATENCY, PIPELINE_STALL, SCHEDULER_PRESSURE, QUARANTINE_PROPAGATION]
+
+    CyberRangeCube:
+      type: object
+      required:
+        - id
+        - index
+        - status
+        - scenario
+        - progress
+        - startedAt
+        - completedAt
+        - durationMs
+        - cycles
+        - cores
+        - numaNodes
+        - cacheState
+        - cacheHitRate
+        - numaLatencyNs
+        - event
+        - error
+      properties:
+        id: { type: string }
+        index: { type: integer, minimum: 0, maximum: 99 }
+        status:
+          type: string
+          enum: [IDLE, RUNNING, PAUSED, SUCCESS, ISOLATED, FAILED]
+        scenario:
+          $ref: "#/components/schemas/CyberRangeScenario"
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        startedAt: { type: [string, "null"], format: date-time }
+        completedAt: { type: [string, "null"], format: date-time }
+        durationMs: { type: [integer, "null"] }
+        cycles: { type: integer, minimum: 0 }
+        cores: { type: integer, minimum: 0 }
+        numaNodes: { type: integer, minimum: 0 }
+        cacheState:
+          type: [string, "null"]
+          enum: [M, E, S, I, null]
+        cacheHitRate: { type: [number, "null"], minimum: 0, maximum: 1 }
+        numaLatencyNs: { type: [integer, "null"], minimum: 0 }
+        event: { type: [string, "null"] }
+        error: { type: [string, "null"] }
+
+    CyberRangeState:
+      type: object
+      required:
+        - rangeId
+        - status
+        - scenario
+        - createdAt
+        - updatedAt
+        - arbitraryExecutionDisabled
+        - isolationBoundary
+        - coordination
+        - totalCubes
+        - activeProcessWorkers
+        - runningCubes
+        - successCubes
+        - isolatedCubes
+        - failedCubes
+        - completedCubes
+        - cubes
+      properties:
+        rangeId: { type: string }
+        status:
+          type: string
+          enum: [READY, RUNNING, PAUSED, COMPLETED]
+        scenario:
+          $ref: "#/components/schemas/CyberRangeScenario"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        arbitraryExecutionDisabled: { type: boolean, enum: [true] }
+        isolationBoundary:
+          type: string
+          enum: [TRUSTED_FIXED_CODE_PROCESS]
+        coordination:
+          type: string
+          enum: [INSTANCE_LOCAL_VOLATILE]
+        totalCubes: { type: integer, enum: [100] }
+        activeProcessWorkers: { type: integer, minimum: 0, maximum: 8 }
+        runningCubes: { type: integer, minimum: 0, maximum: 100 }
+        successCubes: { type: integer, minimum: 0, maximum: 100 }
+        isolatedCubes: { type: integer, minimum: 0, maximum: 100 }
+        failedCubes: { type: integer, minimum: 0, maximum: 100 }
+        completedCubes: { type: integer, minimum: 0, maximum: 100 }
+        cubes:
+          type: array
+          minItems: 100
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/CyberRangeCube"
+
     IncidentCenter:
       type: object
       properties:

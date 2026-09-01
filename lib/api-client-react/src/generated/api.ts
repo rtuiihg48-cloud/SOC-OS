@@ -29,6 +29,7 @@ import type {
   CreateRuleBody,
   CreateTenantBody,
   CurrentPrincipal,
+  CyberRangeState,
   DashboardSummary,
   EventInput,
   ExecuteVoiceCommandBody,
@@ -85,6 +86,7 @@ import type {
   SelfHealingRestorePoint,
   SelfTestResult,
   SimulationResult,
+  StartCyberRangeBody,
   StrategyOverview,
   StrategySandboxPreview,
   StrategySandboxPreviewBody,
@@ -2032,6 +2034,294 @@ export const useRunSimulation = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRunSimulationMutationOptions(options));
+    }
+
+export const getGetCyberRangeUrl = () => {
+
+
+
+
+  return `/api/cyber-range`
+}
+
+/**
+ * @summary Get the tenant-scoped 100-cube cyber range state
+ */
+export const getCyberRange = async ( options?: RequestInit): Promise<CyberRangeState> => {
+
+  return customFetch<CyberRangeState>(getGetCyberRangeUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCyberRangeQueryKey = () => {
+    return [
+    `/api/cyber-range`
+    ] as const;
+    }
+
+
+export const getGetCyberRangeQueryOptions = <TData = Awaited<ReturnType<typeof getCyberRange>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCyberRange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCyberRangeQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCyberRange>>> = ({ signal }) => getCyberRange({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCyberRange>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCyberRangeQueryResult = NonNullable<Awaited<ReturnType<typeof getCyberRange>>>
+export type GetCyberRangeQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the tenant-scoped 100-cube cyber range state
+ */
+
+export function useGetCyberRange<TData = Awaited<ReturnType<typeof getCyberRange>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCyberRange>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCyberRangeQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStartCyberRangeUrl = () => {
+
+
+
+
+  return `/api/cyber-range/start`
+}
+
+/**
+ * @summary Start a bounded deterministic process-worker simulation across 100 cubes
+ */
+export const startCyberRange = async (startCyberRangeBody: StartCyberRangeBody, options?: RequestInit): Promise<CyberRangeState> => {
+
+  return customFetch<CyberRangeState>(getStartCyberRangeUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      startCyberRangeBody,)
+  }
+);}
+
+
+
+
+export const getStartCyberRangeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCyberRange>>, TError,{data: BodyType<StartCyberRangeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startCyberRange>>, TError,{data: BodyType<StartCyberRangeBody>}, TContext> => {
+
+const mutationKey = ['startCyberRange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startCyberRange>>, {data: BodyType<StartCyberRangeBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startCyberRange(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartCyberRangeMutationResult = NonNullable<Awaited<ReturnType<typeof startCyberRange>>>
+    export type StartCyberRangeMutationBody = BodyType<StartCyberRangeBody>
+    export type StartCyberRangeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Start a bounded deterministic process-worker simulation across 100 cubes
+ */
+export const useStartCyberRange = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startCyberRange>>, TError,{data: BodyType<StartCyberRangeBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startCyberRange>>,
+        TError,
+        {data: BodyType<StartCyberRangeBody>},
+        TContext
+      > => {
+      return useMutation(getStartCyberRangeMutationOptions(options));
+    }
+
+export const getPauseCyberRangeUrl = () => {
+
+
+
+
+  return `/api/cyber-range/pause`
+}
+
+/**
+ * @summary Pause the current cyber range and terminate active process workers
+ */
+export const pauseCyberRange = async ( options?: RequestInit): Promise<CyberRangeState> => {
+
+  return customFetch<CyberRangeState>(getPauseCyberRangeUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPauseCyberRangeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pauseCyberRange>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof pauseCyberRange>>, TError,void, TContext> => {
+
+const mutationKey = ['pauseCyberRange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof pauseCyberRange>>, void> = () => {
+
+
+          return  pauseCyberRange(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PauseCyberRangeMutationResult = NonNullable<Awaited<ReturnType<typeof pauseCyberRange>>>
+
+    export type PauseCyberRangeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Pause the current cyber range and terminate active process workers
+ */
+export const usePauseCyberRange = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pauseCyberRange>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof pauseCyberRange>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPauseCyberRangeMutationOptions(options));
+    }
+
+export const getResetCyberRangeUrl = () => {
+
+
+
+
+  return `/api/cyber-range/reset`
+}
+
+/**
+ * @summary Reset all 100 cubes to an idle logical state
+ */
+export const resetCyberRange = async ( options?: RequestInit): Promise<CyberRangeState> => {
+
+  return customFetch<CyberRangeState>(getResetCyberRangeUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetCyberRangeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCyberRange>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetCyberRange>>, TError,void, TContext> => {
+
+const mutationKey = ['resetCyberRange'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetCyberRange>>, void> = () => {
+
+
+          return  resetCyberRange(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetCyberRangeMutationResult = NonNullable<Awaited<ReturnType<typeof resetCyberRange>>>
+
+    export type ResetCyberRangeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset all 100 cubes to an idle logical state
+ */
+export const useResetCyberRange = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetCyberRange>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetCyberRange>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResetCyberRangeMutationOptions(options));
     }
 
 export const getTranscribeVoiceUrl = () => {
