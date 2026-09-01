@@ -989,7 +989,10 @@ export const GetStrategyOverviewResponse = zod.object({
   "node": zod.enum(['N2']),
   "quality": zod.number(),
   "latencyMs": zod.number(),
-  "costUnits": zod.number()
+  "costUnits": zod.number(),
+  "budgetMs": zod.number(),
+  "deadlineMet": zod.boolean(),
+  "budgetUtilization": zod.number()
 }),
   "simulatedOutcome": zod.object({
   "verificationStatus": zod.enum(['pending', 'verified', 'rejected', 'inconclusive']),
@@ -1026,7 +1029,10 @@ export const GetStrategyOverviewResponse = zod.object({
   "node": zod.enum(['N2']),
   "quality": zod.number(),
   "latencyMs": zod.number(),
-  "costUnits": zod.number()
+  "costUnits": zod.number(),
+  "budgetMs": zod.number(),
+  "deadlineMet": zod.boolean(),
+  "budgetUtilization": zod.number()
 }),
   "simulatedOutcome": zod.object({
   "verificationStatus": zod.enum(['pending', 'verified', 'rejected', 'inconclusive']),

@@ -57,6 +57,9 @@ export interface CpuSimulationResult {
     quality: number;
     latencyMs: number;
     costUnits: number;
+    budgetMs: number;
+    deadlineMet: boolean;
+    budgetUtilization: number;
   };
 }
 
@@ -500,6 +503,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     );
     lockAcquired = lock.rows[0]?.acquired === true;
     if (!lockAcquired) return null;
+    const cycleStartedAt = Date.now();
 
     const recoveredOutcomes = await reconcilePendingOutcomes(client);
     if (recoveredOutcomes > 0) {
@@ -562,7 +566,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       defenseSuccessRate: feature?.defenseSuccessRate ?? 0,
     });
     const cycleId = crypto.randomUUID();
-    const startedAt = Date.now();
+    const strategyDeadlineAt = cycleStartedAt + strategy.maxDurationMs;
 
     await begin(client);
     transactionOpen = true;
@@ -628,7 +632,7 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     const outcome = simulateDefense(scenario, prediction);
     let layerObservationCount = 0;
 
-    if (markovAnalysis) {
+    if (markovAnalysis && Date.now() <= strategyDeadlineAt) {
       try {
         if (await persistLayerObservation(
           client,
@@ -646,22 +650,26 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
     }
 
     try {
-      const quantumAnalysis = analyzeQuantumLayer({
+      if (Date.now() > strategyDeadlineAt) {
+        logger.info({ cycleId, maxDurationMs: strategy.maxDurationMs }, "Skipped optional quantum observation after strategy deadline");
+      } else {
+        const quantumAnalysis = analyzeQuantumLayer({
         attackFamily: scenario.family,
         riskScore: prediction.riskScore,
         confidence: prediction.confidence,
         defenseSucceeded: outcome.defenseSucceeded,
         residualRisk: outcome.residualRisk,
-      });
-      if (await persistLayerObservation(
-        client,
-        predictionId,
-        "quantum",
-        quantumAnalysis as unknown as Record<string, unknown>,
-        quantumAnalysis.confidence,
-        quantumAnalysis.modelVersion,
-      )) {
-        layerObservationCount += 1;
+        });
+        if (await persistLayerObservation(
+          client,
+          predictionId,
+          "quantum",
+          quantumAnalysis as unknown as Record<string, unknown>,
+          quantumAnalysis.confidence,
+          quantumAnalysis.modelVersion,
+        )) {
+          layerObservationCount += 1;
+        }
       }
     } catch (error) {
       logger.warn({ error, predictionId }, "Failed to persist quantum layer observation");
@@ -702,7 +710,9 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
       logger.warn({ error, predictionId }, "Failed to extend DNA attack graph");
     }
 
-    const latencyMs = Math.max(1, Date.now() - startedAt);
+    const latencyMs = Math.max(1, Date.now() - cycleStartedAt);
+    const deadlineMet = latencyMs <= strategy.maxDurationMs;
+    const budgetUtilization = Number((latencyMs / strategy.maxDurationMs).toFixed(3));
     const quality = clamp(
       prediction.confidence * 0.65 + (outcome.defenseSucceeded ? 0.35 : 0),
       0,
@@ -722,6 +732,9 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
           nodeQuality: quality,
           nodeLatencyMs: latencyMs,
           nodeCostUnits: costUnits,
+          strategyMaxDurationMs: strategy.maxDurationMs,
+          strategyDeadlineMet: deadlineMet,
+          strategyBudgetUtilization: budgetUtilization,
           actualDefenseSucceeded: outcome.defenseSucceeded,
           actualResidualRisk: outcome.residualRisk,
           verificationStatus: outcome.verificationStatus,
@@ -751,6 +764,9 @@ export async function runCpuSimulationCycle(options: { force?: boolean } = {}): 
         quality,
         latencyMs,
         costUnits,
+        budgetMs: strategy.maxDurationMs,
+        deadlineMet,
+        budgetUtilization,
       },
     };
   } catch (error) {

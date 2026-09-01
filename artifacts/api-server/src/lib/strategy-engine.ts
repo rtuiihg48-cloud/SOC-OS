@@ -12,6 +12,7 @@ export interface StrategyDecision {
   reason: string;
   confidence: number;
   computeBudget: number;
+  maxDurationMs: number;
   allocationNode: "N7";
   computeNode: "N2";
   learningNode: "N3";
@@ -117,6 +118,7 @@ export function chooseStrategy(input: StrategyInput): StrategyDecision {
       reason: "High residual risk or weak historical defense coverage requires deeper analysis.",
       confidence: clamp(0.72 + input.markovConfidence * 0.18, 0.72, 0.94),
       computeBudget: 70,
+      maxDurationMs: 1200,
       allocationNode: "N7",
       computeNode: "N2",
       learningNode: "N3",
@@ -129,6 +131,7 @@ export function chooseStrategy(input: StrategyInput): StrategyDecision {
       reason: "Recent verified outcomes are stable; prioritize fast coverage and lower compute cost.",
       confidence: clamp(0.68 + input.markovConfidence * 0.2, 0.68, 0.9),
       computeBudget: 25,
+      maxDurationMs: 400,
       allocationNode: "N7",
       computeNode: "N2",
       learningNode: "N3",
@@ -142,10 +145,15 @@ export function chooseStrategy(input: StrategyInput): StrategyDecision {
       : "No verified history is available; establish a balanced baseline.",
     confidence: clamp(0.58 + input.markovConfidence * 0.22, 0.58, 0.84),
     computeBudget: 45,
+    maxDurationMs: 800,
     allocationNode: "N7",
     computeNode: "N2",
     learningNode: "N3",
   };
+}
+
+export function strategyDeadlineMs(mode: StrategyMode): number {
+  return mode === "fast" ? 400 : mode === "deep" ? 1200 : 800;
 }
 
 export function strategyCost(mode: StrategyMode): number {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseStrategy, strategyCost } from "./strategy-engine";
+import { chooseStrategy, strategyCost, strategyDeadlineMs } from "./strategy-engine";
 
 describe("strategy engine", () => {
   it("starts with a balanced baseline when there is no history", () => {
@@ -11,6 +11,7 @@ describe("strategy engine", () => {
     });
     expect(decision.mode).toBe("balanced");
     expect(decision.computeBudget).toBe(45);
+    expect(decision.maxDurationMs).toBe(800);
   });
 
   it("selects deep analysis for weak defense history", () => {
@@ -34,5 +35,6 @@ describe("strategy engine", () => {
     });
     expect(decision.mode).toBe("fast");
     expect(strategyCost(decision.mode)).toBe(8);
+    expect(strategyDeadlineMs(decision.mode)).toBe(400);
   });
 });

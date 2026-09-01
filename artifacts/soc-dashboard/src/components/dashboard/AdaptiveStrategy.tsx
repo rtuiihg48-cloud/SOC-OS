@@ -130,6 +130,9 @@ function OverviewTab({ strategy, latest }: { strategy: StrategyOverview; latest:
               <div className="mt-1 flex items-center gap-2 text-xs font-mono text-muted-foreground">
                 <Activity className="w-3 h-3" /> Cost efficiency active
               </div>
+              <div className={`mt-2 text-[10px] font-mono ${latest.nodeRun.deadlineMet ? "text-safe" : "text-warn"}`}>
+                {latest.nodeRun.latencyMs}ms / {latest.nodeRun.budgetMs}ms • {Math.round(latest.nodeRun.budgetUtilization * 100)}% USED
+              </div>
             </div>
           </div>
         </div>
@@ -148,8 +151,8 @@ function OverviewTab({ strategy, latest }: { strategy: StrategyOverview; latest:
             <div className="px-2 py-1 rounded bg-secondary/50 text-[10px] font-mono text-muted-foreground border border-border/50">
               EVIDENCE: {latest.context.evidenceFreshness.toUpperCase()}
             </div>
-            <div className="px-2 py-1 rounded bg-secondary/50 text-[10px] font-mono text-muted-foreground border border-border/50">
-              NODE: {latest.nodeRun.node} • LATENCY: {latest.nodeRun.latencyMs}ms • Q: {Math.round(latest.nodeRun.quality * 100)}%
+              <div className="px-2 py-1 rounded bg-secondary/50 text-[10px] font-mono text-muted-foreground border border-border/50">
+                NODE: {latest.nodeRun.node} • LATENCY: {latest.nodeRun.latencyMs}ms • Q: {Math.round(latest.nodeRun.quality * 100)}% • {latest.nodeRun.deadlineMet ? "WITHIN BUDGET" : "BUDGET EXCEEDED"}
             </div>
           </div>
         </div>

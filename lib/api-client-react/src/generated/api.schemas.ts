@@ -1317,6 +1317,9 @@ export interface StrategyNodeRun {
   quality: number;
   latencyMs: number;
   costUnits: number;
+  budgetMs: number;
+  deadlineMet: boolean;
+  budgetUtilization: number;
 }
 
 export type StrategyOutcomeVerificationStatus = typeof StrategyOutcomeVerificationStatus[keyof typeof StrategyOutcomeVerificationStatus];

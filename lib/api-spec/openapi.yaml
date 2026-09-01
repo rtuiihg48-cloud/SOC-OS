@@ -3040,7 +3040,13 @@ components:
           type: number
         costUnits:
           type: number
-      required: [node, quality, latencyMs, costUnits]
+        budgetMs:
+          type: number
+        deadlineMet:
+          type: boolean
+        budgetUtilization:
+          type: number
+      required: [node, quality, latencyMs, costUnits, budgetMs, deadlineMet, budgetUtilization]
 
     StrategyOutcome:
       type: object

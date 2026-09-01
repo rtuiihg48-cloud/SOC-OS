@@ -327,6 +327,12 @@ router.get("/strategy/overview", requireCapability("strategy:global:read", () =>
       const triggerSignals = (telemetryString(telemetry, "strategyTriggerSignals") ?? "")
         .split("|")
         .filter(Boolean);
+      const nodeLatencyMs = telemetryNumber(telemetry, "nodeLatencyMs", 0);
+      const strategyBudgetMs = telemetryNumber(
+        telemetry,
+        "strategyMaxDurationMs",
+        mode === "fast" ? 400 : mode === "deep" ? 1200 : 800,
+      );
       return {
         id: prediction.id,
         cycleId: prediction.cycleId,
@@ -352,8 +358,15 @@ router.get("/strategy/overview", requireCapability("strategy:global:read", () =>
         nodeRun: {
           node: "N2" as const,
           quality: telemetryNumber(telemetry, "nodeQuality", prediction.confidence),
-          latencyMs: telemetryNumber(telemetry, "nodeLatencyMs", 0),
+          latencyMs: nodeLatencyMs,
           costUnits: telemetryNumber(telemetry, "nodeCostUnits", mode === "fast" ? 8 : mode === "deep" ? 26 : 16),
+          budgetMs: strategyBudgetMs,
+          deadlineMet: telemetryBoolean(telemetry, "strategyDeadlineMet", nodeLatencyMs <= strategyBudgetMs),
+          budgetUtilization: telemetryNumber(
+            telemetry,
+            "strategyBudgetUtilization",
+            strategyBudgetMs > 0 ? Number((nodeLatencyMs / strategyBudgetMs).toFixed(3)) : 0,
+          ),
         },
         simulatedOutcome: {
           verificationStatus: verificationStatus(telemetry),
