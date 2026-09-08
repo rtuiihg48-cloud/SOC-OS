@@ -69,7 +69,7 @@ export default function Simulation() {
   };
 
   const scheduleStep = (callback: () => void, delay: number) => {
-    const timer = scheduleStep(() => {
+    const timer = setTimeout(() => {
       timersRef.current = timersRef.current.filter((scheduledTimer) => scheduledTimer !== timer);
       if (isMountedRef.current) callback();
     }, delay);
