@@ -33,6 +33,13 @@ const statusStyle: Record<CyberRangeCubeStatus, string> = {
   FAILED: "border-critical bg-critical/15 text-critical",
 };
 
+const getErrorDescription = (error: unknown) => {
+  const candidate = error as { response?: { data?: { message?: string } }; data?: { message?: string } };
+  return candidate.response?.data?.message ?? candidate.data?.message ?? (error instanceof Error ? error.message : "Unexpected control-plane error.");
+};
+
+const clampProgress = (progress: number) => Math.min(100, Math.max(0, Number.isFinite(progress) ? progress : 0));
+
 function Metric({ label, value, color = "text-foreground" }: { label: string; value: string | number; color?: string }) {
   return (
     <div className="rounded border border-border bg-background/40 px-3 py-2">
@@ -56,14 +63,17 @@ export function CyberRangePanel() {
     },
   });
   const sync = (data: unknown) => queryClient.setQueryData(queryKey, data);
-  const mutationError = (title: string) => () => toast({ title, description: "The process-worker control plane rejected the request.", variant: "destructive" });
+  const mutationError = (title: string) => (error: unknown) => toast({ title, description: getErrorDescription(error), variant: "destructive" });
   const start = useStartCyberRange({ mutation: { onSuccess: sync, onError: mutationError("RANGE START FAILED") } });
   const pause = usePauseCyberRange({ mutation: { onSuccess: sync, onError: mutationError("RANGE PAUSE FAILED") } });
   const reset = useResetCyberRange({ mutation: { onSuccess: sync, onError: mutationError("RANGE RESET FAILED") } });
 
   const selectedCube = useMemo(
-    () => range.data?.cubes.find((cube) => cube.id === selectedCubeId) ?? range.data?.cubes[0],
-    [range.data, selectedCubeId],
+    () => {
+      const cubes = range.data?.cubes.filter((cube) => statusFilter === "ALL" || cube.status === statusFilter) ?? [];
+      return cubes.find((cube) => cube.id === selectedCubeId) ?? cubes[0];
+    },
+    [range.data, selectedCubeId, statusFilter],
   );
   const visibleCubes = useMemo(
     () => range.data?.cubes.filter((cube) => statusFilter === "ALL" || cube.status === statusFilter) ?? [],
@@ -170,11 +180,11 @@ export function CyberRangePanel() {
                     onClick={() => setSelectedCubeId(cube.id)}
                     className={`group relative aspect-square min-h-11 overflow-hidden rounded border p-1 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${statusStyle[cube.status]} ${selectedCube?.id === cube.id ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`}
                     aria-label={`${cube.id} ${cube.status}`}
-                    title={`${cube.id} · ${cube.status} · ${cube.progress}%`}
+                    title={`${cube.id} · ${cube.status} · ${clampProgress(cube.progress)}%`}
                   >
                     <span className="block truncate font-mono text-[8px] font-semibold sm:text-[9px]">{String(cube.index + 1).padStart(3, "0")}</span>
                     <span className="absolute inset-x-1 bottom-1 h-0.5 overflow-hidden rounded bg-foreground/10">
-                      <span className="block h-full bg-current transition-[width]" style={{ width: `${cube.progress}%` }} />
+                      <span className="block h-full bg-current transition-[width]" style={{ width: `${clampProgress(cube.progress)}%` }} />
                     </span>
                   </button>
                 ))}
@@ -226,9 +236,9 @@ function CubeDetails({ cube }: { cube?: CyberRangeCube }) {
         {cube.error && <div className="mt-2 font-mono text-[10px] text-critical">{cube.error}</div>}
       </div>
       <div className="mt-4">
-        <div className="mb-1 flex justify-between font-mono text-[9px] text-muted-foreground"><span>PROGRESS</span><span>{cube.progress}%</span></div>
+        <div className="mb-1 flex justify-between font-mono text-[9px] text-muted-foreground"><span>PROGRESS</span><span>{clampProgress(cube.progress)}%</span></div>
         <div className="h-1.5 overflow-hidden rounded bg-secondary">
-          <div className="h-full bg-primary transition-[width]" style={{ width: `${cube.progress}%` }} />
+          <div className="h-full bg-primary transition-[width]" style={{ width: `${clampProgress(cube.progress)}%` }} />
         </div>
       </div>
     </aside>
