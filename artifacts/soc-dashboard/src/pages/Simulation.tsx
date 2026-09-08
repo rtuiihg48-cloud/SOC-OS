@@ -22,7 +22,7 @@ type SimStep = {
 type SelfTestResult = {
   systemStatus: string;
   patchesApplied: number;
-  vulnerabilities: Array<{ attack: string; score: number; tactic?: string }>;
+  vulnerabilities: Array<{ attack: string; score: number; tactic?: string | null }>;
 };
 
 export default function Simulation() {
