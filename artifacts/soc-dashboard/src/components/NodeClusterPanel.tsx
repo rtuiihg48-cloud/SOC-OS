@@ -73,12 +73,19 @@ function Metric({ label, value, color = "text-foreground" }: { label: string; va
 }
 
 function formatTime(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString(undefined, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) + '.' + d.getMilliseconds().toString().padStart(3, '0');
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleTimeString(undefined, { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) + '.' + d.getMilliseconds().toString().padStart(3, '0');
+}
+
+function getErrorDescription(error: unknown) {
+  const candidate = error as { response?: { data?: { message?: string } }; data?: { message?: string } };
+  return candidate.response?.data?.message ?? candidate.data?.message ?? (error instanceof Error ? error.message : "Unexpected relay error.");
+}
+
+function utilizationPercent(activeTasks: number, capacity: number) {
+  if (!Number.isFinite(activeTasks) || !Number.isFinite(capacity) || capacity <= 0) return 0;
+  return Math.min(100, Math.max(0, (activeTasks / capacity) * 100));
 }
 
 export function NodeClusterPanel() {
@@ -108,8 +115,8 @@ export function NodeClusterPanel() {
         queryClient.invalidateQueries({ queryKey });
         toast({ title: "TASK DISPATCHED", description: `Task routed to queue. ID: ${data.taskId.substring(0, 8)}` });
       },
-      onError: () => {
-        toast({ title: "DISPATCH FAILED", description: "Relay rejected the task payload.", variant: "destructive" });
+      onError: (error) => {
+        toast({ title: "DISPATCH FAILED", description: getErrorDescription(error), variant: "destructive" });
       }
     }
   });
@@ -190,7 +197,7 @@ export function NodeClusterPanel() {
                   <label className="text-[9px] font-mono uppercase text-muted-foreground">Task Kind</label>
                   <div className="flex gap-1.5">
                     {kindLabels.map(k => (
-                       <button 
+                       <button type="button" 
                          key={k.value} 
                          onClick={() => setTaskKind(k.value)}
                          className={`flex-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${taskKind === k.value ? 'bg-primary/20 border-primary text-primary shadow-[0_0_8px_hsl(var(--primary)/0.2)]' : 'bg-transparent border-border text-muted-foreground hover:bg-secondary/50'}`}
@@ -216,7 +223,7 @@ export function NodeClusterPanel() {
                   <label className="text-[9px] font-mono uppercase text-muted-foreground">Capabilities Required</label>
                   <div className="flex flex-wrap gap-1.5">
                     {capabilityLabels.map(cap => (
-                       <button 
+                       <button type="button" 
                          key={cap.value} 
                          onClick={() => setCapabilities(c => c.includes(cap.value) ? (c.length > 1 ? c.filter(x => x !== cap.value) : c) : [...c, cap.value])}
                          className={`px-2 py-1 text-[9px] font-mono border rounded transition-colors ${capabilities.includes(cap.value) ? 'bg-primary/20 border-primary text-primary' : 'bg-transparent border-border text-muted-foreground hover:bg-secondary/50'}`}
@@ -229,7 +236,7 @@ export function NodeClusterPanel() {
                   <label className="text-[9px] font-mono uppercase text-muted-foreground">Priority</label>
                   <div className="flex gap-1.5">
                     {priorityLabels.map(p => (
-                       <button 
+                       <button type="button" 
                          key={p.value} 
                          onClick={() => setPriority(p.value)}
                          className={`flex-1 py-1.5 text-[10px] font-mono border rounded transition-colors ${priority === p.value ? 'bg-primary/20 border-primary text-primary' : 'bg-transparent border-border text-muted-foreground hover:bg-secondary/50'}`}
@@ -262,7 +269,7 @@ export function NodeClusterPanel() {
                        </div>
                        <div className="flex flex-col gap-1.5">
                           <div className="flex-1 h-1.5 bg-secondary rounded overflow-hidden">
-                             <div className={`h-full transition-[width] ${node.healthScore < 50 ? 'bg-critical' : node.healthScore < 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${(node.activeTasks / node.capacity) * 100}%` }} />
+                             <div className={`h-full transition-[width] ${node.healthScore < 50 ? 'bg-critical' : node.healthScore < 80 ? 'bg-warn' : 'bg-primary'}`} style={{ width: `${utilizationPercent(node.activeTasks, node.capacity)}%` }} />
                           </div>
                           <div className="flex gap-0.5 shrink-0">
                              {node.capabilities.map(cap => (
@@ -319,7 +326,7 @@ export function NodeClusterPanel() {
                               {msg.priority}
                             </span>
                             <span className="text-muted-foreground">·</span>
-                            <span className="text-muted-foreground">{msg.taskId.substring(0, 6)}</span>
+                            <span className="text-muted-foreground">{msg.taskId?.substring(0, 6) ?? "—"}</span>
                           </div>
                           <span className="text-[9px] font-mono text-safe bg-safe/10 px-1 rounded border border-safe/20">
                             {msg.destinationNodeId ? msg.destinationNodeId : 'QUEUE'}
