@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useRunSimulation, useRunSelfTest, getGetDashboardQueryKey, getListEventsQueryKey, getListPatchesQueryKey, getGetThreatGraphQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -19,11 +19,17 @@ type SimStep = {
   tactic?: string;
 };
 
+type SelfTestResult = {
+  systemStatus: string;
+  patchesApplied: number;
+  vulnerabilities: Array<{ attack: string; score: number; tactic?: string }>;
+};
+
 export default function Simulation() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSelfTestRunning, setIsSelfTestRunning] = useState(false);
   const [steps, setSteps] = useState<SimStep[]>([]);
-  const [selfTestResult, setSelfTestResult] = useState<any>(null);
+  const [selfTestResult, setSelfTestResult] = useState<SelfTestResult | null>(null);
 
   const runSimulation = useRunSimulation();
   const runSelfTest = useRunSelfTest();
@@ -31,8 +37,26 @@ export default function Simulation() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [quota, setQuota] = useState<{ freeUsed: number; freeRemaining: number; freeLimit: number; paidAccess: boolean } | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const isMountedRef = useRef(true);
+
   useEffect(() => {
-    void fetch("/api/billing/status", { credentials: "include" }).then((response) => response.ok ? response.json() : null).then(setQuota).catch(() => setQuota(null));
+    let cancelled = false;
+    void fetch("/api/billing/status", { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => {
+        if (!cancelled) setQuota(value);
+      })
+      .catch(() => {
+        if (!cancelled) setQuota(null);
+      });
+
+    return () => {
+      cancelled = true;
+      isMountedRef.current = false;
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
   }, []);
   const handleQuotaError = (error: unknown) => {
     const candidate = error as { response?: { data?: { code?: string } }; data?: { code?: string } };
@@ -44,15 +68,31 @@ export default function Simulation() {
     return false;
   };
 
+  const scheduleStep = (callback: () => void, delay: number) => {
+    const timer = scheduleStep(() => {
+      timersRef.current = timersRef.current.filter((scheduledTimer) => scheduledTimer !== timer);
+      if (isMountedRef.current) callback();
+    }, delay);
+    timersRef.current.push(timer);
+  };
+
+  const getErrorDescription = (error: unknown) => {
+    const candidate = error as { response?: { data?: { message?: string } }; data?: { message?: string } };
+    return candidate.response?.data?.message ?? candidate.data?.message ?? (error instanceof Error ? error.message : "An unexpected error occurred.");
+  };
+
   const handleSimulate = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
     setIsRunning(true);
     setSelfTestResult(null);
     setSteps([{ id: 'init', title: 'INITIALIZING SIMULATION', description: 'Starting autonomous self-healing cycle...', type: 'info' }]);
 
     runSimulation.mutate(undefined, {
       onSuccess: (result) => {
+        if (!isMountedRef.current) return;
         let stepDelay = 1000;
-        setTimeout(() => {
+        scheduleStep(() => {
           setSteps(prev => [...prev, {
             id: 'base',
             title: 'THREAT DETECTED',
@@ -64,7 +104,7 @@ export default function Simulation() {
 
         result.selfHealingEvents.forEach((healingEvent, idx) => {
           stepDelay += 1500;
-          setTimeout(() => {
+          scheduleStep(() => {
             setSteps(prev => [...prev, {
               id: `heal-attack-${idx}`,
               title: 'SELF-RED-TEAM ATTACK',
@@ -75,7 +115,7 @@ export default function Simulation() {
           }, stepDelay);
 
           stepDelay += 1500;
-          setTimeout(() => {
+          scheduleStep(() => {
             setSteps(prev => [...prev, {
               id: `heal-fix-${idx}`,
               title: 'AUTO-FIX APPLIED',
@@ -86,7 +126,7 @@ export default function Simulation() {
         });
 
         stepDelay += 1000;
-        setTimeout(() => {
+        scheduleStep(() => {
           setSteps(prev => [...prev, {
             id: 'complete',
             title: 'SIMULATION COMPLETE',
@@ -104,27 +144,38 @@ export default function Simulation() {
         }, stepDelay);
       },
       onError: (error) => {
+        if (!isMountedRef.current) return;
         setIsRunning(false);
         if (handleQuotaError(error)) return;
-        setSteps(prev => [...prev, { id: 'error', title: 'SIMULATION FAILED', description: 'An error occurred during cycle.', type: 'attack' }]);
-        toast({ title: "SIMULATION FAILED", variant: "destructive" });
+        const description = getErrorDescription(error);
+        setSteps(prev => [...prev, { id: 'error', title: 'SIMULATION FAILED', description, type: 'attack' }]);
+        toast({ title: "SIMULATION FAILED", description, variant: "destructive" });
       }
     });
   };
 
   const handleSelfTest = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
     setIsSelfTestRunning(true);
     setSteps([]);
     runSelfTest.mutate(undefined, {
       onSuccess: (res) => {
+        if (!isMountedRef.current) return;
         setIsSelfTestRunning(false);
+        if (!Array.isArray(res?.vulnerabilities)) {
+          setSelfTestResult(null);
+          toast({ title: "SELF-TEST FAILED", description: "The server returned an invalid result.", variant: "destructive" });
+          return;
+        }
         setSelfTestResult(res);
         toast({ title: "SELF-TEST COMPLETE", description: `Found ${res.vulnerabilities.length} vectors.` });
       },
       onError: (error) => {
+        if (!isMountedRef.current) return;
         setIsSelfTestRunning(false);
         if (handleQuotaError(error)) return;
-        toast({ title: "SELF-TEST FAILED", variant: "destructive" });
+        toast({ title: "SELF-TEST FAILED", description: getErrorDescription(error), variant: "destructive" });
       }
     });
   };
