@@ -4,7 +4,7 @@ import { useRunSimulation, useRunSelfTest, getGetDashboardQueryKey, getListEvent
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Play, Shield, Terminal, Zap, CheckCircle2, AlertTriangle, Bug, Wrench, ShieldAlert } from "lucide-react";
+import { Terminal, Zap, CheckCircle2, Bug, Wrench, ShieldAlert } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -247,7 +247,7 @@ export default function Simulation() {
                 </div>
               </div>
               <div className="space-y-2">
-                {selfTestResult.vulnerabilities.map((v: any, i: number) => (
+                {selfTestResult.vulnerabilities.map((v, i) => (
                   <div key={i} className="p-3 rounded border border-critical/30 bg-critical/5 flex items-center justify-between font-mono text-sm">
                     <div className="flex items-center gap-3">
                       <Bug className="w-4 h-4 text-critical" />
